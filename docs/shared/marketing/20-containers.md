@@ -194,7 +194,7 @@ X 운영 설정(아침/밤·대댓글/선댓글 한도·킬스위치·페르소�
 `GET`/`PUT /api/admin/marketing/x-ops`(`marketing.x.*`)에 있다. **발행 스위치 기본 꺼짐.** 페르소나 학습은 기본 켜짐(매일 04:30 KST, FxTwitter 읽기). `POST /x-ops/learn`으로 즉시 실행.
 성장 루프(ritual / inbound / outbound)는 해당 플래그가 켜져 있을 때만 작문·게시한다. **dev는 LLM 꺼짐(L3)이라 작문·발행은 no-op.** 기본 off이므로 prod가 자동 게시 중이라고 보지 않는다. 상세 [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
 
-댓글 감시 창(발행 후 N시간, 기본 24h)의 텔레그램 노티는 운영자 수동 답용이다. 성장 루프가 이미 같은 트윗에 `x_ops_action` `POSTED`로 자동 답했으면, 미답글로 취급해 운영자를 재촉하지 않는다(스킵하거나 “자동 답함”으로만 표시).
+댓글 감시 창(발행 후 N시간, 기본 24h)의 텔레그램 노티는 운영자 수동 답용이다. 성장 루프가 이미 같은 트윗에 `x_ops_action` `POSTED`로 자동 답했으면, 미답글로 취급해 운영자를 재촉하지 않는다(스킵하거나 “자동 답함”으로만 표시). **선댓글·대댓글이 실제로 게시되면** `XOpsTelegramAlerts`가 댓글 URL·대상 글 URL·본문을 `@WaggleBot_bot`으로 보낸다.
 프롬프트 자동 패치는 **금지**. AI 고지는 **2027-01**.
 
 ### 댓글 알림 정확성
@@ -315,7 +315,7 @@ CREATE TABLE marketing_job (
 | ASM | `app/worker/failure.py::fail_job()` | `ASM:` (CLAIM·BRIEF_PARSE·SCRIPT_GEN·TTS·WAGGLE_SUBMIT·WAGGLE_POLL·CAPTURE·UPLOAD·PUBLISH·CALLBACK) |
 | WaggleBot | 실패 응답 페이로드 (`failureCode`/`failureStage`/`retryable`/`error`) | `WAGGLE:` (기존 `phaseName`을 영문 상수로 승격, 예: "씬 구성"→`SCENE_COMPOSE`) |
 
-공통 enum을 두지 않고 저장소별로 독립 정의한 이유: ASM `CLAUDE.md`의 단방향 계약("ASM은 AS를
+공통 enum을 두지 않고 저장소별로 독립 정의한 이유: ASM `AGENTS.md`의 단방향 계약("ASM은 AS를
 모른다")을 지키기 위해서다. `failure_stage`가 비면(코드 결함) 텔레그램에 "⚠️ 원인 미기록"으로
 눈에 띄게 표시된다 — 조용히 UNKNOWN으로 덮지 않는다. FAILED인데 `failure_stage`가 NULL이면
 실패하는 회귀 테스트를 AS·ASM 양쪽에 추가해 재발을 막는다.

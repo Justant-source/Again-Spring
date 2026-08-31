@@ -19,7 +19,7 @@ ssh justant@100.115.252.61
 cd ~/Data/Again-Spring-Marketing
 ```
 
-마케팅 작업 초점(미공개): **X / `x_thread`만**. 상세: ASM `CLAUDE.md` · AS `docs/shared/marketing/70-policy/x-thread-strategy.md`.
+마케팅 작업 초점(미공개): **X / `x_thread`만**. 상세: ASM `AGENTS.md` · AS `docs/shared/marketing/70-policy/x-thread-strategy.md`.
 
 ---
 
