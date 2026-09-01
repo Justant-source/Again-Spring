@@ -205,7 +205,7 @@
 |---|---|---|
 | `GET` | `/api/admin/marketing/quota` | 24h 자동 분배 일일 상한·오늘 KST 사용량 |
 | `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
-| `GET` | `/api/admin/marketing/x-ops` | X 운영 설정(아침/밤·한도·킬스위치·페르소나 학습). 발행 스위치 기본 꺼짐, 학습 기본 켜짐 |
+| `GET` | `/api/admin/marketing/x-ops` | X 운영 설정. 상세 `docs/shared/marketing/70-policy/justant-bot-x-ops.md` |
 | `PUT` | `/api/admin/marketing/x-ops` | X 운영 설정 저장 (`marketing.x.*`) |
 | `POST` | `/api/admin/marketing/x-ops/learn` | X 페르소나 지금 학습 (학습 off면 400). e2e에서 호출하지 않음 |
 | `POST` | `/api/admin/marketing/x-ops/outbound` | X 선댓글 지금 1틱 (스위치 off면 400). e2e에서 호출하지 않음 |

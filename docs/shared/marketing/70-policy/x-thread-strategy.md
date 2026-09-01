@@ -1,6 +1,6 @@
 # X 스레드 마케팅 전략 — 4단 체인
 
-> **권위본**: 이 문서. X(트위터) 채널의 콘텐츠 포맷·발행 트리거·구현 위치 결정을 담는다.
+> **권위본**: 이 문서 — **사연 스크린샷 체인** (`x_thread`). 선댓글·대댓글·의식·페르소나 학습은 [`justant-bot-x-ops.md`](justant-bot-x-ops.md).
 > 플랫폼 일반 사양은 [`platforms.md`](platforms.md), 발행기 운영은 [`social-poster.md`](../30-components.md) 참조.
 > **작성**: 2026-07-31 · 레퍼런스 실측 30건 기반
 
@@ -144,40 +144,14 @@ AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 리트윗이 확실히 덜 돈다. 다만 **bio에 다시봄 운영 계정임을 명시**한다 — 순수 큐레이터 위장은
 링크가 전부 자사 도메인이라 금방 들통나고, 들통난 뒤 받는 타격이 크다.
 
-### 2.4 X 운영 설정 (2026-08-30)
+### 2.4 X 운영 설정 · Justant-Bot
 
-#### Justant-Bot
+계정 성장 루프(선댓글·대댓글·의식·새벽 학습)의 **권위본은 [`justant-bot-x-ops.md`](justant-bot-x-ops.md)** 다. 이 절은 사연 스레드 문서에서 헷갈리지 않도록 구분만 한다.
 
-**Justant-Bot**은 운영자(Justant)의 말투를 쓰는 X 댓글 AI다. 선댓글·대댓글·아침/밤 인사 작문이 이 봇이다. 게시 계정은 `@againspring_net`. 트윗/댓글 **본문에는** Justant-Bot·AI·봇이라고 쓰지 않는다. 목소리 SSOT는 `marketing.x.persona_profile_json`. 프롬프트: `docs/shared/prompts/marketing/x-outbound-reply.md`. 이후 대화에서 「Justant-Bot」은 이 봇을 가리킨다. 광장 **AI-user**와는 별개다.
-
-어드민 `/admin/marketing` **설정 → X 운영**. API `GET`/`PUT /api/admin/marketing/x-ops`.
-저장 키 `marketing.x.*` (`system_setting`).
-
-| 항목 | 기본 | 키 |
-|---|---|---|
-| 아침 시각 | 07:30 KST | `marketing.x.morning_time` |
-| 밤 시각 | 22:00 KST | `marketing.x.night_time` |
-| 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` |
-| 선댓글 /일 | 20 | `marketing.x.outbound_daily_cap` |
-| 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
-| 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
-| 불 난 글 최소 댓글 | 3 | `marketing.x.hot_min_replies` |
-| 불 난 글 최대 나이 | 6시간 | `marketing.x.hot_max_age_hours` |
-| 아침/밤 글 · 대댓글 · 선댓글 | **off** | `marketing.x.{ritual,inbound,outbound}_enabled` |
-| 페르소나 학습 | **on** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
-
-매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 직접 남에게 단 댓글·인용 평**만 gold 코퍼스(`source=TIMELINE`)에 넣는다. Justant-Bot이 게시한 선댓글·대댓글(`x_ops_action.posted_tweet_id`, 최근 14일)은 타임라인에 남아 있어도 gold가 아니다. 최근 3일 POSTED 댓글이 타임라인에 없으면 운영자가 지운 것으로 보고 `DELETED_AUTO`(avoid)로 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)도 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 **Sonnet**(`claude-sonnet-5`, `MARKETING_X_PERSONA_LEARN_MODEL`)으로 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`. Telegram으로 페르소나를 학습시키지 않는다. 게시 알림용 Telegram은 그대로 둔다.
-
-성장 루프 발행기는 위 플래그를 읽는다. 스위치 기본값은 꺼짐이라, 어드민에서 켜기 전에는 X에 글·댓글이 나가지 않는다. **prod가 자동 게시 중이라고 보지 않는다.**
-
-- **inbound** (우리 글 대댓글): 하루 40, 글당 12(설정 기본값). 수신 후 **30분 창**, 지터 **3–25분**은 코드 고정(어드민 UI 없음). 게시 성공 시 outbound와 같은 Telegram 통보.
-- **outbound** (팔로우 선댓글): 하루 20, **팔로우 중 타임라인 원글**(맞팔 필수 아님). 최소 댓글 수·최대 나이는 설정의 `hotMinReplies` / `hotMaxAgeHours` (`hotMinReplies=0`이면 댓글 없는 최신글도 후보). 그 글에 우리 댓글이 없으면 **원글(root)**, 있으면 스레드 대댓글. **후보 조회는 1분이 아니다** — `XGrowthLoopScheduler.outboundTick`이 **08:00–22:00 KST 30분 간격**(08:00, 08:30, … 22:30). **틱당 댓글 최대 1개**(게시 성공하면 그 틱은 끝). **네이티브 영상 글은 스킵**(`hasVideo`)하고 다음 후보로 넘어간다. GIF는 영상이 아니라 사진으로 취급. 사진이 있으면 Haiku가 **첫 JPEG만**(ASM `photoJpegBase64`) + **타인 댓글 최대 10**(`peerReplies`)을 본다. 자신 없으면 게시하지 않는다(`UNSURE`) — ㅋㅋ로 채우지 않음. 영어 원글에 한글 댓글(또는 반대)은 `LANG_MISMATCH`로 스킵. 가드 이유: `TOO_LONG` / `LAUGH_SPAM` / `ECHO` / `LANG_MISMATCH` / `VIDEO` / `VISION_FAIL`. 작문 피드백은 세 층만: 프롬프트 `docs/shared/prompts/marketing/x-outbound-reply.md` · 금지 `x-outbound-donts.md` · `system_setting` `marketing.x.outbound_guards` + `OutboundDraftGuard`. 밤·심야에는 X 세션 API를 치지 않는다. 의식/대댓글 분 단위 틱과는 분리. **게시 성공 시** `@WaggleBot_bot` Telegram으로 댓글 URL·대상 글 URL·본문을 보낸다 (`XOpsTelegramAlerts`).
-- **ritual** (아침/밤 글): `morningTime` / `nightTime`에 사진 한 장 + 짧은 격려. 사진은 ASM `assets/x-ritual`.
-- BE는 `RemoteLlmProvider`(Haiku) + **Justant-Bot** `persona_profile_json` + 운영자 TIMELINE few-shot + 지운 자동댓글 avoid로 작문하고, ASM이 게시한다.
-- **dev는 LLM 꺼짐(L3)** — 작문·발행은 no-op. 페르소나 학습은 새벽에 그대로 돈다.
-- 나중에 켤 때: inbound → outbound → ritual.
-
-**Phase B (이후)**: 사연 메인 텍스트를 마스터 훅 대신 페르소나 1~3줄 평 + 스크린샷 1장으로 바꾼다. `storyScoopsPerDay`는 아직 소비하지 않는다. 링크·유입은 후순위.
+- 어드민 `/admin/marketing` 설정 → X 운영 · `GET`/`PUT /api/admin/marketing/x-ops`
+- 발행 스위치 코드 기본값 **off**. 학습 기본 **on** (04:30 KST). prod 실제 값은 DB.
+- Telegram 드릴은 없다. 선댓글/대댓글 게시 성공 알림만 남는다.
+- **Phase B (이후)**: 사연 메인 텍스트를 마스터 훅 대신 페르소나 1~3줄 평 + 스크린샷 1장. `storyScoopsPerDay`는 아직 미소비.
 
 ---
 

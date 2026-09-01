@@ -654,7 +654,7 @@ POST /api/admin/marketing/x-ops/outbound
 - `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
 - `GET /api/v1/x/outbound-candidates` — 팔로우 중 최근 원글 중 댓글 수·나이 필터 후보. 필드: `tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`, **`hasVideo`**, **`hasPhoto`**, **`photoJpegBase64`**, **`peerReplies`**. `hasVideo`=네이티브 영상 플레이어(GIF 배지/aria는 영상 아님 → `hasVideo=false`, 사진으로 취급). `hasPhoto`=본문 사진/GIF(og·아바타 제외). `photoJpegBase64`=**첫 사진만** Playwright가 받아 JPEG(긴 변 ~768, ~200KB); AS는 x.com CDN을 직접 받지 않음. `peerReplies`=우리 핸들 제외 비어 있지 않은 답글 텍스트 **최대 10**. AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:00 KST). 틱당 댓글 1개; `hasVideo`면 그 후보는 건너뛰고 다음. Playwright 스크래프가 기본 30s를 넘기므로 `AsmClient`는 **stats 클라이언트**(`ASM_STATS_REQUEST_TIMEOUT_MS`, 기본 300s)로 호출한다. 1분 폴링 금지.
 
-흐름·한도: [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
+흐름·한도·학습: [`justant-bot-x-ops.md`](70-policy/justant-bot-x-ops.md).
 
 ### 4.2 플랫폼별 점수 가중치 · auto_adjust
 

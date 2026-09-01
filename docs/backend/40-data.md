@@ -602,7 +602,7 @@ ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일
 
 ### `x_persona_example` (Justant-Bot 말투 코퍼스) **V123** · **V124**
 
-운영자가 X에서 직접 단 댓글만 gold. `source=TIMELINE`은 새벽 FxTwitter 수집(부모 글 텍스트 없을 수 있음). Justant-Bot이 올린 댓글 id(`x_ops_action.posted_tweet_id`)는 gold에서 제외. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(운영자가 지운 문맥 빗나간 자동댓글, avoid). Telegram 드릴(`DRILL`)은 V124에서 삭제. `tweet_id` unique.
+운영자가 X에서 직접 단 댓글만 gold. 파이프·학습 상세 [`justant-bot-x-ops.md`](../shared/marketing/70-policy/justant-bot-x-ops.md). `source=TIMELINE`은 새벽 FxTwitter 수집(부모 글 텍스트 없을 수 있음). Justant-Bot이 올린 댓글 id(`x_ops_action.posted_tweet_id`)는 gold에서 제외. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`. Telegram 드릴(`DRILL`)은 V124에서 삭제. `tweet_id` unique.
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|

@@ -59,7 +59,7 @@ python3 scripts/lint_docs.py
 | 환경/인프라/배포 | `env/` | `docs/env/60-runtime/deployment.md` · `docs/env/20-containers/architecture.md` |
 | 환경 변수 사전 | — | `docs/env/40-data.md` |
 | **마케팅 (ASM)** | AS `100.81.189.92` → `ssh justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM `AGENTS.md` · `docs/shared/marketing/x-thread-strategy.md` |
-| **Justant-Bot** (X 선댓글·대댓글 목소리) | `backend/.../marketing/XCommentComposer.java` | `docs/shared/marketing/70-policy/x-thread-strategy.md` §2.4 · `docs/shared/prompts/marketing/x-outbound-reply.md` |
+| **Justant-Bot** (X 선댓글·대댓글 목소리) | `backend/.../marketing/XCommentComposer.java` | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` · `docs/shared/prompts/marketing/x-outbound-reply.md` |
 
 **ASM**: Python 3.12 + FastAPI, 포트 8200. AS 호스트에서 `ssh justant@100.115.252.61` **암호 없이** 접속. **활성 = X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h 자동). 네이버·YouTube·Threads 보류. Again-Spring 쪽은 thin client만.
 

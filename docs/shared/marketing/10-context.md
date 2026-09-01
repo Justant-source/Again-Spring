@@ -2,7 +2,7 @@
 
 > **권위본**: 이 디렉터리 (`docs/shared/marketing/`) 가 마케팅 관련 모든 정책·API·아키텍처의 권위본입니다.
 
-**Justant-Bot**: 운영자(Justant) 말투의 X 선댓글·대댓글 AI. 계정 `@againspring_net`. 광장 AI-user와 다름. 상세 [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
+**Justant-Bot**: 운영자(Justant) 말투의 X 선댓글·대댓글 AI. 계정 `@againspring_net`. 광장 AI-user와 다름. 권위본 [`justant-bot-x-ops.md`](70-policy/justant-bot-x-ops.md).
 
 ---
 
@@ -79,7 +79,7 @@ docs/shared/marketing/
 ├── platforms.md        ← 지원 플랫폼 · Phase2 점수/cap · 태그 · 슬롯
 ├── credentials.md      ← 플랫폼 계정 자격증명 저장·암호화 정책
 ├── social-poster.md            ← social-poster 서비스 운영 가이드
-├── x-thread-strategy.md        ← X 스레드 전략 (솔로 3~4 / 양면 최대 6단)
+├── x-thread-strategy.md        ← X 사연 스레드 (솔로 3~4 / 양면 최대 6단)
 ├── instagram-feed-strategy.md  ← IG 하이브리드 캐러셀 (24h · 글 슬롯)
 ├── youtube-shorts-strategy.md  ← Shorts/Reels (유니크·길이·TTS 감정 · §5.2 클릭 경로 제약)
 ├── sibom-video-insertion.md    ← 시봄이 숏폼 삽입 (메타포 금지 · 본문 §6 레이아웃 SSOT)

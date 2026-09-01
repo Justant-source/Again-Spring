@@ -192,7 +192,7 @@ T+24h MarketingHoldingCommitService
 
 X 운영 설정(아침/밤·대댓글/선댓글 한도·킬스위치·페르소나 학습)은 어드민 `/admin/marketing` 설정 탭과
 `GET`/`PUT /api/admin/marketing/x-ops`(`marketing.x.*`)에 있다. **발행 스위치 기본 꺼짐.** 페르소나 학습은 기본 켜짐(매일 04:30 KST, FxTwitter 읽기). `POST /x-ops/learn`으로 즉시 학습, `POST /x-ops/outbound`로 즉시 선댓글 틱.
-성장 루프(ritual / inbound / outbound)는 해당 플래그가 켜져 있을 때만 작문·게시한다. **dev는 LLM 꺼짐(L3)이라 작문·발행은 no-op.** 기본 off이므로 prod가 자동 게시 중이라고 보지 않는다. 상세 [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
+성장 루프(ritual / inbound / outbound)는 해당 플래그가 켜져 있을 때만 작문·게시한다. **dev는 LLM 꺼짐(L3)이라 작문·발행은 no-op.** 코드 기본값은 off다. prod 실제 on/off는 `system_setting`을 본다. 상세 [`justant-bot-x-ops.md`](70-policy/justant-bot-x-ops.md).
 
 댓글 감시 창(발행 후 N시간, 기본 24h)의 텔레그램 노티는 운영자 수동 답용이다. 성장 루프가 이미 같은 트윗에 `x_ops_action` `POSTED`로 자동 답했으면, 미답글로 취급해 운영자를 재촉하지 않는다(스킵하거나 “자동 답함”으로만 표시). **선댓글·대댓글이 실제로 게시되면** `XOpsTelegramAlerts`가 댓글 URL·대상 글 URL·본문을 `@WaggleBot_bot`으로 보낸다.
 프롬프트 자동 패치는 **금지**. AI 고지는 **2027-01**.

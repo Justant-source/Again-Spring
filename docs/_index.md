@@ -1,6 +1,6 @@
 ---
 title: docs — 문서 지도 & Doc-Sync 트리거 맵
-last_updated: 2026-08-31
+last_updated: 2026-09-01
 ---
 
 # docs/_index.md — 문서 지도 & Doc-Sync 트리거 맵
@@ -18,7 +18,7 @@ last_updated: 2026-08-31
 | 40-data | `40-data.md` | — | — | `40-data/` (1) | `40-data.md` | `40-data/` (2) |
 | 50-api | `50-api.md` 🏛 | — | `50-api/` (6) 🏛 | — | — | `50-api.md` |
 | 60-runtime | `60-runtime/` (3) | `60-runtime/` (6) | `60-runtime.md` | `60-runtime/` (3) | `60-runtime/` (4) | `60-runtime.md` |
-| 70-policy | `70-policy.md` | `70-policy/` (7) | `70-policy/` (9) | `70-policy/` (2) | — | `70-policy/` (6) |
+| 70-policy | `70-policy.md` | `70-policy/` (7) | `70-policy/` (9) | `70-policy/` (2) | — | `70-policy/` (7) |
 | 90-adr | — | — | `90-adr/` (7) 🏛 | — | — | — |
 
 루트: `docs/_index.md` · `docs/agent-development.md` · `docs/ai-user/history.md` (계층 밖).
@@ -44,7 +44,7 @@ last_updated: 2026-08-31
 | 정책 (금지어·인증·권한) | `docs/shared/70-policy/forbidden-words.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
 | 환경/배포 | `docs/env/60-runtime/deployment.md` | `docs/env/20-containers/architecture.md` | `env/docker-compose*.yml` |
 | 마케팅 | `docs/shared/marketing/10-context.md` | `docs/shared/marketing/70-policy/` | ASM: (별도 저장소) |
-| Justant-Bot (X 댓글 페르소나) | `docs/shared/marketing/70-policy/x-thread-strategy.md` §2.4 | `docs/shared/prompts/marketing/x-outbound-reply.md` · `x-outbound-donts.md` | `XCommentComposer` · `XOutboundService` |
+| Justant-Bot (X 선댓글·대댓글) | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | `docs/shared/prompts/marketing/x-outbound-reply.md` · `x-outbound-donts.md` | `backend/src/main/java/com/againspring/marketing/XCommentComposer.java` |
 
 ## §3. 🚨 런타임 자산 (이동 금지)
 
@@ -92,6 +92,7 @@ last_updated: 2026-08-31
 | 15 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | `docs/shared/70-policy/forbidden-words.md` | M |
 | 16 | `backend/src/main/java/com/againspring/llm/prompt/PromptLoader.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 17 | `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` | `docs/backend/30-components/llm-bridge.md` | M |
+| 18 | `backend/src/main/java/com/againspring/marketing/**` | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | M |
 
 등급: **M**=필수 · **C**=조건부.
 
@@ -108,3 +109,4 @@ last_updated: 2026-08-31
 | `env/docker-compose*.yml` | env | `docs/env/20-containers/architecture.md` | 🏛 |
 | `docs/shared/policies/` | shared | `docs/shared/70-policy/` | 🏛 |
 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | shared | `docs/shared/70-policy/forbidden-words.md` | 🏛 |
+| `backend/src/main/java/com/againspring/marketing/` | marketing | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | 🏛 |
