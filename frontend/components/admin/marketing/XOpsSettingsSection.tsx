@@ -10,6 +10,7 @@ import {
   updateMarketingXOpsSettings,
   runMarketingXOpsPersonaLearn,
   MarketingXOpsSettings,
+  MarketingXOpsSettingsUpdate,
 } from '@/lib/api/admin/marketing';
 
 const DEFAULTS: MarketingXOpsSettings = {
@@ -26,7 +27,36 @@ const DEFAULTS: MarketingXOpsSettings = {
   outboundEnabled: false,
   personaLearningEnabled: true,
   personaLearnAt: '04:30',
+  personaEvalEnabled: true,
+  originalPostEnabled: false,
+  originalPostDailyCap: 1,
 };
+
+function formatDeletePct(rate: number | null | undefined): string {
+  if (rate == null || !Number.isFinite(rate)) return '—';
+  const pct = rate <= 1 ? rate * 100 : rate;
+  return pct.toFixed(1);
+}
+
+function formatMimicryBadge(s: MarketingXOpsSettings): string {
+  const avg =
+    s.mimicryAvg28d != null && Number.isFinite(s.mimicryAvg28d)
+      ? s.mimicryAvg28d.toFixed(1)
+      : '—';
+  const pct = formatDeletePct(s.deleteRate28d);
+  const gate = s.gatePassed === true ? '통과' : '미달';
+  return `28일 닮음 ${avg} / 삭제율 ${pct}% / 게이트 ${gate}`;
+}
+
+function mergeXOps(raw: MarketingXOpsSettings): MarketingXOpsSettings {
+  return {
+    ...DEFAULTS,
+    ...raw,
+    personaEvalEnabled: raw.personaEvalEnabled ?? true,
+    originalPostEnabled: raw.originalPostEnabled ?? false,
+    originalPostDailyCap: raw.originalPostDailyCap ?? 1,
+  };
+}
 
 function extractError(err: unknown): string {
   if (typeof err === 'object' && err !== null) {
@@ -94,7 +124,7 @@ export function XOpsSettingsSection() {
     setLoading(true);
     setError(null);
     try {
-      setSettings(await getMarketingXOpsSettings());
+      setSettings(mergeXOps(await getMarketingXOpsSettings()));
     } catch (err: unknown) {
       setError(`X 운영 설정을 불러오지 못했습니다: ${extractError(err)}`);
     } finally {
@@ -110,7 +140,7 @@ export function XOpsSettingsSection() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  const writable = (s: MarketingXOpsSettings) => ({
+  const writable = (s: MarketingXOpsSettings): MarketingXOpsSettingsUpdate => ({
     morningTime: s.morningTime,
     nightTime: s.nightTime,
     storyScoopsPerDay: s.storyScoopsPerDay,
@@ -124,6 +154,9 @@ export function XOpsSettingsSection() {
     outboundEnabled: s.outboundEnabled,
     personaLearningEnabled: s.personaLearningEnabled,
     personaLearnAt: s.personaLearnAt,
+    personaEvalEnabled: s.personaEvalEnabled ?? true,
+    originalPostEnabled: s.originalPostEnabled ?? false,
+    originalPostDailyCap: s.originalPostDailyCap ?? 1,
   });
 
   const handleSave = async () => {
@@ -131,7 +164,7 @@ export function XOpsSettingsSection() {
     setError(null);
     setSavedMsg(null);
     try {
-      setSettings(await updateMarketingXOpsSettings(writable(settings)));
+      setSettings(mergeXOps(await updateMarketingXOpsSettings(writable(settings))));
       setSavedMsg(
         '저장했습니다. 글·댓글은 해당 스위치가 켜져 있을 때만 나갑니다. dev는 LLM이 꺼져 있어(L3) 작문·발행은 동작하지 않습니다. 페르소나 학습은 새벽 시각에 돌아갑니다.'
       );
@@ -147,7 +180,7 @@ export function XOpsSettingsSection() {
     setError(null);
     setSavedMsg(null);
     try {
-      setSettings(await runMarketingXOpsPersonaLearn());
+      setSettings(mergeXOps(await runMarketingXOpsPersonaLearn()));
       setSavedMsg('학습을 돌렸습니다. 아래 상태가 갱신됩니다. (dev는 LLM 없이 댓글만 모읍니다)');
     } catch (err: unknown) {
       setError(`학습에 실패했습니다: ${extractError(err)}`);
@@ -180,6 +213,13 @@ export function XOpsSettingsSection() {
           </p>
         </div>
 
+        <div
+          data-testid="marketing-x-ops-mimicry-badge"
+          className="rounded border border-[#5F8F76]/40 bg-[#5F8F76]/10 px-3 py-2 text-sm text-gray-800"
+        >
+          {formatMimicryBadge(settings)}
+        </div>
+
         <div className="space-y-2">
           <FlagSwitch
             id="x-ops-ritual"
@@ -205,9 +245,23 @@ export function XOpsSettingsSection() {
           <FlagSwitch
             id="x-ops-persona-learn"
             label="페르소나 학습"
-            hint="매일 새벽에 내가 단 댓글만 골라 목소리를 갱신. 자동 스레드는 제외"
+            hint="매일 새벽에 내가 단 댓글·원글만 골라 목소리를 갱신. 자동 스레드는 제외"
             checked={settings.personaLearningEnabled}
             onChange={() => patch('personaLearningEnabled', !settings.personaLearningEnabled)}
+          />
+          <FlagSwitch
+            id="x-ops-persona-eval"
+            label="페르소나 채점"
+            hint="게시 아님. 새벽 학습 내부 채점(held-out 재현). 운영자 말투와 얼마나 닮았는지 본다"
+            checked={settings.personaEvalEnabled ?? true}
+            onChange={() => patch('personaEvalEnabled', !(settings.personaEvalEnabled ?? true))}
+          />
+          <FlagSwitch
+            id="x-ops-original-post"
+            label="원글 자동 작성"
+            hint="광장 사연 스쿱만. 슬롯 12:30·19:30 KST. 95% 게이트(평균≥95 ∧ 삭제율≤2% ∧ n≥30) 통과 전 prod에서 켜지 말 것"
+            checked={settings.originalPostEnabled ?? false}
+            onChange={() => patch('originalPostEnabled', !(settings.originalPostEnabled ?? false))}
           />
         </div>
 
@@ -248,6 +302,24 @@ export function XOpsSettingsSection() {
               max={10}
               value={settings.storyScoopsPerDay}
               onChange={(e) => patch('storyScoopsPerDay', Number(e.target.value))}
+            />
+            <p className="text-xs text-gray-500">
+              원글 파이프가 켜져 있을 때 소비. 실제 발행은 원글 한도와 이 숫자의 작은 쪽
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="x-ops-original-cap">원글 /일</Label>
+            <Input
+              id="x-ops-original-cap"
+              type="number"
+              min={0}
+              max={5}
+              value={settings.originalPostDailyCap ?? 1}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                const clamped = Number.isFinite(n) ? Math.min(5, Math.max(0, n)) : 1;
+                patch('originalPostDailyCap', clamped);
+              }}
             />
           </div>
           <div className="space-y-1">

@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
 class XCommentComposerTest {
 
     private static final String DISTINCT_PROFILE =
-        "{\"summary\":\"테스트페르소나XYZ 반말 ㅋㅋㅋ\",\"traits\":[\"한 줄\"],\"examples\":[\"힘빠지긴 할듯\"],\"avoid\":[\"습니다체\",\"판결\"]}";
+        "{\"summary\":\"테스트페르소나XYZ 반말 ㅋㅋㅋ\",\"traits\":[\"한 줄\"],\"examples\":[\"힘빠지긴 할듯\"],\"avoid\":[\"습니다체\",\"판결\"],\"post_style\":\"한 줄 공감 후 링크\"}";
 
     @Mock
     private SystemSettingRepository systemSettingRepository;
@@ -230,8 +230,141 @@ class XCommentComposerTest {
         assertThat(promptCaptor.getValue()).contains("운영자가 지운 자동댓글");
     }
 
+    @Test
+    void composeOutbound_excludeTweetId_heldOutOfFewShot() throws Exception {
+        stubOutboundPrompts();
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE))
+            .thenReturn(List.of(
+                XPersonaExample.builder()
+                    .source(XPersonaExample.Source.TIMELINE)
+                    .tweetId("hold-me")
+                    .postText("상황 홀드")
+                    .operatorBody("홀드바디")
+                    .build(),
+                XPersonaExample.builder()
+                    .source(XPersonaExample.Source.TIMELINE)
+                    .tweetId("keep-me")
+                    .postText("상황 킵")
+                    .operatorBody("킵바디")
+                    .build()));
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+
+        composer.composeOutbound("아무 트윗", List.of(), null, "hold-me");
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        assertThat(promptCaptor.getValue()).doesNotContain("홀드바디");
+        assertThat(promptCaptor.getValue()).contains("킵바디");
+    }
+
+    @Test
+    void fewShotBlock_skipsTimelinePostSource() {
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE))
+            .thenReturn(List.of());
+
+        String block = composer.fewShotBlock("아무 트윗", "x");
+
+        assertThat(block).isEmpty();
+        verify(exampleRepository).findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE);
+        verify(exampleRepository, never())
+            .findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE_POST);
+    }
+
+    @Test
+    void composeOriginal_llmDisabled_skipsDevLlmOffWithoutInvoking() throws Exception {
+        ReflectionTestUtils.setField(composer, "llmEnabled", false);
+
+        XCommentComposer.Draft draft = composer.composeOriginal("사연 요약", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isTrue();
+        assertThat(draft.skipReason()).isEqualTo("DEV_LLM_OFF");
+        verify(llmProvider, never()).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void composeOriginal_missingPrompt_skipsUnsure() throws Exception {
+        when(promptLoader.get("marketing/x-original-post.md"))
+            .thenThrow(new java.nio.file.NoSuchFileException("marketing/x-original-post.md"));
+
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isTrue();
+        assertThat(draft.skipReason()).isEqualTo("UNSURE");
+        verify(llmProvider, never()).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void composeOriginal_creditBalanceError_skipsLlmError() throws Exception {
+        stubOriginalPrompts();
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("Credit balance is too low");
+
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isTrue();
+        assertThat(draft.skipReason()).isEqualTo("LLM_ERROR");
+        assertThat(draft.body()).isNull();
+    }
+
+    @Test
+    void composeOriginal_tooLong_skips() throws Exception {
+        stubOriginalPrompts();
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("가".repeat(141));
+
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isTrue();
+        assertThat(draft.skipReason()).isEqualTo("TOO_LONG");
+    }
+
+    @Test
+    void composeOriginal_moreThanThreeLines_skips() throws Exception {
+        stubOriginalPrompts();
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("한줄\n두줄\n세줄\n네줄");
+
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isTrue();
+        assertThat(draft.skipReason()).isEqualTo("TOO_LONG");
+    }
+
+    @Test
+    void composeOriginal_injectsPersonaPostFewShotAndDonts() throws Exception {
+        stubOriginalPrompts();
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE_POST))
+            .thenReturn(List.of(XPersonaExample.builder()
+                .source(XPersonaExample.Source.TIMELINE_POST)
+                .tweetId("op-1")
+                .operatorBody("오늘 광장 글 하나 올렸다")
+                .build()));
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("이런 마음 이해됨 https://againspring.net/p/1");
+
+        XCommentComposer.Draft draft = composer.composeOriginal("퇴근 갈등", "https://againspring.net/p/1");
+
+        assertThat(draft.skip()).isFalse();
+        assertThat(draft.body()).contains("이런 마음 이해됨");
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        String prompt = promptCaptor.getValue();
+        assertThat(prompt).contains("<user_input>");
+        assertThat(prompt).contains("테스트페르소나XYZ");
+        assertThat(prompt).contains("post_style");
+        assertThat(prompt).contains("한 줄 공감 후 링크");
+        assertThat(prompt).contains("퇴근 갈등");
+        assertThat(prompt).contains("오늘 광장 글 하나 올렸다");
+        assertThat(prompt).contains("- no spam");
+    }
+
     private void stubOutboundPrompts() throws Exception {
         when(promptLoader.get("marketing/x-outbound-reply.md")).thenReturn("JSON only");
+        when(promptLoader.get("marketing/x-outbound-donts.md")).thenReturn("- no spam");
+    }
+
+    private void stubOriginalPrompts() throws Exception {
+        when(promptLoader.get("marketing/x-original-post.md")).thenReturn("원글 본문만");
         when(promptLoader.get("marketing/x-outbound-donts.md")).thenReturn("- no spam");
     }
 }

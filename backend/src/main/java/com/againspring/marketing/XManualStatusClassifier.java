@@ -5,11 +5,50 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Distinguishes operator-typed X replies from automated x_thread chains.
+ * Distinguishes operator-typed X posts/replies from automated x_thread chains.
  */
 public final class XManualStatusClassifier {
 
-    public record Status(String id, String text, String replyToHandle, boolean quote) {}
+    public enum Classification {
+        MANUAL_REPLY,
+        MANUAL_POST,
+        NOT_MANUAL
+    }
+
+    public record Status(
+            String id,
+            String text,
+            String replyToHandle,
+            boolean quote,
+            String replyToStatusId,
+            String quoteText,
+            boolean hasMedia) {
+
+        public static Status reply(String id, String text, String replyToHandle) {
+            return reply(id, text, replyToHandle, null, false);
+        }
+
+        public static Status reply(
+                String id, String text, String replyToHandle, String replyToStatusId, boolean hasMedia) {
+            return new Status(id, text, replyToHandle, false, replyToStatusId, null, hasMedia);
+        }
+
+        public static Status post(String id, String text) {
+            return post(id, text, false);
+        }
+
+        public static Status post(String id, String text, boolean hasMedia) {
+            return new Status(id, text, null, false, null, null, hasMedia);
+        }
+
+        public static Status quote(String id, String text, String quoteText) {
+            return quote(id, text, quoteText, false);
+        }
+
+        public static Status quote(String id, String text, String quoteText, boolean hasMedia) {
+            return new Status(id, text, null, true, null, quoteText, hasMedia);
+        }
+    }
 
     private static final Pattern URL_ONLY = Pattern.compile("(?is)^\\s*https?://\\S+\\s*$");
     private static final Pattern MENTION = Pattern.compile("@[A-Za-z0-9_]+");
@@ -25,28 +64,39 @@ public final class XManualStatusClassifier {
      * Those look like human replies on the timeline but must not become gold.
      */
     public static boolean isManual(Status status, String ourHandle, Set<String> autoPostedIds) {
+        return classify(status, ourHandle, autoPostedIds) != Classification.NOT_MANUAL;
+    }
+
+    public static Classification classify(Status status, String ourHandle) {
+        return classify(status, ourHandle, Set.of());
+    }
+
+    public static Classification classify(Status status, String ourHandle, Set<String> autoPostedIds) {
         if (status == null || status.id() == null || status.id().isBlank()) {
-            return false;
+            return Classification.NOT_MANUAL;
         }
         if (autoPostedIds != null && autoPostedIds.contains(status.id())) {
-            return false;
+            return Classification.NOT_MANUAL;
         }
         String text = status.text() != null ? status.text().trim() : "";
         if (isBrandHook(text)) {
-            return false;
+            return Classification.NOT_MANUAL;
         }
         String ours = ourHandle != null ? ourHandle.trim() : "";
         String replyTo = status.replyToHandle();
         if (replyTo != null && !replyTo.isBlank() && replyTo.equalsIgnoreCase(ours)) {
-            return false;
+            return Classification.NOT_MANUAL;
         }
         if (!hasHumanText(text)) {
-            return false;
+            return Classification.NOT_MANUAL;
         }
         if (replyTo != null && !replyTo.isBlank()) {
-            return true;
+            return Classification.MANUAL_REPLY;
         }
-        return status.quote();
+        if (status.quote()) {
+            return Classification.MANUAL_REPLY;
+        }
+        return Classification.MANUAL_POST;
     }
 
     static boolean isBrandHook(String text) {

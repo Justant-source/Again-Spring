@@ -50,6 +50,12 @@ public class UpdateMarketingXOpsSettingsRequest {
     private Boolean outboundEnabled;
     private Boolean personaLearningEnabled;
     private String personaLearnAt;
+    private Boolean personaEvalEnabled;
+    private Boolean originalPostEnabled;
+
+    @Min(0)
+    @Max(5)
+    private Integer originalPostDailyCap;
 
     public MarketingXOpsSettingsService.XOpsSettings toSettings(
             MarketingXOpsSettingsService.XOpsSettings current) {
@@ -66,7 +72,10 @@ public class UpdateMarketingXOpsSettingsRequest {
             inboundEnabled != null ? inboundEnabled : current.inboundEnabled(),
             outboundEnabled != null ? outboundEnabled : current.outboundEnabled(),
             personaLearningEnabled != null ? personaLearningEnabled : current.personaLearningEnabled(),
-            personaLearnAt != null ? personaLearnAt : current.personaLearnAt()
+            personaLearnAt != null ? personaLearnAt : current.personaLearnAt(),
+            personaEvalEnabled != null ? personaEvalEnabled : current.personaEvalEnabled(),
+            originalPostEnabled != null ? originalPostEnabled : current.originalPostEnabled(),
+            originalPostDailyCap != null ? originalPostDailyCap : current.originalPostDailyCap()
         );
     }
 }

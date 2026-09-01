@@ -23,6 +23,7 @@ import com.againspring.marketing.MarketingWeeklyReportService;
 import com.againspring.marketing.MarketingXOpsSettingsService;
 import com.againspring.marketing.XOutboundService;
 import com.againspring.marketing.XPersonaLearnService;
+import com.againspring.marketing.XPersonaShadowEval;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -73,6 +75,9 @@ public class AdminMarketingController {
     private final MarketingXOpsSettingsService marketingXOpsSettingsService;
     private final XPersonaLearnService xPersonaLearnService;
     private final XOutboundService xOutboundService;
+
+    @Autowired(required = false)
+    private XPersonaShadowEval xPersonaShadowEval;
 
     // ===== Daily auto-publish quota (Phase 2 per-platform) =====
 
@@ -121,10 +126,9 @@ public class AdminMarketingController {
             + "발행 스위치 기본 false. 학습 기본 true(04:30 KST). 발행 파이프가 붙기 전에는 저장만.")
     @ApiResponse(responseCode = "200", description = "Settings returned")
     public ResponseEntity<MarketingXOpsSettingsResponse> getXOps() {
-        return ResponseEntity.ok(
-            MarketingXOpsSettingsResponse.from(
-                marketingXOpsSettingsService.get(),
-                xPersonaLearnService.status()));
+        return ResponseEntity.ok(xOpsResponse(
+            marketingXOpsSettingsService.get(),
+            xPersonaLearnService.status()));
     }
 
     @PutMapping("/x-ops")
@@ -138,7 +142,7 @@ public class AdminMarketingController {
             Authentication auth) {
         String updatedBy = auth != null ? auth.getName() : "admin";
         var next = req.toSettings(marketingXOpsSettingsService.get());
-        return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
+        return ResponseEntity.ok(xOpsResponse(
             marketingXOpsSettingsService.update(next, updatedBy),
             xPersonaLearnService.status()));
     }
@@ -152,9 +156,26 @@ public class AdminMarketingController {
     public ResponseEntity<MarketingXOpsSettingsResponse> learnXOpsNow(Authentication auth) {
         String updatedBy = auth != null ? auth.getName() : "admin";
         xPersonaLearnService.requireEnabledThenRun(updatedBy);
-        return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
+        return ResponseEntity.ok(xOpsResponse(
             marketingXOpsSettingsService.get(),
             xPersonaLearnService.status()));
+    }
+
+    private MarketingXOpsSettingsResponse xOpsResponse(
+            MarketingXOpsSettingsService.XOpsSettings settings,
+            XPersonaLearnService.LearnResult learn) {
+        MarketingXOpsSettingsResponse.MimicryMetrics metrics = null;
+        if (xPersonaShadowEval != null) {
+            XPersonaShadowEval.MimicryMetrics m = xPersonaShadowEval.metrics();
+            if (m != null) {
+                metrics = new MarketingXOpsSettingsResponse.MimicryMetrics(
+                    m.avg28d(),
+                    (int) m.sampleCount(),
+                    m.deleteRate28d(),
+                    m.gatePassed());
+            }
+        }
+        return MarketingXOpsSettingsResponse.from(settings, learn, metrics);
     }
 
     @PostMapping("/x-ops/outbound")

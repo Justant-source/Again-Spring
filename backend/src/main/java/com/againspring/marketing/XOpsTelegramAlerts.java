@@ -17,6 +17,15 @@ final class XOpsTelegramAlerts {
             body != null ? body : "");
     }
 
+    /** Notification only — not a persona drill. */
+    static String originalPosted(AsmClient.XPublishResult result, String storyUrl, String body) {
+        return String.format(
+            "📝 [Again-Spring] X 원글 (사연 스쿱)%n글 URL: %s%n사연: %s%n본문: %s",
+            commentUrl(result),
+            storyUrl != null && !storyUrl.isBlank() ? storyUrl : "(없음)",
+            body != null ? body : "");
+    }
+
     static String commentUrl(AsmClient.XPublishResult result) {
         if (result != null && result.url() != null && !result.url().isBlank()) {
             return result.url();

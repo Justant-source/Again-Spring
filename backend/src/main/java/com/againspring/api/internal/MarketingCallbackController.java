@@ -1,6 +1,5 @@
 package com.againspring.api.internal;
 
-import com.againspring.marketing.AsmProperties;
 import com.againspring.marketing.MarketingJobService;
 import com.againspring.marketing.dto.JobCallbackPayload;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +13,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
@@ -29,13 +25,13 @@ import java.util.Map;
 @Slf4j
 public class MarketingCallbackController {
     private final MarketingJobService marketingJobService;
-    private final AsmProperties asmProperties;
+    private final InternalTokenGuard tokenGuard;
 
     @PostMapping("/callback")
     public ResponseEntity<Void> receiveCallback(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader,
             @RequestBody JobCallbackPayload payload) {
-        if (!isAuthorized(authHeader)) {
+        if (!tokenGuard.isAuthorized(authHeader)) {
             log.debug("Marketing callback rejected: invalid or missing token (job={})", payload.getJobId());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -56,7 +52,7 @@ public class MarketingCallbackController {
     public ResponseEntity<Map<String, Object>> redrive(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader,
             @RequestBody InternalRedriveRequest req) {
-        if (!isAuthorized(authHeader)) {
+        if (!tokenGuard.isAuthorized(authHeader)) {
             log.debug("Marketing internal redrive rejected: invalid or missing token");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -93,23 +89,5 @@ public class MarketingCallbackController {
     }
 
     public record InternalRedriveRequest(long jobId, String remoteJobId, boolean skipExisting) {
-    }
-
-    private boolean isAuthorized(String authHeader) {
-        String expected = "Bearer " + asmProperties.getCallbackToken();
-        return authHeader != null && constantTimeEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                authHeader.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private boolean constantTimeEqual(byte[] a, byte[] b) {
-        if (a.length != b.length) {
-            return false;
-        }
-        byte result = 0;
-        for (int i = 0; i < a.length; i++) {
-            result |= a[i] ^ b[i];
-        }
-        return result == 0;
     }
 }

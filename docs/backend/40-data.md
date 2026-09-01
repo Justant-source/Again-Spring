@@ -5,7 +5,7 @@ last_updated: 2026-09-01
 
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-09-01 · code-ref: `backend/src/main/resources/db/migration/V48~V124.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-09-01 · code-ref: `backend/src/main/resources/db/migration/V48~V126.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -158,8 +158,9 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
 | `visit_events` | 방문 계측 (경로·UTM·referrer·봇 판정·고유방문자) | BIGINT auto · 유입 귀속 확장 **V120** |
 | `marketing_holding_exclusion` | 홀딩 풀 콘텐츠 가드 제외 사유 (조용한 누락 방지) | `post_id` VARCHAR(32) PK **V121** |
-| `x_ops_action` | X 성장 루프 원장 (ritual / inbound / outbound) | BIGINT auto |
-| `x_persona_example` | Justant-Bot 말투 코퍼스 (TIMELINE gold / DELETED_AUTO avoid) | BIGINT auto **V123** · 드릴 행 삭제 **V124** |
+| `x_ops_action` | X 성장 루프 원장 (ritual / inbound / outbound / original) | BIGINT auto · `ref_post_id` **V126** |
+| `x_persona_example` | Justant-Bot 말투 코퍼스 (TIMELINE · TIMELINE_POST gold / DELETED_AUTO avoid) | BIGINT auto **V123** · 드릴 행 삭제 **V124** · source 코멘트 **V125** |
+| `x_persona_eval` | 페르소나 held-out 재현 채점 (28일 닮음 지표) | BIGINT auto **V125** |
 
 ### AI-user 운영 테이블
 
@@ -583,38 +584,59 @@ Phase 1 = VIDEO_VARIANT 스테이지(instagram_reels/youtube_shorts). Phase 2+ �
 
 ### `x_ops_action` (성장 루프 원장)
 
-ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일일·글당 cap·중복 답글 조회용 내부 원장.
+ritual / inbound / outbound / original 작문·게시 결과. 어드민 REST 없음 — 일일·글당 cap·중복 답글·스쿱 사연 조회용 내부 원장.
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | `id` | BIGINT auto PK | |
-| `kind` | VARCHAR | `RITUAL` \| `INBOUND` \| `OUTBOUND` |
+| `kind` | VARCHAR | `RITUAL` \| `INBOUND` \| `OUTBOUND` \| `ORIGINAL` (**V126**) |
 | `target_tweet_id` | VARCHAR | 답글 대상 트윗. 이미 처리했는지 조회 |
 | `parent_tweet_id` | VARCHAR | 스레드 부모 (outbound 대댓글) |
 | `our_post_tweet_id` | VARCHAR | 우리 글(inbound 글당 cap) |
 | `posted_tweet_id` | VARCHAR | 우리가 게시한 트윗 ID (`POSTED`일 때) |
+| `ref_post_id` | BIGINT NULL | ORIGINAL 스쿱 사연. `posts.id`는 VARCHAR(32)이라 숫자면 parse, 아니면 hash (**V126**). 다른 kind는 null |
 | `body` | TEXT | 게시 본문 |
 | `status` | VARCHAR | `POSTED` \| `SKIPPED` \| `FAILED` |
 | `skip_reason` | VARCHAR(32) | `VIDEO` \| `UNSURE` \| `TOO_LONG` \| `LAUGH_SPAM` \| `ECHO` \| `SAFETY` \| `VISION_FAIL` \| `NO_VOICE` \| `LLM_ERROR` \| `CAP` \| `DISABLED` \| `DEV_LLM_OFF` \| `PUBLISH_FAILED` \| `ASM_ERROR` |
 | `created_at` | TIMESTAMP | 일일 cap·글당 cap 집계 |
 
-인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound).
+인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound), `idx_xoa_ref_post(ref_post_id)` (**V126**, 기스쿱 제외).
 
-### `x_persona_example` (Justant-Bot 말투 코퍼스) **V123** · **V124**
+### `x_persona_example` (Justant-Bot 말투 코퍼스) **V123** · **V124** · **V125**
 
-운영자가 X에서 직접 단 댓글만 gold. 파이프·학습 상세 [`justant-bot-x-ops.md`](../shared/marketing/70-policy/justant-bot-x-ops.md). `source=TIMELINE`은 새벽 FxTwitter 수집(부모 글 텍스트 없을 수 있음). Justant-Bot이 올린 댓글 id(`x_ops_action.posted_tweet_id`)는 gold에서 제외. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`. Telegram 드릴(`DRILL`)은 V124에서 삭제. `tweet_id` unique.
+운영자가 X에서 직접 단 댓글·인용·원글 gold. 파이프·학습 상세 [`justant-bot-x-ops.md`](../shared/marketing/70-policy/justant-bot-x-ops.md). `source=TIMELINE`은 새벽 FxTwitter 수집 — `replying_to_status` + `fetchStatus`로 부모 `post_text`를 채움(실패 시 null). `source=TIMELINE_POST`는 운영자 원글(리추얼·자동 원글 `posted_tweet_id`는 `ALL_KINDS`로 제외). Justant-Bot이 올린 id는 gold에서 제외. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`. Telegram 드릴(`DRILL`)은 V124에서 삭제. `tweet_id` unique.
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | `id` | BIGINT auto PK | |
-| `source` | VARCHAR(16) | `TIMELINE` \| `DELETED_AUTO` (`DRILL` 잔존 enum만) |
-| `tweet_id` | VARCHAR(64) UNIQUE | 우리 댓글 status id |
-| `post_text` | TEXT | TIMELINE은 null 가능. DELETED_AUTO는 대상 트윗 id |
-| `has_photo` | TINYINT(1) | 사진 유무 |
-| `operator_body` | TEXT | gold=운영자 한 줄. DELETED_AUTO=지운 자동댓글 본문 |
+| `source` | VARCHAR(16) | `TIMELINE` \| `TIMELINE_POST` \| `DELETED_AUTO` (`DRILL` 잔존 enum만) |
+| `tweet_id` | VARCHAR(64) UNIQUE | 우리 댓글·원글 status id |
+| `post_text` | TEXT | TIMELINE=부모/인용 상황(null 가능). TIMELINE_POST=null. DELETED_AUTO=대상 트윗 id |
+| `has_photo` | TINYINT(1) | TIMELINE=부모 사진. TIMELINE_POST=자기 미디어 |
+| `operator_body` | TEXT | gold=운영자 본문. DELETED_AUTO=지운 자동댓글 본문 |
 | `created_at` | TIMESTAMP(3) | |
 
 인덱스: `uk_xpe_tweet(tweet_id)`, `idx_xpe_source_created(source, created_at)`.
+
+### `x_persona_eval` (held-out 재현 채점) **V125**
+
+새벽 학습 말미 shadow eval. 사진 상황 제외, run당 캡 10. 28일 overall 평균·삭제율·95% 게이트 산출. 상세 [`justant-bot-x-ops.md`](../shared/marketing/70-policy/justant-bot-x-ops.md) §5.4.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `example_id` | BIGINT | `x_persona_example.id` (held-out gold) |
+| `tweet_id` | VARCHAR(64) | 해당 예시 트윗 id |
+| `bot_body` | TEXT | 봇 재현 초안 (게시 아님) |
+| `score_overall` | INT | 0–100 |
+| `score_tone` | INT | 말투 |
+| `score_length` | INT | 길이 |
+| `score_texture` | INT | 결 |
+| `score_content` | INT | 내용(공감·관점 — 판결 아님) |
+| `judge_note` | TEXT | 심판 메모 |
+| `created_at` | TIMESTAMP(3) | |
+
+인덱스: `idx_xpev_created(created_at)`, `idx_xpev_example(example_id)`.
 
 ---
 

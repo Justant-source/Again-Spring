@@ -140,6 +140,7 @@ export const ADMIN_MARKETING = {
   timeline:            '[data-testid="marketing-timeline"]',
   platformAutoSection: '[data-testid="marketing-platform-auto-section"]',
   xOpsSection:         '[data-testid="marketing-x-ops-section"]',
+  xOpsMimicryBadge:    '[data-testid="marketing-x-ops-mimicry-badge"]',
   shortformVideoSection: '[data-testid="marketing-shortform-video-section"]',
   holdingDraftDialog:  '[data-testid="marketing-holding-draft-dialog"]',
   // ⚠️ 가정(assumption) — 완료 탭 재설계: 확정(게시) / 탈락 보드 분리.

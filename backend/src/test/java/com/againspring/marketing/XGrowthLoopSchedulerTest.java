@@ -23,6 +23,8 @@ class XGrowthLoopSchedulerTest {
     private XInboundService inboundService;
     @Mock
     private XOutboundService outboundService;
+    @Mock
+    private XOriginalPostService originalPostService;
 
     @InjectMocks
     private XGrowthLoopScheduler scheduler;
@@ -38,6 +40,7 @@ class XGrowthLoopSchedulerTest {
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
         verify(inboundService).run(any(Instant.class));
+        verify(originalPostService).runIfDue(any(Instant.class));
         verify(outboundService, never()).run(any(Instant.class));
     }
 
@@ -48,16 +51,29 @@ class XGrowthLoopSchedulerTest {
         scheduler.tick();
 
         verify(inboundService).run(any(Instant.class));
+        verify(originalPostService).runIfDue(any(Instant.class));
         verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
-    void tick_inboundFailure_stillSkipsOutbound() {
+    void tick_inboundFailure_stillRunsOriginal_skipsOutbound() {
         doThrow(new RuntimeException("inbound boom")).when(inboundService).run(any());
 
         scheduler.tick();
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
+        verify(originalPostService).runIfDue(any(Instant.class));
+        verify(outboundService, never()).run(any(Instant.class));
+    }
+
+    @Test
+    void tick_originalFailure_isIsolated() {
+        doThrow(new RuntimeException("original boom")).when(originalPostService).runIfDue(any());
+
+        scheduler.tick();
+
+        verify(ritualPublisher).runIfDue(any(Instant.class));
+        verify(inboundService).run(any(Instant.class));
         verify(outboundService, never()).run(any(Instant.class));
     }
 
@@ -68,6 +84,7 @@ class XGrowthLoopSchedulerTest {
         verify(outboundService).run(any(Instant.class));
         verify(ritualPublisher, never()).runIfDue(any());
         verify(inboundService, never()).run(any());
+        verify(originalPostService, never()).runIfDue(any());
     }
 
     @Test

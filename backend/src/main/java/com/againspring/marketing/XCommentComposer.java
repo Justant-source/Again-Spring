@@ -30,6 +30,9 @@ public class XCommentComposer {
 
     static final String OUTBOUND_REPLY_PROMPT = "marketing/x-outbound-reply.md";
     static final String OUTBOUND_DONTS_PROMPT = "marketing/x-outbound-donts.md";
+    static final String ORIGINAL_POST_PROMPT = "marketing/x-original-post.md";
+    static final int ORIGINAL_MAX_CHARS = 140;
+    static final int ORIGINAL_MAX_LINES = 3;
 
     public record Draft(boolean skip, String body, String skipReason) {
         public static Draft of(String body) {
@@ -93,6 +96,15 @@ public class XCommentComposer {
      * Outbound JSON compose. Photo bytes travel as {@link LlmImage}, never inside the prompt.
      */
     public Draft composeOutbound(String tweetText, List<String> peerReplies, String photoJpegBase64) {
+        return composeOutbound(tweetText, peerReplies, photoJpegBase64, null);
+    }
+
+    /**
+     * Outbound compose with a held-out tweet id skipped in TIMELINE few-shot
+     * (shadow eval must not see the gold example being scored).
+     */
+    public Draft composeOutbound(
+            String tweetText, List<String> peerReplies, String photoJpegBase64, String excludeTweetId) {
         if (!llmEnabled) {
             return Draft.skipped("DEV_LLM_OFF");
         }
@@ -109,7 +121,7 @@ public class XCommentComposer {
         String safeTweet = promptSanitizer.sanitize(tweetText);
         String safePeers = promptSanitizer.sanitize(joinPeers(peerReplies));
         String safeDonts = promptSanitizer.sanitize(donts);
-        String safeShots = promptSanitizer.sanitize(fewShotBlock(tweetText));
+        String safeShots = promptSanitizer.sanitize(fewShotBlock(tweetText, excludeTweetId));
         String safeAvoid = promptSanitizer.sanitize(avoidDeletedBlock());
         String prompt = instructions + """
 
@@ -168,6 +180,68 @@ public class XCommentComposer {
             인사 한 줄만 출력하세요. 할 말이 없으면 '할 말 없음'만 출력하세요.
             """.formatted(safeSlot, safeProfile);
         return invokeDraft(prompt);
+    }
+
+    /**
+     * Original post from a plaza story scoop. Length guard is 140 chars / 3 lines
+     * (not the 40-char outbound comment guard).
+     */
+    public Draft composeOriginal(String storySummary, String link) {
+        if (!llmEnabled) {
+            return Draft.skipped("DEV_LLM_OFF");
+        }
+        String instructions;
+        try {
+            instructions = promptLoader.get(ORIGINAL_POST_PROMPT);
+        } catch (Exception e) {
+            log.warn("[x-composer] original prompt missing: {}", e.getMessage());
+            return Draft.skipped("UNSURE");
+        }
+        String donts;
+        try {
+            donts = promptLoader.get(OUTBOUND_DONTS_PROMPT);
+        } catch (Exception e) {
+            donts = "";
+        }
+        String safeProfile = promptSanitizer.sanitize(readProfile());
+        String safeStory = promptSanitizer.sanitize(storySummary);
+        String safeLink = promptSanitizer.sanitize(link);
+        String safeDonts = promptSanitizer.sanitize(donts);
+        String safeShots = promptSanitizer.sanitize(fewShotPostBlock());
+        String prompt = instructions + """
+
+            목소리 프로필:
+            <user_input>
+            %s
+            </user_input>
+
+            사연 요약:
+            <user_input>
+            %s
+            </user_input>
+
+            링크:
+            <user_input>
+            %s
+            </user_input>
+
+            하지 말 것:
+            <user_input>
+            %s
+            </user_input>
+
+            운영자 원글 예시 (베끼지 말고 결만):
+            <user_input>
+            %s
+            </user_input>
+            """.formatted(safeProfile, safeStory, safeLink, safeDonts, safeShots);
+        try {
+            String raw = llmProvider.invoke(prompt, model);
+            return toOriginalDraft(raw);
+        } catch (Exception e) {
+            log.warn("[x-composer] original invoke failed: {}", e.getMessage());
+            return Draft.skipped("LLM_ERROR");
+        }
     }
 
     private Draft invokeOutbound(String prompt, String photoJpegBase64) {
@@ -283,6 +357,10 @@ public class XCommentComposer {
     }
 
     String fewShotBlock(String tweetText) {
+        return fewShotBlock(tweetText, null);
+    }
+
+    String fewShotBlock(String tweetText, String excludeTweetId) {
         List<XPersonaExample> gold;
         try {
             gold = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
@@ -301,6 +379,10 @@ public class XCommentComposer {
             if (ex == null || ex.getOperatorBody() == null || ex.getOperatorBody().isBlank()) {
                 continue;
             }
+            if (excludeTweetId != null && !excludeTweetId.isBlank()
+                && excludeTweetId.equals(ex.getTweetId())) {
+                continue;
+            }
             String sit = ex.getPostText() == null ? "" : ex.getPostText();
             if (want != OutboundDraftGuard.Script.MIXED && !sit.isBlank()) {
                 OutboundDraftGuard.Script got = OutboundDraftGuard.scriptOf(sit);
@@ -310,6 +392,32 @@ public class XCommentComposer {
             }
             sb.append("상황: ").append(sit.replace('\n', ' ').trim()).append('\n');
             sb.append("운영자: ").append(ex.getOperatorBody().replace('\n', ' ').trim()).append("\n---\n");
+            kept++;
+            if (kept >= 5) {
+                break;
+            }
+        }
+        return sb.toString();
+    }
+
+    String fewShotPostBlock() {
+        List<XPersonaExample> gold;
+        try {
+            gold = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
+                XPersonaExample.Source.TIMELINE_POST);
+        } catch (Exception e) {
+            return "";
+        }
+        if (gold == null || gold.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        int kept = 0;
+        for (XPersonaExample ex : gold) {
+            if (ex == null || ex.getOperatorBody() == null || ex.getOperatorBody().isBlank()) {
+                continue;
+            }
+            sb.append("원글: ").append(ex.getOperatorBody().replace('\n', ' ').trim()).append("\n---\n");
             kept++;
             if (kept >= 5) {
                 break;
@@ -366,6 +474,37 @@ public class XCommentComposer {
             return Draft.skipped("SAFETY");
         }
         return Draft.of(filtered);
+    }
+
+    private Draft toOriginalDraft(String raw) {
+        Draft draft = toDraft(raw);
+        if (draft.skip()) {
+            return draft;
+        }
+        if (originalTooLong(draft.body())) {
+            return Draft.skipped("TOO_LONG");
+        }
+        return draft;
+    }
+
+    static boolean originalTooLong(String body) {
+        if (body == null) {
+            return true;
+        }
+        String t = body.trim();
+        if (t.length() > ORIGINAL_MAX_CHARS) {
+            return true;
+        }
+        int lines = 1;
+        for (int i = 0; i < t.length(); i++) {
+            if (t.charAt(i) == '\n') {
+                lines++;
+                if (lines > ORIGINAL_MAX_LINES) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean containsVerdictBelt(String text) {

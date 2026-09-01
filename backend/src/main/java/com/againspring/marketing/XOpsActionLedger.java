@@ -45,24 +45,38 @@ public class XOpsActionLedger {
     public XOpsAction recordPosted(XOpsAction.Kind kind, String targetTweetId, String parentTweetId,
         String ourPostTweetId, String postedTweetId, String body, Instant now) {
         return persist(kind, targetTweetId, parentTweetId, ourPostTweetId, postedTweetId, body,
-            XOpsAction.Status.POSTED, null, now);
+            XOpsAction.Status.POSTED, null, now, null);
+    }
+
+    @Transactional
+    public XOpsAction recordPosted(XOpsAction.Kind kind, String targetTweetId, String parentTweetId,
+        String ourPostTweetId, String postedTweetId, String body, Instant now, Long refPostId) {
+        return persist(kind, targetTweetId, parentTweetId, ourPostTweetId, postedTweetId, body,
+            XOpsAction.Status.POSTED, null, now, refPostId);
     }
 
     @Transactional
     public XOpsAction recordSkipped(XOpsAction.Kind kind, String targetTweetId, String skipReason, Instant now) {
         return persist(kind, targetTweetId, null, null, null, null,
-            XOpsAction.Status.SKIPPED, skipReason, now);
+            XOpsAction.Status.SKIPPED, skipReason, now, null);
     }
 
     @Transactional
     public XOpsAction recordFailed(XOpsAction.Kind kind, String targetTweetId, String skipReason, Instant now) {
         return persist(kind, targetTweetId, null, null, null, null,
-            XOpsAction.Status.FAILED, skipReason, now);
+            XOpsAction.Status.FAILED, skipReason, now, null);
+    }
+
+    public boolean alreadyScooped(Long refPostId) {
+        if (refPostId == null) {
+            return false;
+        }
+        return repository.existsByRefPostId(refPostId);
     }
 
     private XOpsAction persist(XOpsAction.Kind kind, String targetTweetId, String parentTweetId,
         String ourPostTweetId, String postedTweetId, String body,
-        XOpsAction.Status status, String skipReason, Instant now) {
+        XOpsAction.Status status, String skipReason, Instant now, Long refPostId) {
         XOpsAction row = XOpsAction.builder()
             .kind(kind)
             .targetTweetId(targetTweetId)
@@ -72,6 +86,7 @@ public class XOpsActionLedger {
             .body(body)
             .status(status)
             .skipReason(trimSkipReason(skipReason))
+            .refPostId(refPostId)
             .createdAt(now != null ? now : Instant.now())
             .build();
         return repository.save(row);

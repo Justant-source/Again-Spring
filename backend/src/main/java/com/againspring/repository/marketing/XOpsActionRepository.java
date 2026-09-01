@@ -13,6 +13,8 @@ public interface XOpsActionRepository extends JpaRepository<XOpsAction, Long> {
 
     boolean existsByTargetTweetId(String targetTweetId);
 
+    boolean existsByRefPostId(Long refPostId);
+
     List<XOpsAction> findByStatusAndKindInAndCreatedAtGreaterThanEqual(
         XOpsAction.Status status, Collection<XOpsAction.Kind> kinds, Instant since);
 

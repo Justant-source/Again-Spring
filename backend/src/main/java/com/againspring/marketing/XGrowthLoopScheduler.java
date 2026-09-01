@@ -8,9 +8,10 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Ritual / inbound stay on a one-minute KST tick (inbound has a 30-minute reply
- * window). Outbound candidate fetches hit X's session APIs, so they run only
- * every 30 minutes during 08:00–22:00 KST — one reply per successful tick.
+ * Ritual / inbound / original stay on a one-minute KST tick (inbound has a
+ * 30-minute reply window; original only fires at 12:30/19:30). Outbound
+ * candidate fetches hit X's session APIs, so they run only every 30 minutes
+ * during 08:00–22:00 KST — one reply per successful tick.
  */
 @Slf4j
 @Component
@@ -20,6 +21,7 @@ public class XGrowthLoopScheduler {
     private final XRitualPublisher ritualPublisher;
     private final XInboundService inboundService;
     private final XOutboundService outboundService;
+    private final XOriginalPostService originalPostService;
 
     @Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
     public void tick() {
@@ -33,6 +35,11 @@ public class XGrowthLoopScheduler {
             inboundService.run(now);
         } catch (Exception e) {
             log.warn("[x-growth] inbound tick failed: {}", e.getMessage());
+        }
+        try {
+            originalPostService.runIfDue(now);
+        } catch (Exception e) {
+            log.warn("[x-growth] original tick failed: {}", e.getMessage());
         }
     }
 

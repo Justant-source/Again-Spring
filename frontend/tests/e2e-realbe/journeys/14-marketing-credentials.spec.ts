@@ -78,6 +78,7 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
 
     await expect(page.locator(ADMIN_MARKETING.xOpsSection)).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('X 운영')).toBeVisible()
+    await expect(page.locator(ADMIN_MARKETING.xOpsMimicryBadge)).toBeVisible()
     await expect(page.getByRole('switch', { name: '아침/밤 글' })).toHaveAttribute(
       'aria-checked',
       'false'
@@ -86,8 +87,17 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
       'aria-checked',
       'true'
     )
+    await expect(page.getByRole('switch', { name: '페르소나 채점' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await expect(page.getByRole('switch', { name: '원글 자동 작성' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
     await expect(page.getByRole('button', { name: '지금 학습' })).toBeVisible()
-    // 섹션 존재·기본 스위치·학습 버튼만. inbound/outbound/ritual on 클릭·지금 학습 클릭·실 X 게시 없음
+    // 섹션 존재·기본 스위치·학습 버튼만. inbound/outbound/ritual/원글 on 클릭·지금 학습 클릭·실 X 게시 없음
+    // POST /x-ops/learn · /outbound 인증 호출은 14-A 미인증만. 여기선 트리거하지 않음
 
     // 숏폼영상 섹션 — 릴스·쇼츠 공용 나레이션 설정 박스 (ASM 없이도 셸 노출)
     await expect(page.locator(ADMIN_MARKETING.shortformVideoSection)).toBeVisible({ timeout: 8_000 })

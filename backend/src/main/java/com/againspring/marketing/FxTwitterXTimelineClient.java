@@ -23,6 +23,8 @@ public class FxTwitterXTimelineClient {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
+    public record ParentStatus(String text, boolean hasPhoto) {}
+
     public FxTwitterXTimelineClient(
             ObjectMapper objectMapper,
             @Value("${marketing.x.timeline-base-url:https://api.fxtwitter.com}") String baseUrl) {
@@ -72,6 +74,28 @@ public class FxTwitterXTimelineClient {
         return out;
     }
 
+    /**
+     * Best-effort parent tweet. Failure or 404 → {@code null}.
+     */
+    public ParentStatus fetchStatus(String id) {
+        if (id == null || id.isBlank()) {
+            return null;
+        }
+        try {
+            String body = restClient.get()
+                .uri("/i/status/{id}", id)
+                .retrieve()
+                .body(String.class);
+            if (body == null || body.isBlank()) {
+                return null;
+            }
+            return parseStatusResponse(objectMapper.readTree(body));
+        } catch (Exception e) {
+            log.warn("[x-persona] status fetch failed id={}: {}", id, e.getMessage());
+            return null;
+        }
+    }
+
     static List<XManualStatusClassifier.Status> parsePage(JsonNode root) {
         List<XManualStatusClassifier.Status> out = new ArrayList<>();
         JsonNode results = root.path("results");
@@ -88,15 +112,79 @@ public class FxTwitterXTimelineClient {
             }
             String rawText = item.path("text").isTextual() ? item.path("text").asText() : "";
             JsonNode reply = item.path("replying_to");
-            String replyTo = reply.isTextual()
-                ? reply.asText(null)
-                : reply.path("screen_name").asText(null);
-            boolean quote = item.has("quote") && !item.path("quote").isNull()
-                && !item.path("quote").isMissingNode()
-                && item.path("quote").isObject();
-            out.add(new XManualStatusClassifier.Status(id, rawText, replyTo, quote));
+            String replyTo = parseReplyToHandle(reply);
+            String replyToStatusId = parseReplyToStatusId(item, reply);
+            JsonNode quoteNode = item.path("quote");
+            boolean quote = quoteNode.isObject();
+            String quoteText = quote && quoteNode.path("text").isTextual()
+                ? quoteNode.path("text").asText()
+                : null;
+            boolean hasMedia = hasPhotoMedia(item.path("media"));
+            out.add(new XManualStatusClassifier.Status(
+                id, rawText, replyTo, quote, replyToStatusId, quoteText, hasMedia));
         }
         return out;
+    }
+
+    static ParentStatus parseStatusResponse(JsonNode root) {
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return null;
+        }
+        if (root.path("code").asInt(0) == 404) {
+            return null;
+        }
+        JsonNode tweet = root.path("tweet");
+        if (!tweet.isObject()) {
+            return null;
+        }
+        String text = tweet.path("text").isTextual() ? tweet.path("text").asText() : "";
+        return new ParentStatus(text, hasPhotoMedia(tweet.path("media")));
+    }
+
+    static String parseReplyToHandle(JsonNode reply) {
+        if (reply == null || reply.isMissingNode() || reply.isNull()) {
+            return null;
+        }
+        if (reply.isTextual()) {
+            String h = reply.asText(null);
+            return h == null || h.isBlank() ? null : h;
+        }
+        if (reply.isObject()) {
+            String h = reply.path("screen_name").asText(null);
+            return h == null || h.isBlank() ? null : h;
+        }
+        return null;
+    }
+
+    static String parseReplyToStatusId(JsonNode item, JsonNode reply) {
+        if (reply != null && reply.isObject()) {
+            String nested = text(reply, "status");
+            if (!nested.isBlank()) {
+                return nested;
+            }
+        }
+        String top = text(item, "replying_to_status");
+        return top.isBlank() ? null : top;
+    }
+
+    static boolean hasPhotoMedia(JsonNode media) {
+        if (media == null || media.isMissingNode() || media.isNull() || !media.isObject()) {
+            return false;
+        }
+        JsonNode photos = media.path("photos");
+        if (photos.isArray() && photos.size() > 0) {
+            return true;
+        }
+        JsonNode all = media.path("all");
+        if (all.isArray()) {
+            for (JsonNode m : all) {
+                if (m != null && m.isObject()
+                    && "photo".equalsIgnoreCase(m.path("type").asText(""))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String text(JsonNode n, String field) {

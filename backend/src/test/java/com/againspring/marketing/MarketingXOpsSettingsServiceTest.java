@@ -47,6 +47,9 @@ class MarketingXOpsSettingsServiceTest {
         assertThat(settings.outboundEnabled()).isFalse();
         assertThat(settings.personaLearningEnabled()).isTrue();
         assertThat(settings.personaLearnAt()).isEqualTo("04:30");
+        assertThat(settings.personaEvalEnabled()).isTrue();
+        assertThat(settings.originalPostEnabled()).isFalse();
+        assertThat(settings.originalPostDailyCap()).isEqualTo(1);
     }
 
     @Test
@@ -55,10 +58,10 @@ class MarketingXOpsSettingsServiceTest {
 
         service.update(new MarketingXOpsSettingsService.XOpsSettings(
             "08:00", "21:30", 1, 10, 30, 8, 5, 4,
-            true, false, true, true, "04:30"), "admin");
+            true, false, true, true, "04:30", true, false, 1), "admin");
 
         ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
-        verify(systemSettingRepository, atLeast(13)).save(captor.capture());
+        verify(systemSettingRepository, atLeast(16)).save(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(SystemSetting::getSettingKey)
             .contains(
@@ -74,7 +77,16 @@ class MarketingXOpsSettingsServiceTest {
                 MarketingXOpsSettingsService.KEY_INBOUND_ENABLED,
                 MarketingXOpsSettingsService.KEY_OUTBOUND_ENABLED,
                 MarketingXOpsSettingsService.KEY_PERSONA_LEARNING_ENABLED,
-                MarketingXOpsSettingsService.KEY_PERSONA_LEARN_AT);
+                MarketingXOpsSettingsService.KEY_PERSONA_LEARN_AT,
+                MarketingXOpsSettingsService.KEY_PERSONA_EVAL_ENABLED,
+                MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED,
+                MarketingXOpsSettingsService.KEY_ORIGINAL_POST_DAILY_CAP);
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED.equals(s.getSettingKey())
+                && "false".equals(s.getSettingValue()));
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_PERSONA_EVAL_ENABLED.equals(s.getSettingKey())
+                && "true".equals(s.getSettingValue()));
     }
 
     @Test
@@ -109,5 +121,35 @@ class MarketingXOpsSettingsServiceTest {
             "07:30", "22:00", 2, -1, 40, 12, 3, 6,
             false, false, false, true, "04:30"), "admin"))
             .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void update_originalPostDailyCapOutOfRange_throws() {
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 6), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, -1), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void update_originalPostDailyCapZero_isAllowedWhileOriginalStaysOff() {
+        when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
+
+        service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 0), "admin");
+
+        ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
+        verify(systemSettingRepository, atLeast(1)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_ORIGINAL_POST_DAILY_CAP.equals(s.getSettingKey())
+                && "0".equals(s.getSettingValue()));
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED.equals(s.getSettingKey())
+                && "false".equals(s.getSettingValue()));
     }
 }

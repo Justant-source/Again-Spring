@@ -412,11 +412,28 @@ export interface MarketingXOpsSettings {
   personaLastNewCount?: number | null;
   personaLastLearnedAt?: string | null;
   personaSummary?: string | null;
+  /** 새벽 학습 내부 채점. 게시 아님. 기본 true. */
+  personaEvalEnabled?: boolean;
+  /** 사연 스쿱 원글 자동 작성. 기본 false — 95% 게이트 전 prod off. */
+  originalPostEnabled?: boolean;
+  /** 원글 /일 상한 0–5. 실제 발행은 min(cap, storyScoopsPerDay). 기본 1. */
+  originalPostDailyCap?: number;
+  mimicryAvg28d?: number | null;
+  mimicrySampleCount?: number | null;
+  deleteRate28d?: number | null;
+  gatePassed?: boolean | null;
 }
 
 export type MarketingXOpsSettingsUpdate = Omit<
   MarketingXOpsSettings,
-  'personaLastStatus' | 'personaLastNewCount' | 'personaLastLearnedAt' | 'personaSummary'
+  | 'personaLastStatus'
+  | 'personaLastNewCount'
+  | 'personaLastLearnedAt'
+  | 'personaSummary'
+  | 'mimicryAvg28d'
+  | 'mimicrySampleCount'
+  | 'deleteRate28d'
+  | 'gatePassed'
 >;
 
 export async function getMarketingXOpsSettings(): Promise<MarketingXOpsSettings> {

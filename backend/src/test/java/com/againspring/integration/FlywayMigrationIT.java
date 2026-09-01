@@ -35,12 +35,12 @@ class FlywayMigrationIT extends MariaDbIntegrationSupport {
 
         assertThat(failedCount).as("실패한 마이그레이션").isZero();
         assertThat(pendingCount).as("미적용 마이그레이션").isZero();
-        // V124(drop_persona_drill)까지 포함 — 총 124개
+        // V126(x_ops_action original)까지 포함 — 총 126개
         // 주의: 마이그레이션 추가 시 이 숫자도 함께 갱신할 것.
         // 2026-08-29: V119 추가 때 갱신이 누락돼 이 단언이 조용히 깨진 채 있었다.
         // 개수만 세는 단언이라 "무엇이" 늘었는지는 알려주지 않는다 — 실패하면
         // src/main/resources/db/migration/ 의 V*.sql 개수와 대조할 것.
-        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(124);
+        assertThat(applied).as("전체 적용 마이그레이션 수").hasSize(126);
     }
 
     @Test

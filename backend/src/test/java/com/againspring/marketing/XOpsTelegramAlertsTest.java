@@ -32,4 +32,19 @@ class XOpsTelegramAlertsTest {
         assertThat(msg).contains("https://x.com/i/web/status/xyz");
         assertThat(msg).contains("공감돼요");
     }
+
+    @Test
+    void originalPosted_isNotificationNotDrill() {
+        String msg = XOpsTelegramAlerts.originalPosted(
+            new AsmClient.XPublishResult(true, "orig", "https://x.com/i/web/status/orig", null),
+            "https://againspring.net/community/1001?utm_source=x",
+            "그 마음 알겠음");
+
+        assertThat(msg).contains("원글");
+        assertThat(msg).contains("사연 스쿱");
+        assertThat(msg).contains("https://x.com/i/web/status/orig");
+        assertThat(msg).contains("againspring.net/community/1001");
+        assertThat(msg).contains("그 마음 알겠음");
+        assertThat(msg).doesNotContain("/drill");
+    }
 }

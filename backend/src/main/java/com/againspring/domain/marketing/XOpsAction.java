@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.Instant;
 
 /**
- * Append-only ledger of X ops actions (ritual / inbound / outbound).
+ * Append-only ledger of X ops actions (ritual / inbound / outbound / original).
  * One row per attempt; any row for a target_tweet_id blocks a double-reply.
  */
 @Getter
@@ -18,14 +18,16 @@ import java.time.Instant;
 @Table(name = "x_ops_action", indexes = {
     @Index(name = "idx_xoa_kind_created", columnList = "kind, created_at"),
     @Index(name = "idx_xoa_target_tweet", columnList = "target_tweet_id"),
-    @Index(name = "idx_xoa_our_post_created", columnList = "our_post_tweet_id, created_at")
+    @Index(name = "idx_xoa_our_post_created", columnList = "our_post_tweet_id, created_at"),
+    @Index(name = "idx_xoa_ref_post", columnList = "ref_post_id")
 })
 public class XOpsAction {
 
     public enum Kind {
         RITUAL,
         INBOUND,
-        OUTBOUND
+        OUTBOUND,
+        ORIGINAL
     }
 
     public enum Status {
@@ -63,6 +65,10 @@ public class XOpsAction {
 
     @Column(name = "skip_reason", length = 32)
     private String skipReason;
+
+    /** Scooped community post for {@link Kind#ORIGINAL}; null for other kinds. */
+    @Column(name = "ref_post_id")
+    private Long refPostId;
 
     @Column(name = "created_at", nullable = false)
     @Builder.Default

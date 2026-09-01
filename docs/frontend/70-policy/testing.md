@@ -120,7 +120,7 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 | 11 | `11-admin-ai-rules.spec.ts` | AI 규칙 UI·전역 CRUD 1경로·content UI·prompts slash-key·voice 회귀 |
 | 12 | `12-og-card.spec.ts` | OG 메타·opengraph-image |
 | 13 | `13-marketing-jobs.spec.ts` (+ callbacks) | 마케팅 허브 탭(대기/완료/설정)·holding board·완료 다이얼로그 Job 링크(`/admin/marketing/jobs/{id}`)·콜백 (ASM create는 stub만) |
-| 14 | `14-marketing-credentials.spec.ts` | 설정 탭(자격증명·자동 게시)·마스킹 (ASM read-only) |
+| 14 | `14-marketing-credentials.spec.ts` | 설정 탭(자격증명·자동 게시·X 운영 스위치/닮음 뱃지)·마스킹 (ASM read-only). `POST /x-ops/learn`·`/outbound`는 미인증 가드만, 트리거 호출 없음 |
 | 15 | `15-admin-ai-generation-status.spec.ts` | AI 생성 관제 패널 (route mock) |
 | 16 | `16-admin-dashboard-home.spec.ts` | 대시보드 ActionCenter·KPI·Cmd+K |
 | 17 | `17-admin-crawl-freshness.spec.ts` · `17-admin-community-insights.spec.ts` | 크롤 배지·stats 인사이트 UI |

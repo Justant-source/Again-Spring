@@ -7,7 +7,6 @@ import com.againspring.marketing.dto.JobCallbackPayload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -39,7 +38,6 @@ class MarketingCallbackControllerTest {
     @Mock
     AsmProperties asmProperties;
 
-    @InjectMocks
     MarketingCallbackController controller;
 
     private static final String VALID_TOKEN = "test-callback-token";
@@ -47,6 +45,7 @@ class MarketingCallbackControllerTest {
     @BeforeEach
     void setUp() {
         when(asmProperties.getCallbackToken()).thenReturn(VALID_TOKEN);
+        controller = new MarketingCallbackController(marketingJobService, new InternalTokenGuard(asmProperties));
     }
 
     @Test

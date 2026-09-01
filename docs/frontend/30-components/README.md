@@ -1,6 +1,6 @@
 ---
 title: L3 Components — frontend 인덱스
-last_updated: 2026-08-31
+last_updated: 2026-09-01
 ---
 
 # L3 Components

@@ -5,6 +5,7 @@ import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
+import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.repository.marketing.XOpsActionRepository;
 import com.againspring.repository.marketing.XPersonaExampleRepository;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.file.NoSuchFileException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -29,12 +31,15 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Dawn job: pull {@code @againspring_net} timeline, keep operator-typed replies,
- * append them to the voice corpus, and (prod LLM only) refresh the distilled profile.
+ * Dawn job: pull {@code @againspring_net} timeline, keep operator-typed replies
+ * and original posts, append them to the voice corpus, and (prod LLM only)
+ * refresh the distilled profile.
  */
 @Slf4j
 @Service
@@ -42,12 +47,14 @@ import java.util.Set;
 public class XPersonaLearnService {
 
     public static final String KEY_PROFILE = "marketing.x.persona_profile_json";
+    public static final String KEY_PROFILE_PREV = "marketing.x.persona_profile_prev_json";
     public static final String KEY_INGESTED = "marketing.x.persona_ingested_ids";
     public static final String KEY_LAST_LEARNED = "marketing.x.persona_last_learned_at";
     public static final String KEY_LAST_STATUS = "marketing.x.persona_last_status";
     public static final String KEY_LAST_NEW = "marketing.x.persona_last_new_count";
     public static final String HANDLE = "againspring_net";
     public static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    static final String CHARTER_PATH = "marketing/x-persona-charter.md";
 
     static final String SEED_PROFILE = """
         {"summary":"한 줄로 끊는 구어체. 반말과 해요체 혼용. ㅋㅋㅋ 자주. 귀여움은 명사형 종결. 사연에서는 판결 안 함.","traits":["한 줄","ㅋㅋㅋ","너무귀여움","힘빠지긴 할듯","벌써자?"],"examples":["꺼드럭은 더늘크크가 썼던 말인데 ㅋㅋㅋ","너무귀여움 ㅋㅋㅋㅋ","퇴근하고와서 힘빠지긴 할듯","벌써자?","바이럴같은데 웃참 실패했다 ㅋㅋㅋㅋㅋ"],"avoid":["습니다체","판결","유무죄","누가 잘못"]}
@@ -56,20 +63,27 @@ public class XPersonaLearnService {
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
     private static final int MAX_INGESTED = 400;
     private static final int MAX_NEW_PER_RUN = 40;
-    private static final int MAX_EXAMPLE_KEEP = 40;
+    private static final int MAX_PARENT_FETCHES = 40;
     private static final int AUTO_ID_DAYS = 14;
     private static final int DELETED_AUTO_DAYS = 3;
-    private static final List<XOpsAction.Kind> COMMENT_KINDS = List.of(
-        XOpsAction.Kind.OUTBOUND, XOpsAction.Kind.INBOUND);
+    private static final int MAX_PROFILE_CHARS = 6000;
+    private static final double MIN_HANGUL_RATIO = 0.30;
+    private static final List<XOpsAction.Kind> ALL_KINDS = List.of(
+        XOpsAction.Kind.RITUAL, XOpsAction.Kind.OUTBOUND, XOpsAction.Kind.INBOUND,
+        XOpsAction.Kind.ORIGINAL);
+    private static final List<XOpsAction.Kind> DELETED_SIGNAL_KINDS = List.of(
+        XOpsAction.Kind.OUTBOUND, XOpsAction.Kind.INBOUND, XOpsAction.Kind.ORIGINAL);
 
     private final SystemSettingRepository systemSettingRepository;
     private final MarketingXOpsSettingsService xOpsSettingsService;
     private final FxTwitterXTimelineClient timelineClient;
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
+    private final PromptLoader promptLoader;
     private final ObjectMapper objectMapper;
     private final XPersonaExampleRepository exampleRepository;
     private final XOpsActionRepository xOpsActionRepository;
+    private final XPersonaShadowEval shadowEval;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -136,7 +150,8 @@ public class XPersonaLearnService {
         Set<String> ingested = readIdSet();
         List<XManualStatusClassifier.Status> fresh = new ArrayList<>();
         for (XManualStatusClassifier.Status s : fetched) {
-            if (!XManualStatusClassifier.isManual(s, HANDLE, autoPostedIds)) {
+            if (XManualStatusClassifier.classify(s, HANDLE, autoPostedIds)
+                == XManualStatusClassifier.Classification.NOT_MANUAL) {
                 continue;
             }
             if (ingested.contains(s.id())) {
@@ -152,61 +167,120 @@ public class XPersonaLearnService {
             return persistMeta("NO_NEW", 0, now, updatedBy);
         }
 
+        int parentFetches = 0;
+        List<XPersonaExample> newlySaved = new ArrayList<>();
         for (XManualStatusClassifier.Status s : fresh) {
-            persistTimelineExample(s);
+            parentFetches = persistTimelineExample(s, parentFetches, newlySaved);
             ingested.add(s.id());
         }
         neu += fresh.size();
         saveIngested(ingested, updatedBy);
 
-        ObjectNode profile = readJson(KEY_PROFILE, SEED_PROFILE);
-        appendExampleLines(profile, formatGoldLines());
-        String status = refreshProfile(profile, updatedBy);
+        maybeRunShadowEval(newlySaved);
+        String status = refreshProfile(updatedBy);
         return persistMeta(status, neu, now, updatedBy);
     }
 
-    private String refreshProfile(ObjectNode profile, String updatedBy) {
-        String status = "INGESTED";
-        if (llmEnabled) {
-            ObjectNode distilled = distill(profile);
-            if (distilled != null) {
-                profile = distilled;
-                status = "OK";
-            } else {
-                status = "INGESTED_LLM_SKIP";
-            }
-        } else {
-            status = "INGESTED_LLM_DISABLED";
+    private void maybeRunShadowEval(List<XPersonaExample> newlySaved) {
+        if (!llmEnabled || newlySaved == null || newlySaved.isEmpty()) {
+            return;
         }
-        saveSetting(KEY_PROFILE, profile.toString(), Instant.now(), updatedBy);
-        return status;
+        try {
+            if (!xOpsSettingsService.get().personaEvalEnabled()) {
+                return;
+            }
+            shadowEval.runForNewGold(newlySaved);
+        } catch (Exception e) {
+            log.warn("[x-persona] shadow eval failed: {}", e.getMessage());
+        }
     }
 
-    private void persistTimelineExample(XManualStatusClassifier.Status s) {
+    private String refreshProfile(String updatedBy) {
+        if (!llmEnabled) {
+            return "INGESTED_LLM_DISABLED";
+        }
+        ObjectNode current = readJson(KEY_PROFILE, SEED_PROFILE);
+        ObjectNode distilled = distill(current);
+        if (distilled == null) {
+            return "INGESTED_LLM_SKIP";
+        }
+        if (!passesSanity(distilled)) {
+            log.warn("[x-persona] distill rejected by sanity guard");
+            return "DISTILL_REJECTED";
+        }
+        Instant now = Instant.now();
+        saveSetting(KEY_PROFILE_PREV, readRaw(KEY_PROFILE, SEED_PROFILE), now, updatedBy);
+        saveSetting(KEY_PROFILE, distilled.toString(), now, updatedBy);
+        return "OK";
+    }
+
+    private int persistTimelineExample(
+            XManualStatusClassifier.Status s, int parentFetches, List<XPersonaExample> newlySaved) {
         if (s == null || s.id() == null || s.id().isBlank()) {
-            return;
+            return parentFetches;
         }
         if (exampleRepository.existsByTweetId(s.id())) {
-            return;
+            return parentFetches;
         }
         String body = s.text() != null ? s.text().replace('\n', ' ').trim() : "";
         if (body.isBlank()) {
-            return;
+            return parentFetches;
         }
-        exampleRepository.save(XPersonaExample.builder()
-            .source(XPersonaExample.Source.TIMELINE)
+        XManualStatusClassifier.Classification kind =
+            XManualStatusClassifier.classify(s, HANDLE);
+        XPersonaExample.Source source = XPersonaExample.Source.TIMELINE;
+        String postText = null;
+        boolean hasPhoto = false;
+        if (kind == XManualStatusClassifier.Classification.MANUAL_POST) {
+            source = XPersonaExample.Source.TIMELINE_POST;
+            postText = null;
+            hasPhoto = s.hasMedia();
+        } else if (s.quote()) {
+            postText = blankToNull(s.quoteText());
+            hasPhoto = s.hasMedia();
+        } else if (s.replyToStatusId() != null && !s.replyToStatusId().isBlank()
+            && parentFetches < MAX_PARENT_FETCHES) {
+            if (parentFetches > 0) {
+                sleepBetweenParentFetches();
+            }
+            FxTwitterXTimelineClient.ParentStatus parent =
+                timelineClient.fetchStatus(s.replyToStatusId());
+            parentFetches++;
+            if (parent != null) {
+                postText = blankToNull(parent.text());
+                hasPhoto = parent.hasPhoto();
+            }
+        }
+        XPersonaExample saved = exampleRepository.save(XPersonaExample.builder()
+            .source(source)
             .tweetId(s.id())
-            .postText(null)
-            .hasPhoto(false)
+            .postText(postText)
+            .hasPhoto(hasPhoto)
             .operatorBody(body)
             .createdAt(Instant.now())
             .build());
+        if (newlySaved != null) {
+            newlySaved.add(saved);
+        }
+        return parentFetches;
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
+    private static void sleepBetweenParentFetches() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextInt(100, 201));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private int persistDeletedAutos(Set<String> timelineIds, Instant now) {
         Instant since = now.minus(DELETED_AUTO_DAYS, ChronoUnit.DAYS);
         int added = 0;
-        for (XOpsAction a : postedCommentsSince(since)) {
+        for (XOpsAction a : postedDeletedSignalsSince(since)) {
             String id = a.getPostedTweetId();
             if (id == null || id.isBlank() || timelineIds.contains(id)) {
                 continue;
@@ -232,7 +306,8 @@ public class XPersonaLearnService {
             if (ex.getSource() == XPersonaExample.Source.DELETED_AUTO) {
                 return false;
             }
-            if (ex.getSource() == XPersonaExample.Source.TIMELINE) {
+            if (ex.getSource() == XPersonaExample.Source.TIMELINE
+                || ex.getSource() == XPersonaExample.Source.TIMELINE_POST) {
                 ex.setSource(XPersonaExample.Source.DELETED_AUTO);
                 ex.setPostText(sit);
                 ex.setOperatorBody(body);
@@ -254,7 +329,7 @@ public class XPersonaLearnService {
 
     private Set<String> autoPostedIds(Instant since) {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
-        for (XOpsAction a : postedCommentsSince(since)) {
+        for (XOpsAction a : postedAutosSince(since)) {
             String id = a.getPostedTweetId();
             if (id != null && !id.isBlank()) {
                 ids.add(id);
@@ -263,20 +338,62 @@ public class XPersonaLearnService {
         return ids;
     }
 
-    private List<XOpsAction> postedCommentsSince(Instant since) {
+    private List<XOpsAction> postedDeletedSignalsSince(Instant since) {
         return xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(
-            XOpsAction.Status.POSTED, COMMENT_KINDS, since);
+            XOpsAction.Status.POSTED, DELETED_SIGNAL_KINDS, since);
+    }
+
+    private List<XOpsAction> postedAutosSince(Instant since) {
+        return xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(
+            XOpsAction.Status.POSTED, ALL_KINDS, since);
     }
 
     String formatCorpusLines() {
-        return formatGoldLines() + formatAvoidLines();
+        return formatGoldLines() + formatOlderGoldLines() + formatPostToneLines() + formatAvoidLines();
     }
 
     String formatGoldLines() {
         StringBuilder sb = new StringBuilder();
-        for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+        for (XPersonaExample ex : exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
             XPersonaExample.Source.TIMELINE)) {
             sb.append(formatPair(ex, 1)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    String formatOlderGoldLines() {
+        List<XPersonaExample> recent = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
+            XPersonaExample.Source.TIMELINE);
+        List<Long> exclude = recent.stream()
+            .map(XPersonaExample::getId)
+            .filter(Objects::nonNull)
+            .toList();
+        if (exclude.isEmpty()) {
+            exclude = List.of(-1L);
+        }
+        List<XPersonaExample> older = exampleRepository.findRandomBySourceExcluding(
+            XPersonaExample.Source.TIMELINE.name(), exclude, 20);
+        StringBuilder sb = new StringBuilder();
+        if (older == null) {
+            return sb.toString();
+        }
+        for (XPersonaExample ex : older) {
+            sb.append(formatPair(ex, 1)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    String formatPostToneLines() {
+        StringBuilder sb = new StringBuilder();
+        List<XPersonaExample> posts = exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+            XPersonaExample.Source.TIMELINE_POST);
+        if (posts == null || posts.isEmpty()) {
+            return sb.toString();
+        }
+        sb.append("원글 톤:\n");
+        for (XPersonaExample ex : posts) {
+            String body = ex.getOperatorBody() == null ? "" : ex.getOperatorBody().replace('\n', ' ').trim();
+            sb.append("원글: ").append(body).append('\n');
         }
         return sb.toString();
     }
@@ -313,27 +430,33 @@ public class XPersonaLearnService {
         }
         String safeComments = promptSanitizer.sanitize(corpus);
         String safeProfile = promptSanitizer.sanitize(current.toString());
-        String prompt = """
-            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글만 금(gold)으로 보고 목소리 프로필 JSON을 갱신하세요.
+        String charter = loadCharter();
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("""
+            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글·원글만 금(gold)으로 보고 목소리 프로필 JSON을 갱신하세요.
             자동 댓글은 gold가 아닙니다. '피함 / 운영자가 지운 자동댓글' 줄은 avoid에만 넣고 examples에 넣지 마세요.
-            기존 프로필의 결을 유지하되, 새 운영자 댓글에서 반복되는 버릇을 보강하세요.
-            판결/승패/유무죄 표현을 프로필에 넣지 마세요. 사연 평은 공감만.
+            '원글 톤' 섹션은 post_style에만 반영하세요.
+            기존 프로필의 결을 유지하되, 새 운영자 글에서 반복되는 버릇을 보강하세요.
+            판결/승패/유무죄 표현을 프로필에 넣지 마세요. 사연 평은 공감만. 작성자/상대방 구분은 공감 관점으로만.
 
-            기존 프로필:
-            <user_input>
-            %s
-            </user_input>
+            """);
+        if (charter != null && !charter.isBlank()) {
+            prompt.append("유지 원칙 — 절대 바꾸지 말 것:\n").append(charter).append("\n\n");
+        }
+        prompt.append("기존 프로필:\n<user_input>\n")
+            .append(safeProfile)
+            .append("\n</user_input>\n\n운영자 코퍼스 (gold·원글 톤)와 지운 자동댓글 (avoid):\n<user_input>\n")
+            .append(safeComments)
+            .append("""
 
-            운영자 코퍼스 (gold)와 지운 자동댓글 (avoid):
-            <user_input>
-            %s
             </user_input>
 
             JSON only:
-            {"summary":"한 문단","traits":["짧은 버릇"],"examples":["실제 댓글 톤 예시"],"avoid":["쓰지 말 것"]}
-            """.formatted(safeProfile, safeComments);
+            {"summary":"한 문단","traits":["짧은 버릇"],"examples":["실제 댓글 톤 예시"],"avoid":["쓰지 말 것"],"situations":["상황→응답 결"],"post_style":"원글 톤 한 문단"}
+            examples는 최대 12개, situations는 최대 8개.
+            """);
         try {
-            String raw = llmProvider.invoke(prompt, model);
+            String raw = llmProvider.invoke(prompt.toString(), model);
             if (raw == null || raw.isBlank() || looksLikeLlmError(raw)) {
                 return null;
             }
@@ -351,27 +474,62 @@ public class XPersonaLearnService {
         }
     }
 
-    private void appendExampleLines(ObjectNode profile, String corpusLines) {
-        ArrayNode examples = profile.withArray("examples");
-        LinkedHashSet<String> keep = new LinkedHashSet<>();
-        for (JsonNode n : examples) {
-            if (n.isTextual() && !n.asText().isBlank()) {
-                keep.add(n.asText().trim());
+    private String loadCharter() {
+        try {
+            return promptLoader.get(CHARTER_PATH);
+        } catch (NoSuchFileException e) {
+            return null;
+        } catch (Exception e) {
+            log.warn("[x-persona] charter load skipped: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    static boolean passesSanity(ObjectNode n) {
+        if (n == null) {
+            return false;
+        }
+        JsonNode summary = n.path("summary");
+        if (!summary.isTextual() || summary.asText().isBlank()) {
+            return false;
+        }
+        if (looksLikeLlmError(n.toString()) || looksLikeLlmError(summary.asText())) {
+            return false;
+        }
+        JsonNode examples = n.path("examples");
+        if (!examples.isArray()) {
+            return false;
+        }
+        StringBuilder joined = new StringBuilder(summary.asText());
+        boolean oneText = false;
+        for (JsonNode e : examples) {
+            if (e.isTextual() && !e.asText().isBlank()) {
+                oneText = true;
+                joined.append(e.asText());
             }
         }
-        if (corpusLines != null) {
-            for (String line : corpusLines.split("\n")) {
-                if (line != null && !line.isBlank()) {
-                    keep.add(line.trim());
-                }
+        if (!oneText) {
+            return false;
+        }
+        String json = n.toString();
+        if (json.length() > MAX_PROFILE_CHARS) {
+            return false;
+        }
+        return hangulRatio(joined.toString()) >= MIN_HANGUL_RATIO;
+    }
+
+    static double hangulRatio(String s) {
+        if (s == null || s.isEmpty()) {
+            return 0;
+        }
+        int hangul = 0;
+        int total = s.length();
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.UnicodeScript.of(s.charAt(i)) == Character.UnicodeScript.HANGUL) {
+                hangul++;
             }
         }
-        examples.removeAll();
-        List<String> list = new ArrayList<>(keep);
-        int start = Math.max(0, list.size() - MAX_EXAMPLE_KEEP);
-        for (int idx = start; idx < list.size(); idx++) {
-            examples.add(list.get(idx));
-        }
+        return (double) hangul / total;
     }
 
     private LearnResult persistMeta(String status, int neu, Instant at, String updatedBy) {

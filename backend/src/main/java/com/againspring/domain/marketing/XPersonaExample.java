@@ -7,7 +7,7 @@ import java.time.Instant;
 
 /**
  * Operator voice sample for Justant-Bot. TIMELINE = operator-typed X replies.
- * DELETED_AUTO = bot comments the operator removed (negative examples).
+ * TIMELINE_POST = operator original posts. DELETED_AUTO = bot comments the operator removed.
  * DRILL is unused leftover (Telegram drill removed).
  */
 @Getter
@@ -24,6 +24,7 @@ public class XPersonaExample {
     public enum Source {
         DRILL,
         TIMELINE,
+        TIMELINE_POST,
         DELETED_AUTO
     }
 

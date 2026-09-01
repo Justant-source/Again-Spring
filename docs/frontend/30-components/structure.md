@@ -55,7 +55,7 @@ frontend/
 │
 ├── components/
 │   ├── admin/
-│   │   └── marketing/
+│   │   └── marketing/          # 마케팅 대시보드 (`XOpsSettingsSection` — 닮음 뱃지·채점/원글 스위치, 원글 기본 꺼짐)
 │   │       └── preview/
 │   │
 │   ├── auth/                   # 인증 컴포넌트

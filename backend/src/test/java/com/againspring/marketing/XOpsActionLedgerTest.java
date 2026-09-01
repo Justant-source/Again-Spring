@@ -124,4 +124,18 @@ class XOpsActionLedgerTest {
         assertThat(ledger.countPostedTodayForOurPost("our-A", noonKst)).isEqualTo(2);
         assertThat(ledger.countPostedTodayForOurPost("our-B", noonKst)).isEqualTo(1);
     }
+
+    @Test
+    void recordPosted_withRefPostId_persistsColumn() {
+        Instant now = Instant.parse("2026-09-01T03:30:00Z");
+
+        XOpsAction row = ledger.recordPosted(
+            XOpsAction.Kind.ORIGINAL, "original:1230:2026-09-01", "1001",
+            null, "tw-9", "그 마음", now, 1001L);
+
+        assertThat(row.getKind()).isEqualTo(XOpsAction.Kind.ORIGINAL);
+        assertThat(row.getRefPostId()).isEqualTo(1001L);
+        assertThat(row.getParentTweetId()).isEqualTo("1001");
+        assertThat(store.get(0).getRefPostId()).isEqualTo(1001L);
+    }
 }

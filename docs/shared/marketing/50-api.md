@@ -562,6 +562,19 @@ ASM은 잡의 `callback_url`로 env를 고른다(`:8091`/`prod` → prod, 그 �
 
 **목적**: AS는 콜백 수신 후 원격 상태(`status`, `phase`, `progress`, `artifacts`, `publications`)와 `error`를 DB에 반영하고 폴링 오류 카운트를 초기화합니다. `error`가 있으면 `marketing_job.error_message`에 최대 1,000자로 저장하며, 최상위 `error`가 비어도 `publications[].error`의 실패 상세를 사용합니다. 원격 `FAILED`/`PARTIAL` 텔레그램은 ASM만 전송해 중복을 막습니다.
 
+### 2.6.1 페르소나 볼트 export (호스트 cron, JWT 아님)
+
+콜백과 **같은** `ASM_CALLBACK_TOKEN` Bearer. 어드민 JWT 경로 아님. 컨테이너는 `.temp`에 쓰지 않고 이 API만 제공한다.
+
+```
+GET /api/internal/marketing/persona-export?sinceExampleId=&sinceEvalId=
+Authorization: Bearer {ASM_CALLBACK_TOKEN}
+```
+
+**Response 200** — `{generatedAt, profile, profilePrev, lastStatus, lastLearnedAt, lastNewCount, metrics, examples[], evals[]}` (증분). 호스트 `scripts/x-persona-vault-sync.py`가 05:00 cron으로 `.temp/x-justant-bot/`에 미러. 토큰 없음/불일치 **401**.
+
+권위본 [`justant-bot-x-ops.md`](70-policy/justant-bot-x-ops.md) §6–7.
+
 ---
 
 ## 3. 폴링 흐름 (AS 내부)
@@ -633,17 +646,19 @@ PUT  /api/admin/marketing/x-ops
 Authorization: Bearer <admin-jwt>
 ```
 
-키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h.  
-`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음.
+키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h / 원글 한도 1(0–5).  
+`ritualEnabled`·`inboundEnabled`·`outboundEnabled`·`originalPostEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음. **원글은 95% 게이트(평균 ≥95 ∧ 삭제율 ≤2% ∧ n≥30) 통과 전 prod에서 켜지 말 것.** `storyScoopsPerDay`는 원글 파이프가 켜져 있을 때 소비(`min(originalPostDailyCap, storyScoopsPerDay)`).
 
-`personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인을 읽어 **운영자가 직접 단 댓글·인용**만 gold(`TIMELINE`)로 넣고, 원장에 있는 자동 댓글 id는 버린다. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(avoid). prod에서만 **Sonnet**(`claude-sonnet-5`)으로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)도 버린다. 코퍼스는 `x_persona_example`.
+`personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. `personaEvalEnabled` 기본 **true**(게시 아님 — 새벽 학습 내부 채점). 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인을 읽어 **운영자가 직접 단 댓글·인용**은 gold(`TIMELINE`, 부모 `replying_to_status` + `fetchStatus`), **운영자 원글**은 `TIMELINE_POST`, 원장 자동 게시 id(리추얼·원글 포함)는 버린다. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(avoid). prod에서만 **Sonnet**으로 프로필을 증류한다. 증류 실패·`DISTILL_REJECTED` 시 프로필 무변경, 직전 JSON은 `persona_profile_prev_json`. 코퍼스는 `x_persona_example`. 채점은 `x_persona_eval`.
+
+GET 읽기 전용: `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary` / `mimicryAvg28d` / `mimicrySampleCount` / `deleteRate28d` / `gatePassed`. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK` · `FETCH_FAILED` · `DISTILL_REJECTED`.
 
 ```
 POST /api/admin/marketing/x-ops/learn
 POST /api/admin/marketing/x-ops/outbound
 ```
 
-지금 학습. 스위치가 꺼져 있으면 400. GET 응답의 `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary`는 읽기 전용. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK`(prod 증류) · `FETCH_FAILED`.
+지금 학습. 스위치가 꺼져 있으면 400. GET 응답의 `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary` / `mimicryAvg28d` / `mimicrySampleCount` / `deleteRate28d` / `gatePassed`는 읽기 전용. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK`(prod 증류) · `FETCH_FAILED` · `DISTILL_REJECTED`.
 
 지금 선댓글 틱 1회 (`XOutboundService.run`). 스위치 off면 400. nginx `/api/admin/marketing/` 읽기 타임아웃 300s.
 
