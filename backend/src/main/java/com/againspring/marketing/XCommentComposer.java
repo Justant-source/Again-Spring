@@ -1,11 +1,13 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.LlmImage;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.againspring.safety.KeywordGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,6 +47,7 @@ public class XCommentComposer {
     private final KeywordGuard keywordGuard;
     private final PromptLoader promptLoader;
     private final ObjectMapper objectMapper;
+    private final XPersonaExampleRepository exampleRepository;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -106,6 +109,7 @@ public class XCommentComposer {
         String safeTweet = promptSanitizer.sanitize(tweetText);
         String safePeers = promptSanitizer.sanitize(joinPeers(peerReplies));
         String safeDonts = promptSanitizer.sanitize(donts);
+        String safeShots = promptSanitizer.sanitize(fewShotBlock(tweetText, photoJpegBase64 != null));
         String prompt = instructions + """
 
             목소리 프로필:
@@ -127,7 +131,12 @@ public class XCommentComposer {
             <user_input>
             %s
             </user_input>
-            """.formatted(safeProfile, safeTweet, safePeers, safeDonts);
+
+            운영자가 같은 종류 글에 직접 단 댓글 (베끼지 말고 결만):
+            <user_input>
+            %s
+            </user_input>
+            """.formatted(safeProfile, safeTweet, safePeers, safeDonts, safeShots);
         return invokeOutbound(prompt, photoJpegBase64);
     }
 
@@ -265,6 +274,45 @@ public class XCommentComposer {
             }
         }
         return String.join("\n", lines);
+    }
+
+    String fewShotBlock(String tweetText, boolean hasPhoto) {
+        List<XPersonaExample> drills;
+        try {
+            drills = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
+                XPersonaExample.Source.DRILL);
+        } catch (Exception e) {
+            return "";
+        }
+        if (drills == null || drills.isEmpty()) {
+            return "";
+        }
+        OutboundDraftGuard.Script want = OutboundDraftGuard.scriptOf(
+            tweetText == null ? "" : tweetText);
+        StringBuilder sb = new StringBuilder();
+        int kept = 0;
+        for (XPersonaExample ex : drills) {
+            if (ex == null || ex.getOperatorBody() == null || ex.getOperatorBody().isBlank()) {
+                continue;
+            }
+            if (ex.isHasPhoto() != hasPhoto) {
+                continue;
+            }
+            String sit = ex.getPostText() == null ? "" : ex.getPostText();
+            if (want != OutboundDraftGuard.Script.MIXED && !sit.isBlank()) {
+                OutboundDraftGuard.Script got = OutboundDraftGuard.scriptOf(sit);
+                if (got != OutboundDraftGuard.Script.MIXED && got != want) {
+                    continue;
+                }
+            }
+            sb.append("상황: ").append(sit.replace('\n', ' ').trim()).append('\n');
+            sb.append("운영자: ").append(ex.getOperatorBody().replace('\n', ' ').trim()).append("\n---\n");
+            kept++;
+            if (kept >= 5) {
+                break;
+            }
+        }
+        return sb.toString();
     }
 
     private Draft toDraft(String raw) {

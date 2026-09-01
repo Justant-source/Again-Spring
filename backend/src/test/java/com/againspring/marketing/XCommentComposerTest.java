@@ -1,10 +1,12 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.ScanResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +53,8 @@ class XCommentComposerTest {
     private PromptLoader promptLoader;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock
+    private XPersonaExampleRepository exampleRepository;
 
     @InjectMocks
     private XCommentComposer composer;
@@ -70,6 +74,8 @@ class XCommentComposerTest {
                 .settingKey(XPersonaLearnService.KEY_PROFILE)
                 .settingValue(DISTINCT_PROFILE)
                 .build()));
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(any()))
+            .thenReturn(List.of());
     }
 
     @Test
@@ -177,6 +183,29 @@ class XCommentComposerTest {
         verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"), anyList());
         assertThat(promptCaptor.getValue()).doesNotContain(jpeg);
         verify(llmProvider, never()).invoke(anyString(), anyString());
+    }
+
+    @Test
+    void composeOutbound_includesMatchingDrillFewShot() throws Exception {
+        stubOutboundPrompts();
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.DRILL))
+            .thenReturn(List.of(XPersonaExample.builder()
+                .source(XPersonaExample.Source.DRILL)
+                .tweetId("t1")
+                .postText("강아지 사진 올렸다")
+                .hasPhoto(false)
+                .operatorBody("너무귀여움")
+                .build()));
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+
+        composer.composeOutbound("고양이도 귀엽다", List.of(), null);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        assertThat(promptCaptor.getValue()).contains("너무귀여움");
+        assertThat(promptCaptor.getValue()).contains("강아지 사진 올렸다");
+        assertThat(promptCaptor.getValue()).contains("운영자가 같은 종류 글에 직접 단 댓글");
     }
 
     private void stubOutboundPrompts() throws Exception {

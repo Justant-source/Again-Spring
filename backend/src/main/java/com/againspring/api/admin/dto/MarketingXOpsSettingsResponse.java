@@ -30,6 +30,7 @@ public class MarketingXOpsSettingsResponse {
     private Integer personaLastNewCount;
     private String personaLastLearnedAt;
     private String personaSummary;
+    private Integer personaDrillToday;
 
     public static MarketingXOpsSettingsResponse from(MarketingXOpsSettingsService.XOpsSettings s) {
         return MarketingXOpsSettingsResponse.builder()
@@ -52,6 +53,13 @@ public class MarketingXOpsSettingsResponse {
     public static MarketingXOpsSettingsResponse from(
             MarketingXOpsSettingsService.XOpsSettings s,
             XPersonaLearnService.LearnResult learn) {
+        return from(s, learn, null);
+    }
+
+    public static MarketingXOpsSettingsResponse from(
+            MarketingXOpsSettingsService.XOpsSettings s,
+            XPersonaLearnService.LearnResult learn,
+            Integer personaDrillToday) {
         MarketingXOpsSettingsResponse.MarketingXOpsSettingsResponseBuilder b = MarketingXOpsSettingsResponse.builder()
             .morningTime(s.morningTime())
             .nightTime(s.nightTime())
@@ -65,7 +73,8 @@ public class MarketingXOpsSettingsResponse {
             .inboundEnabled(s.inboundEnabled())
             .outboundEnabled(s.outboundEnabled())
             .personaLearningEnabled(s.personaLearningEnabled())
-            .personaLearnAt(s.personaLearnAt());
+            .personaLearnAt(s.personaLearnAt())
+            .personaDrillToday(personaDrillToday);
         if (learn != null) {
             b.personaLastStatus(learn.status())
                 .personaLastNewCount(learn.newManuals())

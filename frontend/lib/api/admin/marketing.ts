@@ -412,11 +412,12 @@ export interface MarketingXOpsSettings {
   personaLastNewCount?: number | null;
   personaLastLearnedAt?: string | null;
   personaSummary?: string | null;
+  personaDrillToday?: number | null;
 }
 
 export type MarketingXOpsSettingsUpdate = Omit<
   MarketingXOpsSettings,
-  'personaLastStatus' | 'personaLastNewCount' | 'personaLastLearnedAt' | 'personaSummary'
+  'personaLastStatus' | 'personaLastNewCount' | 'personaLastLearnedAt' | 'personaSummary' | 'personaDrillToday'
 >;
 
 export async function getMarketingXOpsSettings(): Promise<MarketingXOpsSettings> {

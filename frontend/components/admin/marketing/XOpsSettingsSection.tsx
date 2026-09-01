@@ -320,6 +320,9 @@ export function XOpsSettingsSection() {
             {settings.personaLastLearnedAt
               ? ` · ${settings.personaLastLearnedAt}`
               : ''}
+            {settings.personaDrillToday != null
+              ? ` · 오늘 드릴 ${settings.personaDrillToday}건`
+              : ''}
           </p>
           {settings.personaSummary && (
             <p className="text-sm text-gray-700">{settings.personaSummary}</p>

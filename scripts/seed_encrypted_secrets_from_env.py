@@ -32,6 +32,9 @@ ENV_MAP: list[tuple[str, tuple[str, ...]]] = [
     ("sync.dev_mariadb_password", ("DEV_MARIADB_PASSWORD",)),
     ("asm.api_token", ("ASM_API_TOKEN",)),
     ("asm.callback_token", ("ASM_CALLBACK_TOKEN",)),
+    ("telegram.bot_token", ("TELEGRAM_BOT_TOKEN",)),
+    ("telegram.chat_id", ("TELEGRAM_CHAT_ID",)),
+    ("telegram.webhook_secret", ("TELEGRAM_WEBHOOK_SECRET",)),
 ]
 
 

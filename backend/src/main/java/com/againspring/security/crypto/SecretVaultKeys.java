@@ -31,6 +31,7 @@ public final class SecretVaultKeys {
         m.put("asm.callback_token", new String[] {"asm.callback-token", "ASM_CALLBACK_TOKEN"});
         m.put("telegram.bot_token", new String[] {"telegram.bot-token", "TELEGRAM_BOT_TOKEN"});
         m.put("telegram.chat_id", new String[] {"telegram.chat-id", "TELEGRAM_CHAT_ID"});
+        m.put("telegram.webhook_secret", new String[] {"telegram.webhook-secret", "TELEGRAM_WEBHOOK_SECRET"});
         return m;
     }
 

@@ -1,9 +1,11 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -58,6 +60,7 @@ public class XPersonaLearnService {
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
     private final ObjectMapper objectMapper;
+    private final XPersonaExampleRepository exampleRepository;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -126,11 +129,32 @@ public class XPersonaLearnService {
             return persistMeta("NO_NEW", 0, Instant.now(), updatedBy);
         }
 
+        for (XManualStatusClassifier.Status s : fresh) {
+            persistTimelineExample(s);
+            ingested.add(s.id());
+        }
+        saveIngested(ingested, updatedBy);
+
         ObjectNode profile = readJson(KEY_PROFILE, SEED_PROFILE);
-        appendExamples(profile, fresh);
+        appendExampleLines(profile, formatCorpusLines());
+        String status = refreshProfile(profile, updatedBy);
+        return persistMeta(status, fresh.size(), Instant.now(), updatedBy);
+    }
+
+    /**
+     * After a Telegram drill is stored, fold the corpus into the distilled profile.
+     */
+    @Transactional
+    public String ingestDrillIntoProfile(String updatedBy) {
+        ObjectNode profile = readJson(KEY_PROFILE, SEED_PROFILE);
+        appendExampleLines(profile, formatCorpusLines());
+        return refreshProfile(profile, updatedBy == null ? "telegram" : updatedBy);
+    }
+
+    private String refreshProfile(ObjectNode profile, String updatedBy) {
         String status = "INGESTED";
         if (llmEnabled) {
-            ObjectNode distilled = distill(profile, fresh);
+            ObjectNode distilled = distill(profile);
             if (distilled != null) {
                 profile = distilled;
                 status = "OK";
@@ -140,25 +164,63 @@ public class XPersonaLearnService {
         } else {
             status = "INGESTED_LLM_DISABLED";
         }
-
         saveSetting(KEY_PROFILE, profile.toString(), Instant.now(), updatedBy);
-        for (XManualStatusClassifier.Status s : fresh) {
-            ingested.add(s.id());
-        }
-        saveIngested(ingested, updatedBy);
-        return persistMeta(status, fresh.size(), Instant.now(), updatedBy);
+        return status;
     }
 
-    private ObjectNode distill(ObjectNode current, List<XManualStatusClassifier.Status> fresh) {
-        StringBuilder comments = new StringBuilder();
-        for (XManualStatusClassifier.Status s : fresh) {
-            comments.append("- ").append(s.text().replace('\n', ' ').trim()).append('\n');
+    private void persistTimelineExample(XManualStatusClassifier.Status s) {
+        if (s == null || s.id() == null || s.id().isBlank()) {
+            return;
         }
-        String safeComments = promptSanitizer.sanitize(comments.toString());
+        if (exampleRepository.existsByTweetId(s.id())) {
+            return;
+        }
+        String body = s.text() != null ? s.text().replace('\n', ' ').trim() : "";
+        if (body.isBlank()) {
+            return;
+        }
+        exampleRepository.save(XPersonaExample.builder()
+            .source(XPersonaExample.Source.TIMELINE)
+            .tweetId(s.id())
+            .postText(null)
+            .hasPhoto(false)
+            .operatorBody(body)
+            .createdAt(Instant.now())
+            .build());
+    }
+
+    String formatCorpusLines() {
+        StringBuilder sb = new StringBuilder();
+        for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+            XPersonaExample.Source.DRILL)) {
+            sb.append(formatPair(ex, 2)).append('\n');
+        }
+        for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+            XPersonaExample.Source.TIMELINE)) {
+            sb.append(formatPair(ex, 1)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    static String formatPair(XPersonaExample ex, int weight) {
+        String sit = ex.getPostText() == null || ex.getPostText().isBlank()
+            ? "(상황 없음)"
+            : ex.getPostText().replace('\n', ' ').trim();
+        String body = ex.getOperatorBody() == null ? "" : ex.getOperatorBody().replace('\n', ' ').trim();
+        return "가중 " + weight + " / 상황: " + sit + " / 운영자: " + body;
+    }
+
+    private ObjectNode distill(ObjectNode current) {
+        String corpus = formatCorpusLines();
+        if (corpus.isBlank()) {
+            return null;
+        }
+        String safeComments = promptSanitizer.sanitize(corpus);
         String safeProfile = promptSanitizer.sanitize(current.toString());
         String prompt = """
-            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글만 보고 목소리 프로필 JSON을 갱신하세요.
-            기존 프로필의 결을 유지하되, 새 댓글에서 반복되는 버릇을 보강하세요.
+            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글(상황-댓글 쌍)만 보고 목소리 프로필 JSON을 갱신하세요.
+            가중 2(드릴: 상황이 있는 쌍)를 가중 1(타임라인: 댓글만)보다 우선하세요.
+            기존 프로필의 결을 유지하되, 새 쌍에서 반복되는 버릇을 보강하세요.
             판결/승패/유무죄 표현을 프로필에 넣지 마세요. 사연 평은 공감만.
 
             기존 프로필:
@@ -166,7 +228,7 @@ public class XPersonaLearnService {
             %s
             </user_input>
 
-            새 수동 댓글:
+            운영자 코퍼스 (상황 / 운영자 댓글):
             <user_input>
             %s
             </user_input>
@@ -193,7 +255,7 @@ public class XPersonaLearnService {
         }
     }
 
-    private void appendExamples(ObjectNode profile, List<XManualStatusClassifier.Status> fresh) {
+    private void appendExampleLines(ObjectNode profile, String corpusLines) {
         ArrayNode examples = profile.withArray("examples");
         LinkedHashSet<String> keep = new LinkedHashSet<>();
         for (JsonNode n : examples) {
@@ -201,22 +263,18 @@ public class XPersonaLearnService {
                 keep.add(n.asText().trim());
             }
         }
-        for (XManualStatusClassifier.Status s : fresh) {
-            String t = s.text() != null ? s.text().replace('\n', ' ').trim() : "";
-            if (!t.isBlank()) {
-                keep.add(t);
+        if (corpusLines != null) {
+            for (String line : corpusLines.split("\n")) {
+                if (line != null && !line.isBlank()) {
+                    keep.add(line.trim());
+                }
             }
         }
         examples.removeAll();
-        int i = 0;
         List<String> list = new ArrayList<>(keep);
         int start = Math.max(0, list.size() - MAX_EXAMPLE_KEEP);
         for (int idx = start; idx < list.size(); idx++) {
             examples.add(list.get(idx));
-            i++;
-            if (i >= MAX_EXAMPLE_KEEP) {
-                break;
-            }
         }
     }
 
@@ -344,6 +402,15 @@ public class XPersonaLearnService {
             || n.contains("rate limit")
             || n.contains("i'm claude")
             || n.contains("as an ai");
+    }
+
+    public int drillsToday(Instant now) {
+        Instant at = now != null ? now : Instant.now();
+        java.time.LocalDate day = at.atZone(KST).toLocalDate();
+        Instant start = day.atStartOfDay(KST).toInstant();
+        Instant end = day.plusDays(1).atStartOfDay(KST).toInstant();
+        return (int) exampleRepository.countBySourceAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            XPersonaExample.Source.DRILL, start, end);
     }
 
     public LearnResult requireEnabledThenRun(String updatedBy) {

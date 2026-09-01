@@ -1,9 +1,11 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,8 @@ class XPersonaLearnServiceTest {
     private PromptSanitizer promptSanitizer;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+    @Mock
+    private XPersonaExampleRepository exampleRepository;
 
     @InjectMocks
     private XPersonaLearnService service;
@@ -56,6 +60,9 @@ class XPersonaLearnServiceTest {
         when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
         when(systemSettingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(xOpsSettingsService.get()).thenReturn(learningOn());
+        when(exampleRepository.existsByTweetId(any())).thenReturn(false);
+        when(exampleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(exampleRepository.findTop20BySourceOrderByCreatedAtDesc(any())).thenReturn(List.of());
     }
 
     @Test
@@ -78,6 +85,7 @@ class XPersonaLearnServiceTest {
         assertThat(captor.getAllValues())
             .extracting(SystemSetting::getSettingKey)
             .contains(XPersonaLearnService.KEY_INGESTED, XPersonaLearnService.KEY_PROFILE);
+        verify(exampleRepository).save(any());
     }
 
     @Test
@@ -95,6 +103,19 @@ class XPersonaLearnServiceTest {
         XPersonaLearnService.LearnResult r = service.runIfDue(dawnKst);
         assertThat(r).isNotNull();
         verify(timelineClient).fetchRecent(eq("againspring_net"), anyInt());
+    }
+
+    @Test
+    void formatPair_putsSituationAndOperator() {
+        XPersonaExample ex = XPersonaExample.builder()
+            .source(XPersonaExample.Source.DRILL)
+            .postText("사진 글")
+            .operatorBody("너무귀여움")
+            .build();
+        assertThat(XPersonaLearnService.formatPair(ex, 2))
+            .contains("가중 2")
+            .contains("상황: 사진 글")
+            .contains("운영자: 너무귀여움");
     }
 
     private static MarketingXOpsSettingsService.XOpsSettings learningOn() {
