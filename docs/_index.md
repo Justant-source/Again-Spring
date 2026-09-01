@@ -1,6 +1,6 @@
 ---
 title: docs — 문서 지도 & Doc-Sync 트리거 맵
-last_updated: 2026-09-01
+last_updated: 2026-09-02
 ---
 
 # docs/_index.md — 문서 지도 & Doc-Sync 트리거 맵
@@ -21,8 +21,16 @@ last_updated: 2026-09-01
 | 70-policy | `70-policy.md` | `70-policy/` (7) | `70-policy/` (9) | `70-policy/` (2) | — | `70-policy/` (7) |
 | 90-adr | — | — | `90-adr/` (7) 🏛 | — | — | — |
 
-루트: `docs/_index.md` · `docs/agent-development.md` · `docs/ai-user/history.md` (계층 밖).
+루트: `docs/_index.md` · `docs/agent-development.md` · `docs/ai-user/history.md` · `docs/_active/` (계층 밖).
 런타임 JSON: `docs/shared/policies/user-permissions.json` (이동 금지).
+
+**`docs/_active/`** — 진행 중인 다단계 작업 트랙의 ROADMAP + 상태를 담는다. 파일 하나 = 트랙 하나
+(등록·규칙은 `docs/_active/README.md` 참고). `.result/` `.temp/` `.request/`는 gitignore 대상이라
+계획·상태 문서를 그 안에만 두면 유실될 수 있다 — 실제로 `.result/ai-user-v2/`가 이렇게 소실됐다.
+그래서 이런 문서를 gitignore 경로에 두거나 그 경로를 권위본으로 지목하는 것은 금지이며, 위반 시
+`scripts/lint_docs.py`의 `no-gitignored-authority` 검사가 커밋을 막는다. 트랙이 완료되면 해당 모듈의
+history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 삭제한다 — 이 디렉토리는 항상
+"지금 진행 중인 것"만 담는다.
 
 🏛 = 그 주제의 전역 권위본. `(n)` = 디렉터리 안 본문 파일 수(README 제외). ADR 본문은 0000–0006 일곱 개(+ README).
 
@@ -32,6 +40,7 @@ last_updated: 2026-09-01
 |---|---|---|---|
 | AI agent 작업 루프 | `docs/agent-development.md` | — | — |
 | 시스템 전체 그림 파악 | `docs/shared/10-context.md` + `docs/shared/20-containers.md` | — | — |
+| 진행 중 작업 트랙 확인/등록 | `docs/_active/README.md` | — | — |
 | FE 기능/UI | `docs/frontend/10-context.md` | `docs/frontend/30-components/` | `frontend/app/` · `frontend/components/` |
 | FE 디자인 | `docs/frontend/70-policy/design-system.md` | — | `frontend/tailwind.config.ts` |
 | FE 테스트/e2e | `docs/frontend/70-policy/testing.md` | `docs/frontend/60-runtime/flows/` | `frontend/tests/` |

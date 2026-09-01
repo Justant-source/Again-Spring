@@ -1,7 +1,7 @@
 # 시봄이 숏폼 삽입 스펙 — Shorts / Reels
 
 > **권위본**: 이 문서 (2026-08-12 그릴링 합의 · **2026-08-16 본문 레이아웃 SSOT**, 검증 job `#669`).  
-> 캐릭터 자산·카탈로그: [`docs/frontend/design/specs/sprout-character-system/`](../../../frontend/assets/sprout-character-system/) · 런타임 패키지: `.temp/sprouts/` (승격 예정).  
+> 캐릭터 자산·카탈로그: [`docs/frontend/design/specs/sprout-character-system/`](../../../frontend/assets/sprout-character-system/) · 영상 합성 방법: [`video-package.md`](../../../frontend/assets/sprout-character-system/video-package.md)(승격 완료, 2026-09-02) · 런타임 자산 미러(로컬 전용, gitignore): `.temp/sprouts/`.  
 > 채널 계약: [`youtube-shorts-strategy.md`](youtube-shorts-strategy.md).  
 > **메타포 일러스트 60종은 영상 경로에서 완전 사용 금지.**
 
@@ -53,7 +53,7 @@
 | 사연/대본 화면 텍스트 | 메인 서사 | ✅ |
 | 시봄이 캔버스 안 캡션 | 보조 이해 (명사구·상황, 판정 금지) | ❌ |
 
-캡션은 캐릭터 PNG **위**에 먼저 합성한 뒤 프레임에 배치한다 (`.temp/sprouts/README.md` §5).
+캡션은 캐릭터 PNG **위**에 먼저 합성한 뒤 프레임에 배치한다 ([`video-package.md`](../../../frontend/assets/sprout-character-system/video-package.md) §5).
 캐릭터 PNG 캔버스는 항상 **1:1**로 유지한다. 캡션이나 사연 텍스트가 줄바꿈되면, 그 PNG를 담는 카드·블록은 직사각형이 될 수 있다.
 
 ---

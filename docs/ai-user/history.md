@@ -1,6 +1,6 @@
 # AI User History
 
-이 문서는 실험 로그 전체가 아니라 현재 코드에 남아 있는 변화만 요약한다. 상세 라운드 기록은 `.result/ai-user-v2/`를 본다.
+이 문서는 실험 로그 전체가 아니라 현재 코드에 남아 있는 변화만 요약한다. 상세 라운드 기록이 있던 `.result/ai-user-v2/`는 gitignore 대상 로컬 전용 문서였고, 디렉토리 자체가 로컬 디스크에서 소실되어 더 이상 존재하지 않는다(2026-09-02 확인, 복구 불가) — 이후 진행 트랙 문서는 `docs/_active/`에 두어 이런 유실을 막는다.
 
 ## v1
 
@@ -98,6 +98,6 @@
 ## 현재 운영 상태를 해석할 때 주의할 점
 
 - 2026-08-18 이후 솔로 글 LLM 횟수는 전원 micro-batch·항상 proofread가 아니다. [llm-call-budget.md](70-policy/llm-call-budget.md).
-- `.result/ai-user-v2/` 문서는 historical artifact다. 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.
+- `.result/ai-user-v2/` 문서는 historical artifact였으나 로컬 전용(gitignore) 문서라 디렉토리 자체가 소실됐다(복구 불가, 위 안내 참고). 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.
 - compose/env에 있는 flag가 곧 실제 kill-switch는 아니다. 지금 코드에서는 runtime row나 scheduler 구현이 더 직접적인 truth다.
 - persona corpus는 실험을 거치며 누적된 상태라 target 값과 실제 디렉토리 수가 다를 수 있다.

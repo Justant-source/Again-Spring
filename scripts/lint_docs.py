@@ -15,6 +15,8 @@ Checks:
    8. code-ref-targets-exist      — every code-ref path actually exists in the repo
    9. banned-refs                 — docs must not instruct use of deleted symbols
   10. code-paths-exist            — trigger-map globs and ADR related_code resolve
+  11. no-gitignored-authority     — docs must not point at a gitignored path (.result/
+                                     .temp/ .request/) as the authoritative source
 
 Exemptions:
   - File-level:  <!-- lint-docs: allow-missing-code-refs -->  anywhere in the file
@@ -407,6 +409,67 @@ def check_code_paths_exist() -> list[tuple[Path, str]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Check 11: no gitignored path cited as authority                       [NEW]
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Directories excluded from git tracking (see .gitignore) that have, in the
+# past, been pointed at as an authoritative/SSOT source from tracked docs —
+# and then been lost, because nothing outside the doc kept them alive.
+GITIGNORED_PATH_PREFIXES = (".result/", ".temp/", ".request/")
+
+# Phrases that mean "this gitignored path is the thing to consult/obey",
+# as opposed to merely describing where runtime data happens to live.
+_DELEGATION_PHRASES = (
+    "권위본", "진행 상황", "우선순위", "따른다", "본다", "읽는다", "기록은", "참고한다",
+)
+
+
+def check_no_gitignored_authority() -> list[tuple[Path, int, str]]:
+    """A tracked doc must never point at a gitignored path as its authority.
+
+    `.result/` `.temp/` `.request/` are gitignored — nothing keeps their
+    contents alive. `.result/ai-user-v2/` was cited as an authoritative
+    source from tracked docs and was then actually lost. Two shapes count
+    as a violation on one line:
+      1. A gitignored path whose backtick token ends in `.md` — pointing at
+         an untracked markdown file as documentation is itself the leak.
+      2. A gitignored *directory* path plus a delegation phrase (권위본 /
+         진행 상황 / 우선순위 / 따른다 / 본다 / 읽는다 / 기록은 / 참고한다) on the
+         same line — the doc is telling the reader to defer to it.
+    Merely describing where runtime data lives (host cron writes there, a
+    package sits there, etc.) is not a violation.
+    """
+    violations: list[tuple[Path, int, str]] = []
+    for md in _docs_files():
+        text = _read(md)
+        if _file_is_exempt(text):
+            continue
+        lines = text.splitlines()
+        exempt = _exempt_line_numbers(lines)
+        for i, line in enumerate(lines):
+            if i in exempt:
+                continue
+            for m in _BACKTICK_RE.finditer(line):
+                token = m.group(1).strip()
+                if not token.startswith(GITIGNORED_PATH_PREFIXES):
+                    continue
+                if token.endswith(".md"):
+                    violations.append((
+                        md, i + 1,
+                        "gitignored 경로가 .md 문서를 가리킴 (%s) — "
+                        "docs/_active/ 등 추적 대상으로 옮기거나 참조를 제거할 것" % token,
+                    ))
+                    continue
+                if any(phrase in line for phrase in _DELEGATION_PHRASES):
+                    violations.append((
+                        md, i + 1,
+                        "gitignored 경로를 권위본으로 지목 (%s) — "
+                        "docs/_active/ 로 승격하거나 참조를 제거할 것" % token,
+                    ))
+    return violations
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Runner
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -421,6 +484,7 @@ CHECKS = [
     ("code-ref-targets-exist",     check_code_ref_targets_exist),
     ("banned-refs",                check_banned_refs),
     ("code-paths-exist",           check_code_paths_exist),
+    ("no-gitignored-authority",    check_no_gitignored_authority),
 ]
 
 
