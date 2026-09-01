@@ -1,10 +1,12 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XOpsActionRepository;
 import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +51,8 @@ class XPersonaLearnServiceTest {
     private ObjectMapper objectMapper = new ObjectMapper();
     @Mock
     private XPersonaExampleRepository exampleRepository;
+    @Mock
+    private XOpsActionRepository xOpsActionRepository;
 
     @InjectMocks
     private XPersonaLearnService service;
@@ -63,6 +67,9 @@ class XPersonaLearnServiceTest {
         when(exampleRepository.existsByTweetId(any())).thenReturn(false);
         when(exampleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(exampleRepository.findTop20BySourceOrderByCreatedAtDesc(any())).thenReturn(List.of());
+        when(exampleRepository.findByTweetId(any())).thenReturn(Optional.empty());
+        when(xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(any(), any(), any()))
+            .thenReturn(List.of());
     }
 
     @Test
@@ -89,6 +96,56 @@ class XPersonaLearnServiceTest {
     }
 
     @Test
+    void runNow_skipsLedgerPostedIdsEvenIfTheyLookManual() {
+        when(timelineClient.fetchRecent(eq("againspring_net"), anyInt())).thenReturn(List.of(
+            new XManualStatusClassifier.Status(
+                "auto-1", "@KoreAgenda 너무귀여움 ㅋㅋㅋㅋ", "KoreAgenda", false),
+            new XManualStatusClassifier.Status(
+                "man-1", "@ceolmh3 힘빠지긴 할듯", "ceolmh3", false)
+        ));
+        when(xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(any(), any(), any()))
+            .thenReturn(List.of(XOpsAction.builder()
+                .kind(XOpsAction.Kind.OUTBOUND)
+                .status(XOpsAction.Status.POSTED)
+                .postedTweetId("auto-1")
+                .targetTweetId("root-a")
+                .body("너무귀여움 ㅋㅋㅋㅋ")
+                .createdAt(Instant.now())
+                .build()));
+
+        service.runNow("admin");
+
+        ArgumentCaptor<XPersonaExample> captor = ArgumentCaptor.forClass(XPersonaExample.class);
+        verify(exampleRepository).save(captor.capture());
+        assertThat(captor.getValue().getTweetId()).isEqualTo("man-1");
+        assertThat(captor.getValue().getSource()).isEqualTo(XPersonaExample.Source.TIMELINE);
+    }
+
+    @Test
+    void runNow_ingestsMissingPostedCommentAsDeletedAuto() {
+        when(timelineClient.fetchRecent(eq("againspring_net"), anyInt())).thenReturn(List.of());
+        when(xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(any(), any(), any()))
+            .thenReturn(List.of(XOpsAction.builder()
+                .kind(XOpsAction.Kind.OUTBOUND)
+                .status(XOpsAction.Status.POSTED)
+                .postedTweetId("auto-gone")
+                .targetTweetId("root-9")
+                .body("문맥없는말")
+                .createdAt(Instant.now())
+                .build()));
+
+        XPersonaLearnService.LearnResult r = service.runNow("admin");
+
+        assertThat(r.status()).isEqualTo("INGESTED_LLM_DISABLED");
+        assertThat(r.newManuals()).isEqualTo(1);
+        ArgumentCaptor<XPersonaExample> captor = ArgumentCaptor.forClass(XPersonaExample.class);
+        verify(exampleRepository).save(captor.capture());
+        assertThat(captor.getValue().getSource()).isEqualTo(XPersonaExample.Source.DELETED_AUTO);
+        assertThat(captor.getValue().getOperatorBody()).isEqualTo("문맥없는말");
+        assertThat(captor.getValue().getTweetId()).isEqualTo("auto-gone");
+    }
+
+    @Test
     void runIfDue_doesNotFetchOutsideLearnMinute() {
         Instant noonKst = Instant.parse("2026-08-30T03:00:00Z");
         XPersonaLearnService.LearnResult r = service.runIfDue(noonKst);
@@ -108,14 +165,21 @@ class XPersonaLearnServiceTest {
     @Test
     void formatPair_putsSituationAndOperator() {
         XPersonaExample ex = XPersonaExample.builder()
-            .source(XPersonaExample.Source.DRILL)
+            .source(XPersonaExample.Source.TIMELINE)
             .postText("사진 글")
             .operatorBody("너무귀여움")
             .build();
-        assertThat(XPersonaLearnService.formatPair(ex, 2))
-            .contains("가중 2")
+        assertThat(XPersonaLearnService.formatPair(ex, 1))
+            .contains("가중 1")
             .contains("상황: 사진 글")
             .contains("운영자: 너무귀여움");
+        assertThat(XPersonaLearnService.formatDeletedLine(XPersonaExample.builder()
+            .source(XPersonaExample.Source.DELETED_AUTO)
+            .postText("root-9")
+            .operatorBody("문맥없는말")
+            .build()))
+            .contains("피함")
+            .contains("문맥없는말");
     }
 
     private static MarketingXOpsSettingsService.XOpsSettings learningOn() {

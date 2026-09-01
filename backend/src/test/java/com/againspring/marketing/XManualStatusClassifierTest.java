@@ -48,4 +48,18 @@ class XManualStatusClassifierTest {
         assertThat(XManualStatusClassifier.isManual(new XManualStatusClassifier.Status(
             "6", "@ceolmh3", "ceolmh3", false), OURS)).isFalse();
     }
+
+    @Test
+    void ledgerPostedId_isNotManual() {
+        assertThat(XManualStatusClassifier.isManual(
+            new XManualStatusClassifier.Status(
+                "auto-1", "@ceolmh3 너무귀여움 ㅋㅋㅋㅋ", "ceolmh3", false),
+            OURS,
+            java.util.Set.of("auto-1"))).isFalse();
+        assertThat(XManualStatusClassifier.isManual(
+            new XManualStatusClassifier.Status(
+                "man-1", "@ceolmh3 힘빠지긴 할듯", "ceolmh3", false),
+            OURS,
+            java.util.Set.of("auto-1"))).isTrue();
+    }
 }

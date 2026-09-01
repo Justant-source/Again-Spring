@@ -2,7 +2,6 @@ package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.notification.TelegramNotifier;
-import com.againspring.repository.marketing.XPersonaExampleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,10 +43,6 @@ class XOutboundServiceTest {
     private XOpsActionLedger ledger;
     @Mock
     private TelegramNotifier telegramNotifier;
-    @Mock
-    private XPersonaDrillService xPersonaDrillService;
-    @Mock
-    private XPersonaExampleRepository exampleRepository;
 
     @InjectMocks
     private XOutboundService service;
@@ -64,8 +59,6 @@ class XOutboundServiceTest {
         when(outboundDraftGuard.firstViolation(any(), any(), any())).thenReturn(Optional.empty());
         when(asmClient.publishX(anyString(), anyString(), any(), any()))
             .thenReturn(new AsmClient.XPublishResult(true, "out-posted", "https://x.com/i/out", null));
-        when(xPersonaDrillService.isBlockedTweet(any())).thenReturn(false);
-        when(exampleRepository.existsByTweetId(any())).thenReturn(false);
     }
 
     @Test
@@ -141,29 +134,6 @@ class XOutboundServiceTest {
         when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
             cand("root-1", "mutual", "글", 5, 1.0, false, null)));
         when(ledger.alreadyHandled("root-1")).thenReturn(true);
-
-        service.run(now);
-
-        verify(asmClient, never()).publishX(any(), any(), any(), any());
-    }
-
-    @Test
-    void drilledTweet_skipsPublish() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
-            cand("root-1", "mutual", "글", 5, 1.0, false, null)));
-        when(exampleRepository.existsByTweetId("root-1")).thenReturn(true);
-
-        service.run(now);
-
-        verify(asmClient, never()).publishX(any(), any(), any(), any());
-        verify(composer, never()).composeOutbound(any(), any(), any());
-    }
-
-    @Test
-    void pendingDrillTweet_skipsPublish() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
-            cand("root-1", "mutual", "글", 5, 1.0, false, null)));
-        when(xPersonaDrillService.isBlockedTweet("root-1")).thenReturn(true);
 
         service.run(now);
 

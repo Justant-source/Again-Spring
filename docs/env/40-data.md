@@ -58,7 +58,6 @@ last_updated: 2026-09-01
 | `sync.dev_mariadb_password` | `DEV_MARIADB_PASSWORD` (prod sync) |
 | `asm.api_token` / `asm.callback_token` | `ASM_API_TOKEN` / `ASM_CALLBACK_TOKEN` (AS→ASM 클라이언트 복사본; 권위본은 ASM `system_secret`) |
 | `telegram.bot_token` / `telegram.chat_id` | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` |
-| `telegram.webhook_secret` | `TELEGRAM_WEBHOOK_SECRET` (Telegram `X-Telegram-Bot-Api-Secret-Token`) |
 | `github.pat.<username>` | git credential helper only |
 
 ## Base LLM (`againspring-llm`)
@@ -122,10 +121,7 @@ last_updated: 2026-09-01
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
 | `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | **vault** `ai_user.bot_password` (env 비권장) |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 예약 글 게시 성공·최종 실패 알림 · Justant-Bot 드릴 채팅 | 기본은 host watchdog credential file(`~/.config/again-spring-watchdog/telegram.env`)에서 compose가 주입. Git에 커밋 금지. BE는 vault `telegram.bot_token` / `telegram.chat_id` |
-| `TELEGRAM_WEBHOOK_URL` | prod BE `setWebhook` 대상 | `https://againspring.net/api/internal/telegram/webhook` (시크릿 아님) |
-| `TELEGRAM_WEBHOOK_SECRET` | Telegram `X-Telegram-Bot-Api-Secret-Token` | vault `telegram.webhook_secret` |
-| `MARKETING_X_DRILL_DAILY_CAP` | Justant-Bot Telegram 드릴 하루 상한 | `10` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 예약 글 게시 성공·최종 실패 알림 · Justant-Bot 선댓글/대댓글 게시 통보 | 기본은 host watchdog credential file(`~/.config/again-spring-watchdog/telegram.env`)에서 compose가 주입. Git에 커밋 금지. BE는 vault `telegram.bot_token` / `telegram.chat_id` |
 | `TELEGRAM_ENV_FILE` | ai-user compose의 Telegram credential file 경로 override | 기본값=`/home/justant/.config/again-spring-watchdog/telegram.env`; 다른 host 경로일 때만 설정 |
 | `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
 | `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |

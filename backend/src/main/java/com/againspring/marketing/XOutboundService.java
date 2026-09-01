@@ -2,7 +2,6 @@ package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.notification.TelegramNotifier;
-import com.againspring.repository.marketing.XPersonaExampleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,8 +26,6 @@ public class XOutboundService {
     private final OutboundDraftGuard outboundDraftGuard;
     private final XOpsActionLedger ledger;
     private final TelegramNotifier telegramNotifier;
-    private final XPersonaDrillService xPersonaDrillService;
-    private final XPersonaExampleRepository exampleRepository;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -71,12 +68,6 @@ public class XOutboundService {
                 continue;
             }
             if (ledger.alreadyHandled(replyTo)) {
-                continue;
-            }
-            if (xPersonaDrillService.isBlockedTweet(c.tweetId())
-                || xPersonaDrillService.isBlockedTweet(replyTo)
-                || exampleRepository.existsByTweetId(c.tweetId())
-                || exampleRepository.existsByTweetId(replyTo)) {
                 continue;
             }
 

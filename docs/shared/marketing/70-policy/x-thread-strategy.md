@@ -166,16 +166,14 @@ AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 | 아침/밤 글 · 대댓글 · 선댓글 | **off** | `marketing.x.{ritual,inbound,outbound}_enabled` |
 | 페르소나 학습 | **on** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
 
-매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 남에게 단 댓글·인용 평**만 코퍼스에 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)는 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 Haiku 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`.
-
-**Telegram 상황 드릴**: 운영자가 `@WaggleBot_bot`에 `/drill` (또는 `/drill 5`)을 보내면 BE가 실제 선댓글 후보를 보여 준다. 그 메시지에 한 줄 답장 → `x_persona_example` `source=DRILL` (가중 2). `/skip`은 학습 없이 다음. **X에 게시하지 않음.** 대기 1건·하루 10장·2시간 만료. 드릴한 tweetId는 outbound가 건너뛴다. 웹훅 `POST /api/internal/telegram/webhook`.
+매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 직접 남에게 단 댓글·인용 평**만 gold 코퍼스(`source=TIMELINE`)에 넣는다. Justant-Bot이 게시한 선댓글·대댓글(`x_ops_action.posted_tweet_id`, 최근 14일)은 타임라인에 남아 있어도 gold가 아니다. 최근 3일 POSTED 댓글이 타임라인에 없으면 운영자가 지운 것으로 보고 `DELETED_AUTO`(avoid)로 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)도 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 Haiku 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`. Telegram으로 페르소나를 학습시키지 않는다. 게시 알림용 Telegram은 그대로 둔다.
 
 성장 루프 발행기는 위 플래그를 읽는다. 스위치 기본값은 꺼짐이라, 어드민에서 켜기 전에는 X에 글·댓글이 나가지 않는다. **prod가 자동 게시 중이라고 보지 않는다.**
 
 - **inbound** (우리 글 대댓글): 하루 40, 글당 12(설정 기본값). 수신 후 **30분 창**, 지터 **3–25분**은 코드 고정(어드민 UI 없음). 게시 성공 시 outbound와 같은 Telegram 통보.
 - **outbound** (팔로우 선댓글): 하루 20, **팔로우 중 타임라인 원글**(맞팔 필수 아님). 최소 댓글 수·최대 나이는 설정의 `hotMinReplies` / `hotMaxAgeHours` (`hotMinReplies=0`이면 댓글 없는 최신글도 후보). 그 글에 우리 댓글이 없으면 **원글(root)**, 있으면 스레드 대댓글. **후보 조회는 1분이 아니다** — `XGrowthLoopScheduler.outboundTick`이 **08:00–22:00 KST 30분 간격**(08:00, 08:30, … 22:30). **틱당 댓글 최대 1개**(게시 성공하면 그 틱은 끝). **네이티브 영상 글은 스킵**(`hasVideo`)하고 다음 후보로 넘어간다. GIF는 영상이 아니라 사진으로 취급. 사진이 있으면 Haiku가 **첫 JPEG만**(ASM `photoJpegBase64`) + **타인 댓글 최대 10**(`peerReplies`)을 본다. 자신 없으면 게시하지 않는다(`UNSURE`) — ㅋㅋ로 채우지 않음. 영어 원글에 한글 댓글(또는 반대)은 `LANG_MISMATCH`로 스킵. 가드 이유: `TOO_LONG` / `LAUGH_SPAM` / `ECHO` / `LANG_MISMATCH` / `VIDEO` / `VISION_FAIL`. 작문 피드백은 세 층만: 프롬프트 `docs/shared/prompts/marketing/x-outbound-reply.md` · 금지 `x-outbound-donts.md` · `system_setting` `marketing.x.outbound_guards` + `OutboundDraftGuard`. 밤·심야에는 X 세션 API를 치지 않는다. 의식/대댓글 분 단위 틱과는 분리. **게시 성공 시** `@WaggleBot_bot` Telegram으로 댓글 URL·대상 글 URL·본문을 보낸다 (`XOpsTelegramAlerts`).
 - **ritual** (아침/밤 글): `morningTime` / `nightTime`에 사진 한 장 + 짧은 격려. 사진은 ASM `assets/x-ritual`.
-- BE는 `RemoteLlmProvider`(Haiku) + **Justant-Bot** `persona_profile_json` + DRILL few-shot(같은 언어·사진유무 최대 5쌍)으로 작문하고, ASM이 게시한다.
+- BE는 `RemoteLlmProvider`(Haiku) + **Justant-Bot** `persona_profile_json` + 운영자 TIMELINE few-shot + 지운 자동댓글 avoid로 작문하고, ASM이 게시한다.
 - **dev는 LLM 꺼짐(L3)** — 작문·발행은 no-op. 페르소나 학습은 새벽에 그대로 돈다.
 - 나중에 켤 때: inbound → outbound → ritual.
 

@@ -109,7 +109,8 @@ public class XCommentComposer {
         String safeTweet = promptSanitizer.sanitize(tweetText);
         String safePeers = promptSanitizer.sanitize(joinPeers(peerReplies));
         String safeDonts = promptSanitizer.sanitize(donts);
-        String safeShots = promptSanitizer.sanitize(fewShotBlock(tweetText, photoJpegBase64 != null));
+        String safeShots = promptSanitizer.sanitize(fewShotBlock(tweetText));
+        String safeAvoid = promptSanitizer.sanitize(avoidDeletedBlock());
         String prompt = instructions + """
 
             목소리 프로필:
@@ -136,7 +137,12 @@ public class XCommentComposer {
             <user_input>
             %s
             </user_input>
-            """.formatted(safeProfile, safeTweet, safePeers, safeDonts, safeShots);
+
+            운영자가 지운 자동댓글 (이 결·문맥 빗나감 쓰지 말 것):
+            <user_input>
+            %s
+            </user_input>
+            """.formatted(safeProfile, safeTweet, safePeers, safeDonts, safeShots, safeAvoid);
         return invokeOutbound(prompt, photoJpegBase64);
     }
 
@@ -276,26 +282,23 @@ public class XCommentComposer {
         return String.join("\n", lines);
     }
 
-    String fewShotBlock(String tweetText, boolean hasPhoto) {
-        List<XPersonaExample> drills;
+    String fewShotBlock(String tweetText) {
+        List<XPersonaExample> gold;
         try {
-            drills = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
-                XPersonaExample.Source.DRILL);
+            gold = exampleRepository.findTop40BySourceOrderByCreatedAtDesc(
+                XPersonaExample.Source.TIMELINE);
         } catch (Exception e) {
             return "";
         }
-        if (drills == null || drills.isEmpty()) {
+        if (gold == null || gold.isEmpty()) {
             return "";
         }
         OutboundDraftGuard.Script want = OutboundDraftGuard.scriptOf(
             tweetText == null ? "" : tweetText);
         StringBuilder sb = new StringBuilder();
         int kept = 0;
-        for (XPersonaExample ex : drills) {
+        for (XPersonaExample ex : gold) {
             if (ex == null || ex.getOperatorBody() == null || ex.getOperatorBody().isBlank()) {
-                continue;
-            }
-            if (ex.isHasPhoto() != hasPhoto) {
                 continue;
             }
             String sit = ex.getPostText() == null ? "" : ex.getPostText();
@@ -309,6 +312,32 @@ public class XCommentComposer {
             sb.append("운영자: ").append(ex.getOperatorBody().replace('\n', ' ').trim()).append("\n---\n");
             kept++;
             if (kept >= 5) {
+                break;
+            }
+        }
+        return sb.toString();
+    }
+
+    String avoidDeletedBlock() {
+        List<XPersonaExample> deleted;
+        try {
+            deleted = exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+                XPersonaExample.Source.DELETED_AUTO);
+        } catch (Exception e) {
+            return "";
+        }
+        if (deleted == null || deleted.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        int kept = 0;
+        for (XPersonaExample ex : deleted) {
+            if (ex == null || ex.getOperatorBody() == null || ex.getOperatorBody().isBlank()) {
+                continue;
+            }
+            sb.append(ex.getOperatorBody().replace('\n', ' ').trim()).append('\n');
+            kept++;
+            if (kept >= 8) {
                 break;
             }
         }

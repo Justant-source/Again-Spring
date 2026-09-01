@@ -205,11 +205,10 @@
 |---|---|---|
 | `GET` | `/api/admin/marketing/quota` | 24h 자동 분배 일일 상한·오늘 KST 사용량 |
 | `PUT` | `/api/admin/marketing/quota` | 글/영상 상한 저장 (`system_setting`) |
-| `GET` | `/api/admin/marketing/x-ops` | X 운영 설정(아침/밤·한도·킬스위치·페르소나 학습·오늘 드릴 수 `personaDrillToday`). 발행 스위치 기본 꺼짐, 학습 기본 켜짐 |
+| `GET` | `/api/admin/marketing/x-ops` | X 운영 설정(아침/밤·한도·킬스위치·페르소나 학습). 발행 스위치 기본 꺼짐, 학습 기본 켜짐 |
 | `PUT` | `/api/admin/marketing/x-ops` | X 운영 설정 저장 (`marketing.x.*`) |
 | `POST` | `/api/admin/marketing/x-ops/learn` | X 페르소나 지금 학습 (학습 off면 400). e2e에서 호출하지 않음 |
 | `POST` | `/api/admin/marketing/x-ops/outbound` | X 선댓글 지금 1틱 (스위치 off면 400). e2e에서 호출하지 않음 |
-| `POST` | `/api/internal/telegram/webhook` | Justant-Bot Telegram 드릴 (secret header, JWT 없음). e2e에서 호출하지 않음 |
 | `GET` | `/api/admin/marketing/score-weights` | 인기 점수 가중치 (views/comments/votes) |
 | `PUT` | `/api/admin/marketing/score-weights` | 가중치 저장 (`system_setting`, 0–100) |
 | `GET` | `/api/admin/marketing/publish-slots` | 레거시 슬롯 조회. **자동 발행 게이팅에 사용하지 않음** (READY 즉시) |

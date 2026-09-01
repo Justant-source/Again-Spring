@@ -76,6 +76,8 @@ class XCommentComposerTest {
                 .build()));
         when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(any()))
             .thenReturn(List.of());
+        when(exampleRepository.findTop20BySourceOrderByCreatedAtDesc(any()))
+            .thenReturn(List.of());
     }
 
     @Test
@@ -186,11 +188,11 @@ class XCommentComposerTest {
     }
 
     @Test
-    void composeOutbound_includesMatchingDrillFewShot() throws Exception {
+    void composeOutbound_includesMatchingTimelineFewShot() throws Exception {
         stubOutboundPrompts();
-        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.DRILL))
+        when(exampleRepository.findTop40BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE))
             .thenReturn(List.of(XPersonaExample.builder()
-                .source(XPersonaExample.Source.DRILL)
+                .source(XPersonaExample.Source.TIMELINE)
                 .tweetId("t1")
                 .postText("강아지 사진 올렸다")
                 .hasPhoto(false)
@@ -206,6 +208,26 @@ class XCommentComposerTest {
         assertThat(promptCaptor.getValue()).contains("너무귀여움");
         assertThat(promptCaptor.getValue()).contains("강아지 사진 올렸다");
         assertThat(promptCaptor.getValue()).contains("운영자가 같은 종류 글에 직접 단 댓글");
+    }
+
+    @Test
+    void composeOutbound_includesDeletedAutoAvoid() throws Exception {
+        stubOutboundPrompts();
+        when(exampleRepository.findTop20BySourceOrderByCreatedAtDesc(XPersonaExample.Source.DELETED_AUTO))
+            .thenReturn(List.of(XPersonaExample.builder()
+                .source(XPersonaExample.Source.DELETED_AUTO)
+                .tweetId("gone")
+                .operatorBody("문맥없는말")
+                .build()));
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+
+        composer.composeOutbound("고양이도 귀엽다", List.of(), null);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        assertThat(promptCaptor.getValue()).contains("문맥없는말");
+        assertThat(promptCaptor.getValue()).contains("운영자가 지운 자동댓글");
     }
 
     private void stubOutboundPrompts() throws Exception {

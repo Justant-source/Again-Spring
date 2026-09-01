@@ -6,8 +6,9 @@ import lombok.*;
 import java.time.Instant;
 
 /**
- * Operator voice sample for Justant-Bot. DRILL rows are (situation, reply) pairs
- * from Telegram; TIMELINE rows are scraped manual replies (parent text often missing).
+ * Operator voice sample for Justant-Bot. TIMELINE = operator-typed X replies.
+ * DELETED_AUTO = bot comments the operator removed (negative examples).
+ * DRILL is unused leftover (Telegram drill removed).
  */
 @Getter
 @Setter
@@ -22,7 +23,8 @@ public class XPersonaExample {
 
     public enum Source {
         DRILL,
-        TIMELINE
+        TIMELINE,
+        DELETED_AUTO
     }
 
     @Id

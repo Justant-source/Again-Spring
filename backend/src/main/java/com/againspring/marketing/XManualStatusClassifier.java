@@ -1,6 +1,7 @@
 package com.againspring.marketing;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -16,7 +17,18 @@ public final class XManualStatusClassifier {
     private XManualStatusClassifier() {}
 
     public static boolean isManual(Status status, String ourHandle) {
+        return isManual(status, ourHandle, Set.of());
+    }
+
+    /**
+     * {@code autoPostedIds} are tweet ids Justant-Bot already posted (ledger).
+     * Those look like human replies on the timeline but must not become gold.
+     */
+    public static boolean isManual(Status status, String ourHandle, Set<String> autoPostedIds) {
         if (status == null || status.id() == null || status.id().isBlank()) {
+            return false;
+        }
+        if (autoPostedIds != null && autoPostedIds.contains(status.id())) {
             return false;
         }
         String text = status.text() != null ? status.text().trim() : "";

@@ -124,8 +124,7 @@ public class AdminMarketingController {
         return ResponseEntity.ok(
             MarketingXOpsSettingsResponse.from(
                 marketingXOpsSettingsService.get(),
-                xPersonaLearnService.status(),
-                xPersonaLearnService.drillsToday(Instant.now())));
+                xPersonaLearnService.status()));
     }
 
     @PutMapping("/x-ops")
@@ -141,8 +140,7 @@ public class AdminMarketingController {
         var next = req.toSettings(marketingXOpsSettingsService.get());
         return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
             marketingXOpsSettingsService.update(next, updatedBy),
-            xPersonaLearnService.status(),
-            xPersonaLearnService.drillsToday(Instant.now())));
+            xPersonaLearnService.status()));
     }
 
     @PostMapping("/x-ops/learn")
@@ -156,8 +154,7 @@ public class AdminMarketingController {
         xPersonaLearnService.requireEnabledThenRun(updatedBy);
         return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
             marketingXOpsSettingsService.get(),
-            xPersonaLearnService.status(),
-            xPersonaLearnService.drillsToday(Instant.now())));
+            xPersonaLearnService.status()));
     }
 
     @PostMapping("/x-ops/outbound")

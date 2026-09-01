@@ -1,10 +1,12 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
+import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.domain.marketing.XPersonaExample;
 import com.againspring.llm.LLMProvider;
 import com.againspring.llm.PromptSanitizer;
 import com.againspring.repository.ai.SystemSettingRepository;
+import com.againspring.repository.marketing.XOpsActionRepository;
 import com.againspring.repository.marketing.XPersonaExampleRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,9 +25,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -53,6 +57,10 @@ public class XPersonaLearnService {
     private static final int MAX_INGESTED = 400;
     private static final int MAX_NEW_PER_RUN = 40;
     private static final int MAX_EXAMPLE_KEEP = 40;
+    private static final int AUTO_ID_DAYS = 14;
+    private static final int DELETED_AUTO_DAYS = 3;
+    private static final List<XOpsAction.Kind> COMMENT_KINDS = List.of(
+        XOpsAction.Kind.OUTBOUND, XOpsAction.Kind.INBOUND);
 
     private final SystemSettingRepository systemSettingRepository;
     private final MarketingXOpsSettingsService xOpsSettingsService;
@@ -61,6 +69,7 @@ public class XPersonaLearnService {
     private final PromptSanitizer promptSanitizer;
     private final ObjectMapper objectMapper;
     private final XPersonaExampleRepository exampleRepository;
+    private final XOpsActionRepository xOpsActionRepository;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -102,18 +111,32 @@ public class XPersonaLearnService {
 
     @Transactional
     public LearnResult runNow(String updatedBy) {
+        Instant now = Instant.now();
         List<XManualStatusClassifier.Status> fetched;
         try {
             fetched = timelineClient.fetchRecent(HANDLE, 6);
         } catch (Exception e) {
             log.warn("[x-persona] fetch failed: {}", e.getMessage());
-            return persistMeta("FETCH_FAILED", 0, Instant.now(), updatedBy);
+            return persistMeta("FETCH_FAILED", 0, now, updatedBy);
         }
+        if (fetched == null) {
+            fetched = List.of();
+        }
+
+        Set<String> timelineIds = new LinkedHashSet<>();
+        for (XManualStatusClassifier.Status s : fetched) {
+            if (s != null && s.id() != null && !s.id().isBlank()) {
+                timelineIds.add(s.id());
+            }
+        }
+        Set<String> autoPostedIds = autoPostedIds(now.minus(AUTO_ID_DAYS, ChronoUnit.DAYS));
+
+        int neu = persistDeletedAutos(timelineIds, now);
 
         Set<String> ingested = readIdSet();
         List<XManualStatusClassifier.Status> fresh = new ArrayList<>();
         for (XManualStatusClassifier.Status s : fetched) {
-            if (!XManualStatusClassifier.isManual(s, HANDLE)) {
+            if (!XManualStatusClassifier.isManual(s, HANDLE, autoPostedIds)) {
                 continue;
             }
             if (ingested.contains(s.id())) {
@@ -125,30 +148,21 @@ public class XPersonaLearnService {
             }
         }
 
-        if (fresh.isEmpty()) {
-            return persistMeta("NO_NEW", 0, Instant.now(), updatedBy);
+        if (fresh.isEmpty() && neu == 0) {
+            return persistMeta("NO_NEW", 0, now, updatedBy);
         }
 
         for (XManualStatusClassifier.Status s : fresh) {
             persistTimelineExample(s);
             ingested.add(s.id());
         }
+        neu += fresh.size();
         saveIngested(ingested, updatedBy);
 
         ObjectNode profile = readJson(KEY_PROFILE, SEED_PROFILE);
-        appendExampleLines(profile, formatCorpusLines());
+        appendExampleLines(profile, formatGoldLines());
         String status = refreshProfile(profile, updatedBy);
-        return persistMeta(status, fresh.size(), Instant.now(), updatedBy);
-    }
-
-    /**
-     * After a Telegram drill is stored, fold the corpus into the distilled profile.
-     */
-    @Transactional
-    public String ingestDrillIntoProfile(String updatedBy) {
-        ObjectNode profile = readJson(KEY_PROFILE, SEED_PROFILE);
-        appendExampleLines(profile, formatCorpusLines());
-        return refreshProfile(profile, updatedBy == null ? "telegram" : updatedBy);
+        return persistMeta(status, neu, now, updatedBy);
     }
 
     private String refreshProfile(ObjectNode profile, String updatedBy) {
@@ -189,15 +203,89 @@ public class XPersonaLearnService {
             .build());
     }
 
-    String formatCorpusLines() {
-        StringBuilder sb = new StringBuilder();
-        for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
-            XPersonaExample.Source.DRILL)) {
-            sb.append(formatPair(ex, 2)).append('\n');
+    private int persistDeletedAutos(Set<String> timelineIds, Instant now) {
+        Instant since = now.minus(DELETED_AUTO_DAYS, ChronoUnit.DAYS);
+        int added = 0;
+        for (XOpsAction a : postedCommentsSince(since)) {
+            String id = a.getPostedTweetId();
+            if (id == null || id.isBlank() || timelineIds.contains(id)) {
+                continue;
+            }
+            if (persistDeletedAuto(a, id)) {
+                added++;
+            }
         }
+        return added;
+    }
+
+    private boolean persistDeletedAuto(XOpsAction a, String postedId) {
+        String body = a.getBody() != null ? a.getBody().replace('\n', ' ').trim() : "";
+        if (body.isBlank()) {
+            return false;
+        }
+        String sit = a.getTargetTweetId() == null || a.getTargetTweetId().isBlank()
+            ? "(대상 없음)"
+            : a.getTargetTweetId();
+        Optional<XPersonaExample> existing = exampleRepository.findByTweetId(postedId);
+        if (existing.isPresent()) {
+            XPersonaExample ex = existing.get();
+            if (ex.getSource() == XPersonaExample.Source.DELETED_AUTO) {
+                return false;
+            }
+            if (ex.getSource() == XPersonaExample.Source.TIMELINE) {
+                ex.setSource(XPersonaExample.Source.DELETED_AUTO);
+                ex.setPostText(sit);
+                ex.setOperatorBody(body);
+                exampleRepository.save(ex);
+                return true;
+            }
+            return false;
+        }
+        exampleRepository.save(XPersonaExample.builder()
+            .source(XPersonaExample.Source.DELETED_AUTO)
+            .tweetId(postedId)
+            .postText(sit)
+            .hasPhoto(false)
+            .operatorBody(body)
+            .createdAt(Instant.now())
+            .build());
+        return true;
+    }
+
+    private Set<String> autoPostedIds(Instant since) {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (XOpsAction a : postedCommentsSince(since)) {
+            String id = a.getPostedTweetId();
+            if (id != null && !id.isBlank()) {
+                ids.add(id);
+            }
+        }
+        return ids;
+    }
+
+    private List<XOpsAction> postedCommentsSince(Instant since) {
+        return xOpsActionRepository.findByStatusAndKindInAndCreatedAtGreaterThanEqual(
+            XOpsAction.Status.POSTED, COMMENT_KINDS, since);
+    }
+
+    String formatCorpusLines() {
+        return formatGoldLines() + formatAvoidLines();
+    }
+
+    String formatGoldLines() {
+        StringBuilder sb = new StringBuilder();
         for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
             XPersonaExample.Source.TIMELINE)) {
             sb.append(formatPair(ex, 1)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    String formatAvoidLines() {
+        StringBuilder sb = new StringBuilder();
+        for (XPersonaExample ex : exampleRepository.findTop20BySourceOrderByCreatedAtDesc(
+            XPersonaExample.Source.DELETED_AUTO)) {
+            sb.append(formatDeletedLine(ex)).append('\n');
         }
         return sb.toString();
     }
@@ -210,6 +298,14 @@ public class XPersonaLearnService {
         return "가중 " + weight + " / 상황: " + sit + " / 운영자: " + body;
     }
 
+    static String formatDeletedLine(XPersonaExample ex) {
+        String sit = ex.getPostText() == null || ex.getPostText().isBlank()
+            ? "(대상 없음)"
+            : ex.getPostText().replace('\n', ' ').trim();
+        String body = ex.getOperatorBody() == null ? "" : ex.getOperatorBody().replace('\n', ' ').trim();
+        return "피함 / 운영자가 지운 자동댓글: " + body + " / 대상: " + sit;
+    }
+
     private ObjectNode distill(ObjectNode current) {
         String corpus = formatCorpusLines();
         if (corpus.isBlank()) {
@@ -218,9 +314,9 @@ public class XPersonaLearnService {
         String safeComments = promptSanitizer.sanitize(corpus);
         String safeProfile = promptSanitizer.sanitize(current.toString());
         String prompt = """
-            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글(상황-댓글 쌍)만 보고 목소리 프로필 JSON을 갱신하세요.
-            가중 2(드릴: 상황이 있는 쌍)를 가중 1(타임라인: 댓글만)보다 우선하세요.
-            기존 프로필의 결을 유지하되, 새 쌍에서 반복되는 버릇을 보강하세요.
+            당신은 X 계정 문체 분석기입니다. 운영자가 직접 단 댓글만 금(gold)으로 보고 목소리 프로필 JSON을 갱신하세요.
+            자동 댓글은 gold가 아닙니다. '피함 / 운영자가 지운 자동댓글' 줄은 avoid에만 넣고 examples에 넣지 마세요.
+            기존 프로필의 결을 유지하되, 새 운영자 댓글에서 반복되는 버릇을 보강하세요.
             판결/승패/유무죄 표현을 프로필에 넣지 마세요. 사연 평은 공감만.
 
             기존 프로필:
@@ -228,7 +324,7 @@ public class XPersonaLearnService {
             %s
             </user_input>
 
-            운영자 코퍼스 (상황 / 운영자 댓글):
+            운영자 코퍼스 (gold)와 지운 자동댓글 (avoid):
             <user_input>
             %s
             </user_input>
@@ -402,15 +498,6 @@ public class XPersonaLearnService {
             || n.contains("rate limit")
             || n.contains("i'm claude")
             || n.contains("as an ai");
-    }
-
-    public int drillsToday(Instant now) {
-        Instant at = now != null ? now : Instant.now();
-        java.time.LocalDate day = at.atZone(KST).toLocalDate();
-        Instant start = day.atStartOfDay(KST).toInstant();
-        Instant end = day.plusDays(1).atStartOfDay(KST).toInstant();
-        return (int) exampleRepository.countBySourceAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
-            XPersonaExample.Source.DRILL, start, end);
     }
 
     public LearnResult requireEnabledThenRun(String updatedBy) {

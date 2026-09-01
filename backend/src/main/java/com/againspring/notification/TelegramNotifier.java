@@ -4,15 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -26,8 +22,6 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class TelegramNotifier {
-
-    public static final int CAPTION_MAX = 1024;
 
     private final String botToken;
     private final String chatId;
@@ -132,63 +126,6 @@ public class TelegramNotifier {
         }
     }
 
-    public Optional<Long> sendPhoto(byte[] jpeg, String caption) {
-        if (!isConfigured() || jpeg == null || jpeg.length == 0) {
-            return Optional.empty();
-        }
-        try {
-            String cap = truncateCaption(caption);
-            MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-            parts.add("chat_id", chatId);
-            if (cap != null && !cap.isBlank()) {
-                parts.add("caption", cap);
-            }
-            parts.add("photo", new ByteArrayResource(jpeg) {
-                @Override
-                public String getFilename() {
-                    return "drill.jpg";
-                }
-            });
-            String raw = restClient
-                    .post()
-                    .uri("/bot{token}/sendPhoto", botToken)
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(parts)
-                    .retrieve()
-                    .body(String.class);
-            Optional<Long> id = messageIdFromBody(raw);
-            log.info("[telegram] photo sent messageId={}", id.orElse(null));
-            return id;
-        } catch (Exception e) {
-            log.warn("[telegram] failed to send photo: {}", e.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    public void setWebhook(String url, String secretToken) {
-        if (!isConfigured() || url == null || url.isBlank()) {
-            return;
-        }
-        try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("url", url);
-            if (secretToken != null && !secretToken.isBlank()) {
-                body.put("secret_token", secretToken);
-            }
-            body.put("allowed_updates", List.of("message"));
-            restClient
-                    .post()
-                    .uri("/bot{token}/setWebhook", botToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .toBodilessEntity();
-            log.info("[telegram] webhook set url={}", url);
-        } catch (Exception e) {
-            log.warn("[telegram] setWebhook failed: {}", e.getMessage());
-        }
-    }
-
     public Optional<Long> messageIdFromBody(String raw) {
         if (raw == null || raw.isBlank()) {
             return Optional.empty();
@@ -203,15 +140,5 @@ public class TelegramNotifier {
         } catch (Exception e) {
             return Optional.empty();
         }
-    }
-
-    public static String truncateCaption(String caption) {
-        if (caption == null) {
-            return "";
-        }
-        if (caption.length() <= CAPTION_MAX) {
-            return caption;
-        }
-        return caption.substring(0, CAPTION_MAX - 1) + "…";
     }
 }
