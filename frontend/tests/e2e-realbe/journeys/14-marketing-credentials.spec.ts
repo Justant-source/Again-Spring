@@ -79,24 +79,17 @@ test.describe('Journey 14-B: 설정 탭 (자격증명·자동 게시)', () => {
     await expect(page.locator(ADMIN_MARKETING.xOpsSection)).toBeVisible({ timeout: 8_000 })
     await expect(page.getByText('X 운영')).toBeVisible()
     await expect(page.locator(ADMIN_MARKETING.xOpsMimicryBadge)).toBeVisible()
-    await expect(page.getByRole('switch', { name: '아침/밤 글' })).toHaveAttribute(
-      'aria-checked',
-      'false'
-    )
-    await expect(page.getByRole('switch', { name: '페르소나 학습' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
-    await expect(page.getByRole('switch', { name: '페르소나 채점' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
-    await expect(page.getByRole('switch', { name: '원글 자동 작성' })).toHaveAttribute(
-      'aria-checked',
-      'false'
-    )
+    // 스위치는 렌더·조작 가능 여부만 본다. on/off 값은 단언하지 않는다 —
+    // 이 값들은 운영자가 어드민에서 켜고 끄는 system_setting 런타임 상태이지 코드가 아니다.
+    // (2026-09-02: '원글 자동 작성'을 운영자가 켜자 이 테스트가 깨져 배포 게이트가 막혔다.
+    //  dev·prod 설정이 동일했고 코드 회귀는 없었다. 데이터를 단언하던 게 원인이었다.)
+    for (const name of ['아침/밤 글', '페르소나 학습', '페르소나 채점', '원글 자동 작성']) {
+      const sw = page.getByRole('switch', { name })
+      await expect(sw).toBeVisible()
+      await expect(sw).toHaveAttribute('aria-checked', /^(true|false)$/)
+    }
     await expect(page.getByRole('button', { name: '지금 학습' })).toBeVisible()
-    // 섹션 존재·기본 스위치·학습 버튼만. inbound/outbound/ritual/원글 on 클릭·지금 학습 클릭·실 X 게시 없음
+    // 섹션 존재·스위치 렌더·학습 버튼만. inbound/outbound/ritual/원글 on 클릭·지금 학습 클릭·실 X 게시 없음
     // POST /x-ops/learn · /outbound 인증 호출은 14-A 미인증만. 여기선 트리거하지 않음
 
     // 숏폼영상 섹션 — 릴스·쇼츠 공용 나레이션 설정 박스 (ASM 없이도 셸 노출)

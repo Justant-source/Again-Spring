@@ -5,34 +5,49 @@
 > **dev/prod 완전 격리**: 일상 배포·수동 검증·e2e는 **dev(:8090)만**. prod(:8091)에서 e2e·직접 반영 금지.
 > `prod-dev-sync` = **5분 콘텐츠** + **24h full**. **dev LLM 금지(L3)**.
 
+## 배포는 `scripts/deploy.sh`로만 한다 — compose 직접 기동 금지
+
+`curl /api/health` 한 줄만으로 "배포 후 검증"을 삼던 과거 절차는 실패했다: 이 엔드포인트는
+liveness only(상수 `status=UP`, DB조차 안 봄)라 **DB가 죽어도, 계측이 죽어도 200을 반환**한다
+(사고 경위: `docs/_active/deploy-verification.md`). 그리고 배포와 검증이 별개 명령이라 검증
+단계를 통째로 건너뛸 수 있는 구조였다.
+
+`scripts/deploy.sh`는 이 두 문제를 함께 없앤다 — compose 기동과 검증을 **한 프로세스로 묶어
+분리 불가능**하게 만든다:
+
+```bash
+scripts/deploy.sh dev                 # base+dev 기동 → /api/health/deep 대기 → verify-deploy.sh dev
+scripts/deploy.sh prod --i-mean-it    # (명시 지시 시만) mariadb-prod 백업 → base+prod 기동 → 헬스대기 → verify-deploy.sh prod
+```
+
+- **`/api/health`** = liveness probe. DB 등 어떤 컴포넌트도 확인하지 않는다 — 배포 검증에 쓰지 마라.
+- **`/api/health/deep`** = readiness probe. DB `SELECT 1`을 실행하고 실패 시 **503**을 반환한다.
+  `scripts/deploy.sh`는 compose 기동 후 이 엔드포인트가 200을 반환할 때까지 타임아웃을 걸고 대기한다.
+- 대기 후 **`scripts/verify-deploy.sh <env>`를 자동 실행**한다 — 방문 계측 필드 매핑, 세션 키 채움,
+  UTM 귀속, 빌드 주입값, 백그라운드 파이프라인 등 실물 데이터 검증 항목 전체(상세: 동 문서 §4).
+  이 스크립트가 실패하면 `deploy.sh`도 exit 1로 실패한다 — "compose는 떴는데 검증은 안 했다"는
+  상태를 만들 수 없다.
+- prod 경로는 기본 거부다. `--i-mean-it` 플래그(또는 대화형 `yes` 확인) 없이는 진행하지 않고,
+  진행해도 **compose 기동 전에 mariadb-prod 백업을 먼저** 수행한다. e2e는 절대 실행하지 않는다
+  (`RUN_E2E`가 켜져 있으면 prod 경로에서 조기 차단).
+
 ## 표준 흐름
-1. base 스택 확인 (`docker compose up`)
+1. base 스택 확인 (`scripts/deploy.sh`가 자동으로 `docker compose up`)
 2. local unit / build
-3. **dev(:8090)** 배포
-4. 수동 검증
-5. e2e-realbe (`E2E_BASE_URL=http://localhost:8090`)
-6. 명시적 prod 지시가 없으면 여기서 종료
-7. (지시 시) prod DB 백업
-8. prod 스택 배포
-9. ai-user 관련이면 shared ai-user 재배포
-10. commit & push (`main`)
+3. **`scripts/deploy.sh dev`** — dev(:8090) 기동 + 헬스대기 + 실물 검증 자동 실행
+4. e2e-realbe (`E2E_BASE_URL=http://localhost:8090`)
+5. 명시적 prod 지시가 없으면 여기서 종료
+6. (지시 시) **`scripts/deploy.sh prod --i-mean-it`** — DB 백업 + prod(:8091) 기동 + 헬스대기 + 실물 검증 자동 실행
+7. ai-user 관련이면 shared ai-user 재배포
+8. commit & push (`main`)
 
 
 prod는 반드시 `main` 기준으로만 배포한다. **prod 배포 전 dev e2e 전체 통과가 전제**다.
 
-## 0단계: base 스택
-
-```bash
-cd env
-docker compose up -d --build
-```
-
 ## 1단계: dev 배포 (기본 작업면)
 
 ```bash
-cd env
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
-curl http://localhost:8090/api/health
+scripts/deploy.sh dev
 ```
 
 server-dev는 compose에서 `SPRING_FLYWAY_ENABLED=true` · `SPRING_JPA_HIBERNATE_DDL_AUTO=none` ·
@@ -41,24 +56,30 @@ server-dev는 compose에서 `SPRING_FLYWAY_ENABLED=true` · `SPRING_JPA_HIBERNAT
 
 ## 2단계: e2e 검증 (dev:8090)
 
+`scripts/deploy.sh dev`가 이미 `/api/health/deep` + `verify-deploy.sh dev`로 실물 검증을 마친
+상태다. 그 위에 e2e를 추가로 통과시킨다:
+
 ```bash
 cd frontend
-curl http://localhost:8090/api/health
 E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 ```
 
 ## 3단계: prod 배포 (명시 지시 시만)
 
 ```bash
-cd env
+scripts/deploy.sh prod --i-mean-it
+```
+
+DB 백업(`/home/justant/backups/prod-<timestamp>.sql`) → base+prod 스택 기동 →
+`/api/health/deep` 대기 → `scripts/verify-deploy.sh prod` 순서로 한 번에 실행되며,
+어느 단계든 실패하면 exit 1로 중단한다. 백업만 별도로 다시 뜨고 싶다면:
+
+```bash
 BACKUP_DIR=/home/justant/backups
 mkdir -p "$BACKUP_DIR"
 docker exec againspring-mariadb-prod sh -c \
   'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' \
   > "$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql"
-
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-curl http://localhost:8091/api/health
 ```
 
 ## 4단계: shared ai-user / prod-dev-sync
@@ -77,11 +98,10 @@ docker logs -f againspring-prod-dev-sync
 ## prod 사전 체크리스트
 
 - [ ] local unit / lint / build 통과
-- [ ] **dev(:8090) 배포·수동 검증 완료**
+- [ ] **`scripts/deploy.sh dev` 성공** (기동 + `/api/health/deep` + `verify-deploy.sh dev` 전부 통과)
 - [ ] **e2e-realbe (`localhost:8090`) 전체 통과**
 - [ ] 명시적 prod 배포 지시 확인
-- [ ] `mariadb-prod` 백업 완료
-- [ ] prod(:8091) 배포·헬스 확인
+- [ ] **`scripts/deploy.sh prod --i-mean-it` 성공** (백업 + 기동 + `/api/health/deep` + `verify-deploy.sh prod` 전부 통과)
 - [ ] `main` push 완료
 
 ## nginx 접근 로그 — 위치·보존·조회

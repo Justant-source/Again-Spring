@@ -51,6 +51,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/health").permitAll()
+                        .requestMatchers("/api/health/deep").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("POST", "/api/internal/marketing/callback").permitAll()
                         // 컨트롤러가 ASM callback 토큰을 상수시간 비교로 자체 검증한다 (JWT 미사용 내부 채널)

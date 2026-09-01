@@ -66,18 +66,26 @@ prod 전용 확인은 래퍼가 맡는다.
 
 ---
 
-## 5. 조사 중 발견된 미확정 항목
+## 5. 미확정 항목 — 2026-09-02 판정 완료
 
-착수 전에 판정이 필요하다. 셋 다 코드 소유자 확인 사항이다.
+1. **카카오·네이버 FE 빌드 인자 = 죽은 인자로 확정. 제거함.**
+   `frontend/lib/auth/oauth.ts` 가 `type Provider = 'google'` 이고 로그인 페이지에 두 버튼이
+   아예 없다. authorize 리다이렉트를 만드는 코드 자체가 없어 도달 불가능한 경로였다.
+   `frontend/Dockerfile` 과 dev/prod compose 의 `NEXT_PUBLIC_KAKAO_CLIENT_ID` ·
+   `NEXT_PUBLIC_NAVER_CLIENT_ID` 를 제거했다.
+   **BE 쪽 `KAKAO_CLIENT_ID` · `NAVER_CLIENT_ID` 는 유지한다** — `application.yml` 이 읽고
+   `OAuthProviderService` 가 code 교환에 쓴다. FE UI 가 생기면 바로 살아나는 서버측 설정이다.
 
-1. **`NEXT_PUBLIC_KAKAO_CLIENT_ID` · `NEXT_PUBLIC_NAVER_CLIENT_ID` 가 죽은 빌드 인자로 보인다.**
-   Dockerfile 과 dev/prod compose 양쪽에서 정의·주입되지만 `frontend/` 전체에 참조 코드가 **0건**이다
-   (Google 만 실제 사용). 서버사이드 리다이렉트라 불필요한 것인지, 빠져서 조용히 죽은 것인지 미확인.
-2. **`.env.dev` 의 소셜 CLIENT_ID 3종이 전부 빈 값.** dev 에서 소셜 로그인 실물 테스트가 항상 실패할 상태.
-   사양대로일 수도 있음.
-3. **prod 에 남은 e2e 픽스처 계정 10개를 집계에서 우회 중.**
-   `backend/src/main/java/com/againspring/marketing/AcquisitionFunnelService.java` 가 `id NOT LIKE 'e2e%'`
-   로 걸러낸다. 근본 삭제가 안 된 임시방편이라, 검증 쿼리가 이 필터를 빠뜨리면 오염된 수치를 본다.
+2. **`.env` 의 소셜 CLIENT_ID 빈 값 = 사고 아님.** dev·prod 둘 다 같은 상태이고, 1번대로
+   카카오·네이버가 FE 에 미구현이라 시도되는 경로 자체가 없다. 조치 불필요.
+
+3. **e2e 픽스처 우회 필터는 한 곳에만 있다 — 검증 쿼리 선택에 직접 영향.**
+   `id NOT LIKE 'e2e%'` 는 `AcquisitionFunnelService` 에만 존재한다.
+   `DailyStatsAggregatorService` · `PmfStatsService` · `DashboardOpsService` 는 e2e 도
+   synthetic 도 거르지 않는다.
+   → **신규가입 판정에는 `/api/admin/marketing/stats/acquisition` 만 쓴다.**
+   `/api/admin/dashboard/pulse` 의 `totalUsers` · `todayNewUsers` 는 오염된 값이므로
+   신규가입 근거로 쓰지 않는다(§4 의 8번 항목은 파이프라인 생존 확인 용도로만 쓴다).
 
 ---
 

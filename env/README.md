@@ -24,8 +24,7 @@ docker compose up -d
 ```bash
 cp .env.dev.example .env.dev
 # .env.dev 편집
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
-curl http://localhost:8090/api/health
+../scripts/deploy.sh dev   # 기동 + /api/health/deep 대기 + verify-deploy.sh dev (분리 불가)
 ```
 
 ### prod 배포 (명시적 지시 시에만)
@@ -33,9 +32,12 @@ curl http://localhost:8090/api/health
 ```bash
 cp .env.prod.example .env.prod
 # .env.prod 편집 (모든 값 필수)
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
-curl http://localhost:8091/api/health
+../scripts/deploy.sh prod --i-mean-it   # DB 백업 + 기동 + /api/health/deep 대기 + verify-deploy.sh prod
 ```
+
+> `curl /api/health`는 liveness only(DB 미확인)라 배포 검증에 쓸모없다. 실질 검증은
+> `/api/health/deep`(DB `SELECT 1`)과 `scripts/deploy.sh`가 자동 실행하는
+> `scripts/verify-deploy.sh`가 맡는다. 상세: [docs/deployment.md](./docs/deployment.md).
 
 ## 문서
 

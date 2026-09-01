@@ -208,7 +208,8 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 
 | Method | Path | Auth | 상태코드 | 설명 |
 |---|---|---|---|---|
-| GET | `/api/health` | 공개 | 200 | Liveness probe (status=UP) |
+| GET | `/api/health` | 공개 | 200 | Liveness probe (status=UP, DB 미확인) |
+| GET | `/api/health/deep` | 공개 | 200 / 503 | Readiness probe — DB 연결까지 확인. 200: `{status:"UP",db:"ok",dbLatencyMs,checkedAt}` / 503: `{status:"DOWN",db:"fail",checkedAt}`. 내부 오류 정보 비노출 |
 
 ### 6. Admin — Dashboard
 

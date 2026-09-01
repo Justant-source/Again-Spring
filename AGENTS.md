@@ -73,8 +73,8 @@ python3 scripts/lint_docs.py
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
 3. **LLM 프롬프트/출력 수정 시** `docs/shared/70-policy/forbidden-words.md` 확인. AI 출력에 판결/처방/승패 표현 금지 → "공감/관점/작성자/상대방" (상세: `.claude/rules/llm-safety.md`)
 4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **dev/prod 완전 격리**. 필수 순서:
-   ① local unit/build → ② **dev(:8090) 배포** → ③ 수동 검증 + e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
-   → ④ (명시 지시 시에만) prod DB 백업 → prod(:8091) 배포 → ⑤ main commit & push
+   ① local unit/build → ② **`scripts/deploy.sh dev`** (기동+헬스대기+검증 일체) → ③ e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
+   → ④ (명시 지시 시에만) **`scripts/deploy.sh prod --i-mean-it`** (백업+기동+헬스대기+검증 일체) → ⑤ main commit & push
    **prod에서 e2e·직접 반영 금지.** `prod-dev-sync`=5분 콘텐츠+24h full. **dev LLM 금지(L3)**. e2e는 `:8090`만(E3).
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`·`CLAUDE.md`·`AGENTS.md`만. 모든 상세 문서는 `docs/` 하위만.
@@ -123,10 +123,10 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe   # 실서버 e2e = d
 # 검증 — BE
 cd backend && ./gradlew test
 
-# 헬스
-curl localhost:8080/api/health            # 로컬 BE
-curl localhost:8090/api/health            # dev (검증·e2e 면)
-curl localhost:8091/api/health            # prod (명시 배포 후만)
+# 헬스 (/api/health = liveness만, DB 미확인 — 배포 검증엔 쓰지 마라)
+curl localhost:8080/api/health/deep       # 로컬 BE (DB SELECT 1 포함)
+curl localhost:8090/api/health/deep       # dev
+curl localhost:8091/api/health/deep       # prod (명시 배포 후만)
 ```
 
 ---
@@ -147,10 +147,8 @@ curl localhost:8091/api/health            # prod (명시 배포 후만)
 | dev | dev.againspring.net | `docker-compose.dev.yml` + `.env.dev` | :8090 | **활성** (검증·e2e·일상 배포면) |
 
 ```bash
-cd env
-docker compose up -d --build                                                 # ① base (공유 LLM)
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build   # ② dev (기본)
-# docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build  # ③ prod (명시 지시만)
+scripts/deploy.sh dev                     # base+dev 기동 → 헬스대기 → verify-deploy.sh dev (분리 불가)
+scripts/deploy.sh prod --i-mean-it        # (명시 지시만) 백업 → base+prod 기동 → 헬스대기 → verify-deploy.sh prod
 ```
 
 ---
