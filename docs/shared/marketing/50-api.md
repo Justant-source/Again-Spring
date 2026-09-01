@@ -636,7 +636,7 @@ Authorization: Bearer <admin-jwt>
 키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h.  
 `ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음.
 
-`personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인을 읽어 **운영자가 직접 단 댓글·인용**만 gold(`TIMELINE`)로 넣고, 원장에 있는 자동 댓글 id는 버린다. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(avoid). prod에서만 Haiku로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)도 버린다. 코퍼스는 `x_persona_example`.
+`personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인을 읽어 **운영자가 직접 단 댓글·인용**만 gold(`TIMELINE`)로 넣고, 원장에 있는 자동 댓글 id는 버린다. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(avoid). prod에서만 **Sonnet**(`claude-sonnet-5`)으로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)도 버린다. 코퍼스는 `x_persona_example`.
 
 ```
 POST /api/admin/marketing/x-ops/learn

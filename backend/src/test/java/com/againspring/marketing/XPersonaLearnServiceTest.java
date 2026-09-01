@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,7 +61,7 @@ class XPersonaLearnServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "llmEnabled", false);
-        ReflectionTestUtils.setField(service, "model", "claude-haiku-4-5-20251001");
+        ReflectionTestUtils.setField(service, "model", "claude-sonnet-5");
         when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
         when(systemSettingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(xOpsSettingsService.get()).thenReturn(learningOn());
@@ -160,6 +161,31 @@ class XPersonaLearnServiceTest {
         XPersonaLearnService.LearnResult r = service.runIfDue(dawnKst);
         assertThat(r).isNotNull();
         verify(timelineClient).fetchRecent(eq("againspring_net"), anyInt());
+    }
+
+    @Test
+    void runNow_distillsWithSonnet() throws Exception {
+        ReflectionTestUtils.setField(service, "llmEnabled", true);
+        when(promptSanitizer.sanitize(any())).thenAnswer(inv -> {
+            Object arg = inv.getArgument(0);
+            return arg == null ? "" : arg.toString();
+        });
+        when(timelineClient.fetchRecent(eq("againspring_net"), anyInt())).thenReturn(List.of(
+            new XManualStatusClassifier.Status(
+                "man-1", "@KoreAgenda 너무귀여움 ㅋㅋㅋㅋ", "KoreAgenda", false)
+        ));
+        when(exampleRepository.findTop20BySourceOrderByCreatedAtDesc(XPersonaExample.Source.TIMELINE))
+            .thenReturn(List.of(XPersonaExample.builder()
+                .source(XPersonaExample.Source.TIMELINE)
+                .operatorBody("너무귀여움 ㅋㅋㅋㅋ")
+                .build()));
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5")))
+            .thenReturn("{\"summary\":\"한줄 구어체\",\"traits\":[\"ㅋㅋ\"],\"examples\":[\"너무귀여움\"],\"avoid\":[\"습니다체\"]}");
+
+        XPersonaLearnService.LearnResult r = service.runNow("admin");
+
+        assertThat(r.status()).isEqualTo("OK");
+        verify(llmProvider).invoke(anyString(), eq("claude-sonnet-5"));
     }
 
     @Test

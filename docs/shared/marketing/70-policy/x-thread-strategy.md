@@ -166,7 +166,7 @@ AS `CaptureHeightCalculator` / `MarketingJobService` brief 필드.
 | 아침/밤 글 · 대댓글 · 선댓글 | **off** | `marketing.x.{ritual,inbound,outbound}_enabled` |
 | 페르소나 학습 | **on** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
 
-매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 직접 남에게 단 댓글·인용 평**만 gold 코퍼스(`source=TIMELINE`)에 넣는다. Justant-Bot이 게시한 선댓글·대댓글(`x_ops_action.posted_tweet_id`, 최근 14일)은 타임라인에 남아 있어도 gold가 아니다. 최근 3일 POSTED 댓글이 타임라인에 없으면 운영자가 지운 것으로 보고 `DELETED_AUTO`(avoid)로 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)도 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 Haiku 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`. Telegram으로 페르소나를 학습시키지 않는다. 게시 알림용 Telegram은 그대로 둔다.
+매일 새벽 `personaLearnAt`에 `@againspring_net` 타임라인을 읽어 **운영자가 직접 남에게 단 댓글·인용 평**만 gold 코퍼스(`source=TIMELINE`)에 넣는다. Justant-Bot이 게시한 선댓글·대댓글(`x_ops_action.posted_tweet_id`, 최근 14일)은 타임라인에 남아 있어도 gold가 아니다. 최근 3일 POSTED 댓글이 타임라인에 없으면 운영자가 지운 것으로 보고 `DELETED_AUTO`(avoid)로 넣는다. 자동 `x_thread`(자기 체인·링크만·브랜드 해시태그 훅)도 제외. 프로필 JSON은 `marketing.x.persona_profile_json`. **dev는 예시만 적재**(L3, LLM 없음). prod는 **Sonnet**(`claude-sonnet-5`, `MARKETING_X_PERSONA_LEARN_MODEL`)으로 증류. 수동 실행 `POST /api/admin/marketing/x-ops/learn`. Telegram으로 페르소나를 학습시키지 않는다. 게시 알림용 Telegram은 그대로 둔다.
 
 성장 루프 발행기는 위 플래그를 읽는다. 스위치 기본값은 꺼짐이라, 어드민에서 켜기 전에는 X에 글·댓글이 나가지 않는다. **prod가 자동 게시 중이라고 보지 않는다.**
 

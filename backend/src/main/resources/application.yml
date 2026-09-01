@@ -171,6 +171,7 @@ marketing:
   x:
     # Public FxTwitter read-only timeline for persona learning (not publish).
     timeline-base-url: ${MARKETING_X_TIMELINE_BASE_URL:https://api.fxtwitter.com}
+    persona-learn-model: ${MARKETING_X_PERSONA_LEARN_MODEL:claude-sonnet-5}
   telegram:
     # 실패 알림에 인라인 버튼(재구동/무시) 표시 여부. 기본값 false (안전 장치).
     # 활성화 시 Telegram 인라인 버튼 클릭 → ASM webhook → AS redrive API 호출 흐름 개시.
