@@ -71,10 +71,17 @@ public class XOpsActionLedger {
             .postedTweetId(postedTweetId)
             .body(body)
             .status(status)
-            .skipReason(skipReason)
+            .skipReason(trimSkipReason(skipReason))
             .createdAt(now != null ? now : Instant.now())
             .build();
         return repository.save(row);
+    }
+
+    static String trimSkipReason(String skipReason) {
+        if (skipReason == null || skipReason.length() <= 32) {
+            return skipReason;
+        }
+        return skipReason.substring(0, 32);
     }
 
     private static Instant[] kstDayWindow(Instant now) {

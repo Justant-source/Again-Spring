@@ -2,6 +2,7 @@ package com.againspring.api.admin;
 
 import com.againspring.marketing.AsmClient;
 import com.againspring.marketing.MarketingJobService;
+import com.againspring.marketing.XOutboundService;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.againspring.service.admin.MarketingStatsService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,6 +41,8 @@ class AdminMarketingCredentialControllerTest {
     AsmClient asmClient;
     @Mock
     MarketingStatsService marketingStatsService;
+    @Mock
+    XOutboundService xOutboundService;
 
     @InjectMocks
     AdminMarketingController controller;

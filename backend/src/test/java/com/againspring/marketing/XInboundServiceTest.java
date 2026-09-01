@@ -1,6 +1,7 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
+import com.againspring.notification.TelegramNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,8 @@ class XInboundServiceTest {
     private XCommentComposer composer;
     @Mock
     private XOpsActionLedger ledger;
+    @Mock
+    private TelegramNotifier telegramNotifier;
 
     @InjectMocks
     private XInboundService service;
@@ -111,6 +114,8 @@ class XInboundServiceTest {
         verify(ledger).recordPosted(
             eq(XOpsAction.Kind.INBOUND), eq(id), eq("parent-1"), eq("our-1"),
             eq("posted-1"), eq("공감돼요 ㅋㅋ"), eq(now));
+        verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("공감돼요 ㅋㅋ"));
+        verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("https://x.com/i/posted-1"));
     }
 
     @Test
@@ -185,6 +190,7 @@ class XInboundServiceTest {
 
         verify(ledger).recordFailed(eq(XOpsAction.Kind.INBOUND), eq(id), eq("ASM_ERROR"), eq(now));
         verify(ledger, never()).recordPosted(any(), any(), any(), any(), any(), any(), any());
+        verify(telegramNotifier, never()).send(any());
     }
 
     private static AsmClient.XInboxItem inbox(String tweetId, Instant createdAt) {

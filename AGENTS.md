@@ -26,7 +26,7 @@ python3 scripts/lint_docs.py
 **스택**: FE Next.js 14 · BE Spring Boot 3.3 + MariaDB 11 · LLM = Claude CLI 브릿지 (remote only; 주로 AI-user)
 **도메인**: `againspring.net`(prod) · `dev.againspring.net`(dev) · **상태**: 운영 중 — **dev/prod 완전 격리**. 검증·e2e는 **dev만**, prod 배포는 명시 지시 시에만.
 
-**도메인 용어**: 사연=갈등 게시글 · 공감 비율=작성자(A):상대방(B) %(판결 아님) · 진영=작성자(A)/상대방(B) · 광장=공개 피드 · AI-user=운영용 페르소나 봇
+**도메인 용어**: 사연=갈등 게시글 · 공감 비율=작성자(A):상대방(B) %(판결 아님) · 진영=작성자(A)/상대방(B) · 광장=공개 피드 · AI-user=운영용 광장 페르소나 봇 · **Justant-Bot**=운영자(Justant) 말투의 X 댓글 AI(`@againspring_net`, 본문에 봇 이름 미노출)
 
 ---
 
@@ -59,6 +59,7 @@ python3 scripts/lint_docs.py
 | 환경/인프라/배포 | `env/` | `docs/env/60-runtime/deployment.md` · `docs/env/20-containers/architecture.md` |
 | 환경 변수 사전 | — | `docs/env/40-data.md` |
 | **마케팅 (ASM)** | AS `100.81.189.92` → `ssh justant@100.115.252.61`<br>`~/Data/Again-Spring-Marketing` | ASM `AGENTS.md` · `docs/shared/marketing/x-thread-strategy.md` |
+| **Justant-Bot** (X 선댓글·대댓글 목소리) | `backend/.../marketing/XCommentComposer.java` | `docs/shared/marketing/70-policy/x-thread-strategy.md` §2.4 · `docs/shared/prompts/marketing/x-outbound-reply.md` |
 
 **ASM**: Python 3.12 + FastAPI, 포트 8200. AS 호스트에서 `ssh justant@100.115.252.61` **암호 없이** 접속. **활성 = X / `x_thread` + Instagram / `instagram_feed`** (게시 후 24h 자동). 네이버·YouTube·Threads 보류. Again-Spring 쪽은 thin client만.
 

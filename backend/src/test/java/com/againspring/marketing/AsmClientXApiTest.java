@@ -100,6 +100,28 @@ class AsmClientXApiTest {
     }
 
     @Test
+    void listXOutboundCandidates_survivesReadsLongerThanDefaultTimeout() throws Exception {
+        start((path, method, req) -> {
+            Thread.sleep(180);
+            return "{\"items\":[]}";
+        });
+        AsmProperties props = new AsmProperties();
+        props.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        props.setApiToken("tok");
+        props.setRequestTimeoutMs(50);
+        props.setStatsRequestTimeoutMs(5_000);
+        ObjectMapper mapper = Jackson2ObjectMapperBuilder.json().build();
+        RestClient.Builder builder = RestClient.builder()
+            .messageConverters(converters -> {
+                converters.removeIf(c -> c instanceof MappingJackson2HttpMessageConverter);
+                converters.add(new MappingJackson2HttpMessageConverter(mapper));
+            });
+        AsmClient client = new AsmClient(props, builder, mapper);
+
+        assertThat(client.listXOutboundCandidates(3, 6)).isEmpty();
+    }
+
+    @Test
     void publishX_4xx_throwsWithoutTreatingAsSuccess() throws Exception {
         start((path, method, req) -> {
             throw new StatusException(400, "{\"detail\":\"bad\"}");

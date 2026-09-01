@@ -1,6 +1,7 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
+import com.againspring.notification.TelegramNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class XInboundService {
     private final AsmClient asmClient;
     private final XCommentComposer composer;
     private final XOpsActionLedger ledger;
+    private final TelegramNotifier telegramNotifier;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -108,6 +110,8 @@ public class XInboundService {
                         result.tweetId(),
                         draft.body(),
                         now);
+                    telegramNotifier.send(XOpsTelegramAlerts.posted(
+                        "Justant-Bot 대댓글", result, item.tweetId(), draft.body()));
                 } else {
                     ledger.recordFailed(XOpsAction.Kind.INBOUND, item.tweetId(), "PUBLISH_FAILED", now);
                 }

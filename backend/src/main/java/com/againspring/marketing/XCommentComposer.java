@@ -2,13 +2,20 @@ package com.againspring.marketing;
 
 import com.againspring.domain.ai.SystemSetting;
 import com.againspring.llm.LLMProvider;
+import com.againspring.llm.LlmImage;
 import com.againspring.llm.PromptSanitizer;
+import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.safety.KeywordGuard;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Drafts X replies and ritual lines in the learned persona voice.
@@ -18,6 +25,9 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class XCommentComposer {
+
+    static final String OUTBOUND_REPLY_PROMPT = "marketing/x-outbound-reply.md";
+    static final String OUTBOUND_DONTS_PROMPT = "marketing/x-outbound-donts.md";
 
     public record Draft(boolean skip, String body, String skipReason) {
         public static Draft of(String body) {
@@ -33,6 +43,8 @@ public class XCommentComposer {
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
     private final KeywordGuard keywordGuard;
+    private final PromptLoader promptLoader;
+    private final ObjectMapper objectMapper;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -74,6 +86,51 @@ public class XCommentComposer {
         return invokeDraft(prompt);
     }
 
+    /**
+     * Outbound JSON compose. Photo bytes travel as {@link LlmImage}, never inside the prompt.
+     */
+    public Draft composeOutbound(String tweetText, List<String> peerReplies, String photoJpegBase64) {
+        if (!llmEnabled) {
+            return Draft.skipped("DEV_LLM_OFF");
+        }
+        String instructions;
+        String donts;
+        try {
+            instructions = promptLoader.get(OUTBOUND_REPLY_PROMPT);
+            donts = promptLoader.get(OUTBOUND_DONTS_PROMPT);
+        } catch (Exception e) {
+            log.warn("[x-composer] outbound prompt missing: {}", e.getMessage());
+            return Draft.skipped("UNSURE");
+        }
+        String safeProfile = promptSanitizer.sanitize(readProfile());
+        String safeTweet = promptSanitizer.sanitize(tweetText);
+        String safePeers = promptSanitizer.sanitize(joinPeers(peerReplies));
+        String safeDonts = promptSanitizer.sanitize(donts);
+        String prompt = instructions + """
+
+            목소리 프로필:
+            <user_input>
+            %s
+            </user_input>
+
+            대상 트윗:
+            <user_input>
+            %s
+            </user_input>
+
+            다른 사람 댓글 (힌트, 베끼지 말 것):
+            <user_input>
+            %s
+            </user_input>
+
+            하지 말 것:
+            <user_input>
+            %s
+            </user_input>
+            """.formatted(safeProfile, safeTweet, safePeers, safeDonts);
+        return invokeOutbound(prompt, photoJpegBase64);
+    }
+
     /** slot = "morning" or "night". Warm 1-line encouragement in persona voice. */
     public Draft composeRitual(String slot) {
         if (!llmEnabled) {
@@ -98,6 +155,25 @@ public class XCommentComposer {
         return invokeDraft(prompt);
     }
 
+    private Draft invokeOutbound(String prompt, String photoJpegBase64) {
+        try {
+            String raw;
+            if (photoJpegBase64 != null && !photoJpegBase64.isBlank()) {
+                raw = llmProvider.invoke(
+                    prompt, model, List.of(new LlmImage("image/jpeg", photoJpegBase64)));
+            } else {
+                raw = llmProvider.invoke(prompt, model);
+            }
+            return toOutboundDraft(raw);
+        } catch (UnsupportedOperationException e) {
+            log.warn("[x-composer] vision unavailable: {}", e.getMessage());
+            return Draft.skipped("VISION_FAIL");
+        } catch (Exception e) {
+            log.warn("[x-composer] outbound invoke failed: {}", e.getMessage());
+            return Draft.skipped("LLM_ERROR");
+        }
+    }
+
     private Draft invokeDraft(String prompt) {
         try {
             String raw = llmProvider.invoke(prompt, model);
@@ -106,6 +182,89 @@ public class XCommentComposer {
             log.warn("[x-composer] invoke failed: {}", e.getMessage());
             return Draft.skipped("LLM_ERROR");
         }
+    }
+
+    private Draft toOutboundDraft(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Draft.skipped("UNSURE");
+        }
+        if (XPersonaLearnService.looksLikeLlmError(raw)) {
+            return Draft.skipped("LLM_ERROR");
+        }
+        JsonNode n = parseOutboundJson(raw);
+        if (n == null) {
+            return Draft.skipped("UNSURE");
+        }
+        if (!n.path("ok").asBoolean(false)) {
+            return Draft.skipped("UNSURE");
+        }
+        String body = n.path("body").asText("");
+        if (body == null || body.isBlank()) {
+            return Draft.skipped("UNSURE");
+        }
+        if (XPersonaLearnService.looksLikeLlmError(body)) {
+            return Draft.skipped("LLM_ERROR");
+        }
+        if (keywordGuard.scanLLMOutput(body).isBlocked() || containsVerdictBelt(body)) {
+            return Draft.skipped("SAFETY");
+        }
+        String filtered = keywordGuard.applyOutputFilter(body);
+        if (filtered == null || filtered.isBlank() || containsVerdictBelt(filtered)) {
+            return Draft.skipped("SAFETY");
+        }
+        return Draft.of(filtered);
+    }
+
+    private JsonNode parseOutboundJson(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String json = extractJsonObject(raw);
+        try {
+            JsonNode n = objectMapper.readTree(json);
+            if (n == null || !n.isObject()) {
+                return null;
+            }
+            return n;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static String extractJsonObject(String raw) {
+        String s = raw.trim();
+        if (s.startsWith("```")) {
+            int nl = s.indexOf('\n');
+            int end = s.lastIndexOf("```");
+            if (nl >= 0 && end > nl) {
+                s = s.substring(nl + 1, end).trim();
+            }
+        }
+        int start = s.indexOf('{');
+        int end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return s.substring(start, end + 1);
+        }
+        return s;
+    }
+
+    static String joinPeers(List<String> peerReplies) {
+        if (peerReplies == null || peerReplies.isEmpty()) {
+            return "";
+        }
+        List<String> lines = new ArrayList<>();
+        int i = 1;
+        for (String p : peerReplies) {
+            if (p == null || p.isBlank()) {
+                continue;
+            }
+            lines.add(i + ". " + p.strip());
+            i++;
+            if (lines.size() >= 10) {
+                break;
+            }
+        }
+        return String.join("\n", lines);
     }
 
     private Draft toDraft(String raw) {

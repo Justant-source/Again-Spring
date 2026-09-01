@@ -15,6 +15,7 @@
 backend/src/main/java/com/againspring/
 └── llm/
     ├── PromptSanitizer.java       # 사용자 입력 검증 + <user_input> 태그 삽입
+    ├── LlmImage.java              # 선택 vision 첨부 (mime + base64)
     ├── config/                    # LLM 설정 (LlmProperties)
     ├── fallback/                  # 로컬 fallback (개발 전용)
     ├── monitoring/                # 호출 지표 수집
@@ -34,6 +35,7 @@ backend/src/main/java/com/againspring/
 - 로컬/prod 기본 base-url: `http://againspring-llm:8090` (server-dev는 compose에서 더미 URL + 네트워크 격리)
 - 타임아웃: `llm.remote.default-timeout-ms` (운영 기본 600,000ms). HTTP read timeout은 이 값보다 길게 둔다.
 - 인증: 없음 (내부 네트워크, 컨테이너 간)
+- **선택 이미지**: `LLMProvider.invoke(prompt, model, List<LlmImage>)` — `{mime, base64}` 최대 1장. `RemoteLlmProvider`는 body `images`로 전달한다. 인터페이스 기본 구현은 이미지가 있으면 `UnsupportedOperationException`(호출측 `VISION_FAIL`) — 텍스트 invoke는 사진이 없을 때만.
 
 ---
 
@@ -74,6 +76,7 @@ String sanitized = promptSanitizer.sanitize(userInput);
 | 용도 | 파일 | 로드 서비스 |
 |---|---|---|
 | 톤 정규화 | `docs/shared/prompts/community/post_tonalization.md` | `TonalizationService` (`AnswerProcessingService` / 파트너 초대) |
+| X 선댓글 | `docs/shared/prompts/marketing/x-outbound-reply.md` · `x-outbound-donts.md` | `XCommentComposer.composeOutbound` |
 
 주력 LLM 생성은 AI-user 스택(`llm-ai-user`)이 담당한다.
 
@@ -88,6 +91,7 @@ String sanitized = promptSanitizer.sanitize(userInput);
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
 - **호출 경로**: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke` (RemoteLlmProvider 경유)
+- `/v1/invoke` **optional `images`**: mime+base64. 없으면 텍스트만. 있으면 임시 파일로 CLI에 첨부 후 삭제.
 
 **CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 
 입력 토큰 오버헤드를 25,267 토큰에서 ~279 토큰으로 감소시킨다(기본값 대비 -99%). 

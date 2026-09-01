@@ -1,6 +1,7 @@
 package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
+import com.againspring.notification.TelegramNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,8 +11,9 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * One outbound reply per daytime 30-minute tick on hot mutual posts. First reply hits the root;
- * later replies thread under our previous reply. Does not force-fill the daily cap.
+ * One outbound reply per daytime 30-minute tick on followed accounts' recent
+ * original posts. First reply hits the root; later replies thread under our previous reply.
+ * Skips continue to the next candidate; at most one successful publish per tick.
  */
 @Slf4j
 @Service
@@ -21,7 +23,9 @@ public class XOutboundService {
     private final MarketingXOpsSettingsService settingsService;
     private final AsmClient asmClient;
     private final XCommentComposer composer;
+    private final OutboundDraftGuard outboundDraftGuard;
     private final XOpsActionLedger ledger;
+    private final TelegramNotifier telegramNotifier;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -36,6 +40,7 @@ public class XOutboundService {
         }
 
         List<AsmClient.XOutboundCandidate> candidates;
+        long fetchStarted = System.nanoTime();
         try {
             candidates = asmClient.listXOutboundCandidates(
                 settings.hotMinReplies(), settings.hotMaxAgeHours());
@@ -43,6 +48,9 @@ public class XOutboundService {
             log.warn("[x-outbound] candidate fetch failed: {}", e.getMessage());
             return;
         }
+        int n = candidates == null ? 0 : candidates.size();
+        log.info("[x-outbound] fetched {} candidates in {}ms",
+            n, (System.nanoTime() - fetchStarted) / 1_000_000L);
         if (candidates == null || candidates.isEmpty()) {
             return;
         }
@@ -63,11 +71,28 @@ public class XOutboundService {
                 continue;
             }
 
-            XCommentComposer.Draft draft = composer.composeReply(c.text(), c.tweetId());
+            if (c.hasVideo()) {
+                ledger.recordSkipped(XOpsAction.Kind.OUTBOUND, replyTo, "VIDEO", now);
+                continue;
+            }
+            if (c.hasPhoto() && (c.photoJpegBase64() == null || c.photoJpegBase64().isBlank())) {
+                ledger.recordSkipped(XOpsAction.Kind.OUTBOUND, replyTo, "VISION_FAIL", now);
+                continue;
+            }
+
+            String jpeg = c.hasPhoto() ? c.photoJpegBase64() : null;
+            XCommentComposer.Draft draft = composer.composeOutbound(c.text(), c.peerReplies(), jpeg);
             if (draft == null || draft.skip() || draft.body() == null || draft.body().isBlank()) {
                 String reason = draft != null && draft.skipReason() != null
-                    ? draft.skipReason() : "NO_VOICE";
+                    ? draft.skipReason() : "UNSURE";
                 ledger.recordSkipped(XOpsAction.Kind.OUTBOUND, replyTo, reason, now);
+                continue;
+            }
+
+            String guardHit = outboundDraftGuard.firstViolation(draft.body(), c.text(), c.peerReplies())
+                .orElse(null);
+            if (guardHit != null) {
+                ledger.recordSkipped(XOpsAction.Kind.OUTBOUND, replyTo, guardHit, now);
                 continue;
             }
 
@@ -83,14 +108,15 @@ public class XOutboundService {
                         result.tweetId(),
                         draft.body(),
                         now);
-                } else {
-                    ledger.recordFailed(XOpsAction.Kind.OUTBOUND, replyTo, "PUBLISH_FAILED", now);
+                    telegramNotifier.send(XOpsTelegramAlerts.posted(
+                        "Justant-Bot 선댓글", result, replyTo, draft.body()));
+                    return;
                 }
+                ledger.recordFailed(XOpsAction.Kind.OUTBOUND, replyTo, "PUBLISH_FAILED", now);
             } catch (Exception e) {
                 log.warn("[x-outbound] publish failed tweetId={}: {}", replyTo, e.getMessage());
                 ledger.recordFailed(XOpsAction.Kind.OUTBOUND, replyTo, "ASM_ERROR", now);
             }
-            return;
         }
     }
 

@@ -19,6 +19,10 @@ class RemoteLlmProviderDisabledTest {
         );
         BusinessException ex = assertThrows(BusinessException.class, () -> provider.invoke("hi", null));
         assertEquals("LLM_DISABLED", ex.getCode());
+        BusinessException withImage = assertThrows(BusinessException.class,
+                () -> provider.invoke("hi", null, java.util.List.of(
+                        new com.againspring.llm.LlmImage("image/jpeg", "AA=="))));
+        assertEquals("LLM_DISABLED", withImage.getCode());
         assertEquals(501, ex.getHttpStatus());
         assertFalse(provider.isHealthy());
         assertEquals("disabled", provider.getProviderName());

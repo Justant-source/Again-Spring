@@ -21,6 +21,7 @@ import com.againspring.marketing.MarketingScoreAutoAdjustService;
 import com.againspring.marketing.MarketingScoreWeightService;
 import com.againspring.marketing.MarketingWeeklyReportService;
 import com.againspring.marketing.MarketingXOpsSettingsService;
+import com.againspring.marketing.XOutboundService;
 import com.againspring.marketing.XPersonaLearnService;
 import com.againspring.marketing.dto.AsmJobView;
 import com.againspring.repository.marketing.MarketingJobRepository;
@@ -41,6 +42,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +72,7 @@ public class AdminMarketingController {
     private final MarketingScoreAutoAdjustService marketingScoreAutoAdjustService;
     private final MarketingXOpsSettingsService marketingXOpsSettingsService;
     private final XPersonaLearnService xPersonaLearnService;
+    private final XOutboundService xOutboundService;
 
     // ===== Daily auto-publish quota (Phase 2 per-platform) =====
 
@@ -152,6 +155,21 @@ public class AdminMarketingController {
         return ResponseEntity.ok(MarketingXOpsSettingsResponse.from(
             marketingXOpsSettingsService.get(),
             xPersonaLearnService.status()));
+    }
+
+    @PostMapping("/x-ops/outbound")
+    @Operation(summary = "Run X outbound tick now",
+        description = "맞팔 불난 글 후보를 조회하고 선댓글 1건을 시도. 선댓글 스위치가 꺼져 있으면 400. "
+            + "Playwright 스크래프가 길어질 수 있음(최대 ~5분).")
+    @ApiResponse(responseCode = "204", description = "Tick finished")
+    @ApiResponse(responseCode = "400", description = "Outbound disabled")
+    @Auditable(action = "RUN_MARKETING_X_OUTBOUND")
+    public ResponseEntity<Void> runXOutboundNow() {
+        if (!marketingXOpsSettingsService.get().outboundEnabled()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "outbound is disabled");
+        }
+        xOutboundService.run(Instant.now());
+        return ResponseEntity.noContent().build();
     }
 
     // ===== Popularity score weights (Phase 2 per-platform) =====

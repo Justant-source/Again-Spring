@@ -44,6 +44,7 @@ last_updated: 2026-08-31
 | 정책 (금지어·인증·권한) | `docs/shared/70-policy/forbidden-words.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
 | 환경/배포 | `docs/env/60-runtime/deployment.md` | `docs/env/20-containers/architecture.md` | `env/docker-compose*.yml` |
 | 마케팅 | `docs/shared/marketing/10-context.md` | `docs/shared/marketing/70-policy/` | ASM: (별도 저장소) |
+| Justant-Bot (X 댓글 페르소나) | `docs/shared/marketing/70-policy/x-thread-strategy.md` §2.4 | `docs/shared/prompts/marketing/x-outbound-reply.md` · `x-outbound-donts.md` | `XCommentComposer` · `XOutboundService` |
 
 ## §3. 🚨 런타임 자산 (이동 금지)
 

@@ -53,6 +53,11 @@ test.describe('Journey 14-A: 자격증명 API 인증 가드', () => {
     const res = await request.post(`${BASE}/api/admin/marketing/x-ops/learn`)
     expect([401, 403]).toContain(res.status())
   })
+
+  test('미인증 — POST /api/admin/marketing/x-ops/outbound → 401/403', async ({ request }) => {
+    const res = await request.post(`${BASE}/api/admin/marketing/x-ops/outbound`)
+    expect([401, 403]).toContain(res.status())
+  })
 })
 
 // ── B. UI 설정 탭 (ASM 불필요) ───────────────────────────────────

@@ -1,5 +1,6 @@
 package com.againspring.llmworker.service;
 
+import com.againspring.llmworker.dto.InvokeImage;
 import com.againspring.llmworker.exception.ClaudeCodeException;
 import com.againspring.llmworker.exception.InvocationCanceledException;
 import com.againspring.llmworker.pool.CancelableInvocation;
@@ -13,6 +14,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -52,10 +57,16 @@ public class ClaudeCliInvoker {
      * 스트리밍으로 실행하되 최종 결과만 반환.
      */
     public String invoke(String prompt, String model) throws ClaudeCodeException {
+        return invoke(prompt, model, null);
+    }
+
+    public String invoke(String prompt, String model, List<InvokeImage> images) throws ClaudeCodeException {
         String corrId = UUID.randomUUID().toString();
         long startMs = System.currentTimeMillis();
-        ProcessBuilder pb = buildProcessBuilder(prompt, model);
+        List<Path> imageFiles = List.of();
         try {
+            imageFiles = writeTempImages(images);
+            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles);
             Process process = pb.start();
             try {
                 processTerminator.register(process);
@@ -83,6 +94,8 @@ public class ClaudeCliInvoker {
             logLlmStats(model, 1, "UNKNOWN_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
             log.error("Unexpected error running claude CLI: {}", e.getMessage(), e);
             throw new ClaudeCodeException("UNKNOWN_ERROR", e.getMessage(), -1, null);
+        } finally {
+            deleteTempImages(imageFiles);
         }
     }
 
@@ -91,40 +104,51 @@ public class ClaudeCliInvoker {
      */
     public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv)
             throws Exception {
+        return invokeWithCancelSupport(prompt, model, inv, null);
+    }
+
+    public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv,
+                                         List<InvokeImage> images) throws Exception {
         String corrId = UUID.randomUUID().toString();
         long startMs = System.currentTimeMillis();
-        ProcessBuilder pb = buildProcessBuilder(prompt, model);
-        Process process = pb.start();
+        List<Path> imageFiles = List.of();
         try {
-            processTerminator.register(process);
-            inv.attachProcess(process);
-            drainStderr(process, inv.getInvocationId());
+            imageFiles = writeTempImages(images);
+            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles);
+            Process process = pb.start();
+            try {
+                processTerminator.register(process);
+                inv.attachProcess(process);
+                drainStderr(process, inv.getInvocationId());
 
-            StreamResult result = readStreamingOutput(process, inv, corrId, model, 1, startMs);
-            int exitCode = process.waitFor();
+                StreamResult result = readStreamingOutput(process, inv, corrId, model, 1, startMs);
+                int exitCode = process.waitFor();
 
-            if (inv.isCanceled()) {
-                throw inv.terminationException();
+                if (inv.isCanceled()) {
+                    throw inv.terminationException();
+                }
+                // 오류 종료 시 부분 텍스트를 성공처럼 돌려주면 잘린 JSON이 그대로 흘러간다.
+                if (exitCode != 0) {
+                    long d = System.currentTimeMillis() - startMs;
+                    logLlmStats(model, 1, "CLAUDE_TRUNCATED", 0, 0, 0, 0, 0, "FAIL", d, corrId);
+                    throw new ClaudeCodeException("CLAUDE_TRUNCATED",
+                            "Claude CLI exited with code " + exitCode
+                                    + " (부분 응답 " + result.text.length() + "자 폐기)", exitCode, null);
+                }
+                // 정상 종료라도 최종 result 이벤트가 없으면 부분 스트림이다 — 잘린 JSON을
+                // 성공으로 넘기면 호출자가 파싱에 실패해 잡이 죽는다. 명시적으로 실패시켜
+                // 호출자의 재시도 경로를 타게 한다.
+                if (result.truncatedStream) {
+                    throw new ClaudeCodeException("CLAUDE_TRUNCATED",
+                            "응답이 완결되지 않았습니다 (부분 스트림 " + result.text.length() + "자)",
+                            exitCode, null);
+                }
+                return result.text;
+            } finally {
+                processTerminator.release(process);
             }
-            // 오류 종료 시 부분 텍스트를 성공처럼 돌려주면 잘린 JSON이 그대로 흘러간다.
-            if (exitCode != 0) {
-                long d = System.currentTimeMillis() - startMs;
-                logLlmStats(model, 1, "CLAUDE_TRUNCATED", 0, 0, 0, 0, 0, "FAIL", d, corrId);
-                throw new ClaudeCodeException("CLAUDE_TRUNCATED",
-                        "Claude CLI exited with code " + exitCode
-                                + " (부분 응답 " + result.text.length() + "자 폐기)", exitCode, null);
-            }
-            // 정상 종료라도 최종 result 이벤트가 없으면 부분 스트림이다 — 잘린 JSON을
-            // 성공으로 넘기면 호출자가 파싱에 실패해 잡이 죽는다. 명시적으로 실패시켜
-            // 호출자의 재시도 경로를 타게 한다.
-            if (result.truncatedStream) {
-                throw new ClaudeCodeException("CLAUDE_TRUNCATED",
-                        "응답이 완결되지 않았습니다 (부분 스트림 " + result.text.length() + "자)",
-                        exitCode, null);
-            }
-            return result.text;
         } finally {
-            processTerminator.release(process);
+            deleteTempImages(imageFiles);
         }
     }
 
@@ -262,7 +286,15 @@ public class ClaudeCliInvoker {
         log.info(stats);
     }
 
-    private ProcessBuilder buildProcessBuilder(String prompt, String model) {
+    ProcessBuilder buildProcessBuilder(String prompt, String model) {
+        return buildProcessBuilder(prompt, model, List.of());
+    }
+
+    /**
+     * Claude CLI vision: prompt 뒤에 로컬 이미지 경로를 positional argument로 붙인다.
+     * 이미지 경로가 없으면 기존 텍스트 전용 command와 동일하다.
+     */
+    ProcessBuilder buildProcessBuilder(String prompt, String model, List<Path> imagePaths) {
         int splitIdx = prompt.indexOf("<conversation_history>");
         String systemPart;
         String userPart;
@@ -276,6 +308,13 @@ public class ClaudeCliInvoker {
 
         var command = buildCommand(claudeBinaryPath, model, systemPart);
         command.add(userPart);
+        if (imagePaths != null) {
+            for (Path path : imagePaths) {
+                if (path != null) {
+                    command.add(path.toAbsolutePath().toString());
+                }
+            }
+        }
 
         ProcessBuilder pb = new ProcessBuilder(command);
         String baseUrl = llmConfigService.getAnthropicBaseUrl();
@@ -283,6 +322,56 @@ public class ClaudeCliInvoker {
             pb.environment().put("ANTHROPIC_BASE_URL", baseUrl);
         }
         return pb;
+    }
+
+    /** Decode up to one image to a temp file. Empty/null → empty list. */
+    static List<Path> writeTempImages(List<InvokeImage> images) throws Exception {
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+        InvokeImage img = images.get(0);
+        if (img == null || img.getBase64() == null || img.getBase64().isBlank()) {
+            return List.of();
+        }
+        byte[] bytes = Base64.getDecoder().decode(img.getBase64().strip());
+        Path path = Files.createTempFile("llm-vision-", extensionForMime(img.getMime()));
+        try {
+            Files.write(path, bytes);
+            return List.of(path);
+        } catch (Exception e) {
+            Files.deleteIfExists(path);
+            throw e;
+        }
+    }
+
+    static void deleteTempImages(List<Path> paths) {
+        if (paths == null) {
+            return;
+        }
+        for (Path path : paths) {
+            if (path == null) {
+                continue;
+            }
+            try {
+                Files.deleteIfExists(path);
+            } catch (Exception e) {
+                log.warn("Failed to delete temp image {}: {}", path, e.getMessage());
+            }
+        }
+    }
+
+    static String extensionForMime(String mime) {
+        if (mime == null || mime.isBlank()) {
+            return ".bin";
+        }
+        String normalized = mime.strip().toLowerCase();
+        return switch (normalized) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            default -> ".bin";
+        };
     }
 
     /**

@@ -79,6 +79,7 @@ last_updated: 2026-08-31
 | `LLM_PROCESS_TERMINATION_GRACE_MS` | 타임아웃·취소 뒤 CLI 프로세스 트리에 정상 종료를 허용하는 시간 | `2000` |
 | `LLM_REMOTE_CONNECT_TIMEOUT_MS` | backend → bridge HTTP connect timeout | `10000` (2026-08-15, 기존 `5000`) |
 | `ASM_REQUEST_TIMEOUT_MS` | backend → ASM 일반 요청 timeout | `30000` (2026-08-15, 기존 `10000`) |
+| `ASM_STATS_REQUEST_TIMEOUT_MS` | backend → ASM 긴 읽기 (통계 collect · X inbox/outbound Playwright) | `300000` |
 
 ## 마케팅 (Again-Spring & ASM)
 

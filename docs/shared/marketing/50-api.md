@@ -634,22 +634,25 @@ Authorization: Bearer <admin-jwt>
 ```
 
 키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h.  
-`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음. **어드민 REST는 x-ops만** — 게시용 어드민 API는 없다.
+`ritualEnabled`·`inboundEnabled`·`outboundEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음.
 
 `personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인(FxTwitter)을 읽어 **남을 향한 수동 댓글·인용**만 코퍼스에 넣고, prod에서만 Haiku로 프로필을 증류한다. 자동 스레드(자기 답글·URL만·`#다시봄`/`#againspring` 훅)는 버린다.
 
 ```
 POST /api/admin/marketing/x-ops/learn
+POST /api/admin/marketing/x-ops/outbound
 ```
 
 지금 학습. 스위치가 꺼져 있으면 400. GET 응답의 `personaLastStatus` / `personaLastNewCount` / `personaLastLearnedAt` / `personaSummary`는 읽기 전용. 상태 예: `NEVER` · `NO_NEW` · `INGESTED_LLM_DISABLED`(dev L3) · `OK`(prod 증류) · `FETCH_FAILED`.
+
+지금 선댓글 틱 1회 (`XOutboundService.run`). 스위치 off면 400. nginx `/api/admin/marketing/` 읽기 타임아웃 300s.
 
 **ASM 엔드포인트** (AS `AsmClient`가 호출. 어드민 JWT 경로 아님):
 
 - `POST /api/v1/x/publish` — `{ text, imageBase64?, imageMime?, replyToTweetId? }` → social-poster. 성공 시 `{ tweetId, url }`
 - `POST /api/v1/x/ritual` — `{ slot: "morning"|"night", text }` — ASM `assets/x-ritual` 사진 한 장을 붙여 게시
 - `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
-- `GET /api/v1/x/outbound-candidates` — 맞팔 최근 글 중 댓글 수·나이 필터 후보 (`tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`). AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:00 KST). 1분 폴링 금지.
+- `GET /api/v1/x/outbound-candidates` — 팔로우 중 최근 원글 중 댓글 수·나이 필터 후보. 필드: `tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`, **`hasVideo`**, **`hasPhoto`**, **`photoJpegBase64`**, **`peerReplies`**. `hasVideo`=네이티브 영상 플레이어(GIF 배지/aria는 영상 아님 → `hasVideo=false`, 사진으로 취급). `hasPhoto`=본문 사진/GIF(og·아바타 제외). `photoJpegBase64`=**첫 사진만** Playwright가 받아 JPEG(긴 변 ~768, ~200KB); AS는 x.com CDN을 직접 받지 않음. `peerReplies`=우리 핸들 제외 비어 있지 않은 답글 텍스트 **최대 10**. AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:00 KST). 틱당 댓글 1개; `hasVideo`면 그 후보는 건너뛰고 다음. Playwright 스크래프가 기본 30s를 넘기므로 `AsmClient`는 **stats 클라이언트**(`ASM_STATS_REQUEST_TIMEOUT_MS`, 기본 300s)로 호출한다. 1분 폴링 금지.
 
 흐름·한도: [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
 

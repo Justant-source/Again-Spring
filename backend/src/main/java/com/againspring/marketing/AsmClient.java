@@ -8,6 +8,7 @@ import com.againspring.marketing.dto.XOutboundCandidatesResponse;
 import com.againspring.marketing.dto.XPublishRequest;
 import com.againspring.marketing.dto.XPublishResponse;
 import com.againspring.marketing.dto.XRitualRequest;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -405,6 +406,7 @@ public class AsmClient {
         Instant createdAt
     ) {}
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record XOutboundCandidate(
         String tweetId,
         String authorHandle,
@@ -412,8 +414,18 @@ public class AsmClient {
         int replyCount,
         double ageHours,
         boolean alreadyRepliedByUs,
-        String ourReplyTweetId
-    ) {}
+        String ourReplyTweetId,
+        boolean hasVideo,
+        boolean hasPhoto,
+        String photoJpegBase64,
+        List<String> peerReplies
+    ) {
+        public XOutboundCandidate {
+            if (peerReplies == null) {
+                peerReplies = List.of();
+            }
+        }
+    }
 
     /**
      * Publish text (and optional image) to X. {@code replyToTweetId} null = original post.
@@ -455,7 +467,7 @@ public class AsmClient {
      */
     public List<XInboxItem> listXInbox(int sinceMinutes) {
         try {
-            XInboxResponse body = restClient
+            XInboxResponse body = statsRestClient
                 .get()
                 .uri(uriBuilder -> uriBuilder
                     .path("/api/v1/x/inbox")
@@ -474,11 +486,12 @@ public class AsmClient {
     }
 
     /**
-     * Mutual-follow hot posts for outbound replies.
+     * Mutual-follow hot posts for outbound replies. Playwright scrape often exceeds
+     * the default 30s ASM timeout (measured ~49s) — use the long-read client.
      */
     public List<XOutboundCandidate> listXOutboundCandidates(int minReplies, int maxAgeHours) {
         try {
-            XOutboundCandidatesResponse body = restClient
+            XOutboundCandidatesResponse body = statsRestClient
                 .get()
                 .uri(uriBuilder -> uriBuilder
                     .path("/api/v1/x/outbound-candidates")
@@ -540,7 +553,11 @@ public class AsmClient {
                 it.replyCount() == null ? 0 : it.replyCount(),
                 it.ageHours() == null ? 0.0 : it.ageHours(),
                 Boolean.TRUE.equals(it.alreadyRepliedByUs()),
-                it.ourReplyTweetId()));
+                it.ourReplyTweetId(),
+                Boolean.TRUE.equals(it.hasVideo()),
+                Boolean.TRUE.equals(it.hasPhoto()),
+                it.photoJpegBase64(),
+                it.peerReplies()));
         }
         return out;
     }

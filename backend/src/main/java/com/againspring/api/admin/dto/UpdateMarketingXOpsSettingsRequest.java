@@ -37,7 +37,7 @@ public class UpdateMarketingXOpsSettingsRequest {
     @Max(50)
     private Integer inboundPerPostCap;
 
-    @Min(1)
+    @Min(0)
     @Max(50)
     private Integer hotMinReplies;
 

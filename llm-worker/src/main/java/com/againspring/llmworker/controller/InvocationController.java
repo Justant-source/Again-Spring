@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -48,7 +49,7 @@ public class InvocationController {
         long start = System.currentTimeMillis();
         try {
             String text = pool.executeSyncTask(req.getPrompt(), req.getModel(),
-                    req.getTimeoutMs(), correlationId);
+                    req.getTimeoutMs(), correlationId, capImages(req.getImages()));
             long latency = System.currentTimeMillis() - start;
             return ResponseEntity.ok(InvokeResponse.success(text, latency, correlationId));
 
@@ -188,6 +189,14 @@ public class InvocationController {
     private boolean isCanceled(Throwable ex) {
         Throwable cause = ex instanceof java.util.concurrent.ExecutionException ? ex.getCause() : ex;
         return cause instanceof InvocationCanceledException;
+    }
+
+    /** Haiku vision: at most one image. */
+    static List<InvokeImage> capImages(List<InvokeImage> images) {
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+        return List.of(images.get(0));
     }
 
     private String resolveErrorType(Throwable ex) {

@@ -18,6 +18,10 @@ public record XOutboundCandidatesResponse(List<Item> items) {
         Integer replyCount,
         Double ageHours,
         Boolean alreadyRepliedByUs,
-        String ourReplyTweetId
+        String ourReplyTweetId,
+        Boolean hasVideo,
+        Boolean hasPhoto,
+        String photoJpegBase64,
+        List<String> peerReplies
     ) {}
 }

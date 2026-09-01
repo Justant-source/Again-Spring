@@ -2,6 +2,7 @@ package com.againspring.llm.remote;
 
 import com.againspring.common.exception.BusinessException;
 import com.againspring.llm.LLMProvider;
+import com.againspring.llm.LlmImage;
 import com.againspring.llm.remote.dto.WorkerInvokeRequest;
 import com.againspring.llm.remote.dto.WorkerInvokeResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -44,6 +46,11 @@ public class RemoteLlmProvider implements LLMProvider {
 
     @Override
     public String invoke(String prompt, String model) throws Exception {
+        return invoke(prompt, model, null);
+    }
+
+    @Override
+    public String invoke(String prompt, String model, List<LlmImage> images) throws Exception {
         if (!enabled) {
             log.warn("[remote-llm] blocked: llm.enabled=false");
             throw new BusinessException("LLM_DISABLED", DISABLED_MESSAGE, 501);
@@ -54,6 +61,7 @@ public class RemoteLlmProvider implements LLMProvider {
                     .prompt(prompt)
                     .model(model != null ? model : defaultModel)
                     .timeoutMs(defaultTimeoutMs)
+                    .images(capImages(images))
                     .build();
             WorkerInvokeResponse resp = restClient.post()
                     .uri("/v1/invoke")
@@ -65,6 +73,13 @@ public class RemoteLlmProvider implements LLMProvider {
             log.error("[remote-llm] invoke failed correlationId={}: {}", correlationId, e.getMessage());
             throw e;
         }
+    }
+
+    static List<LlmImage> capImages(List<LlmImage> images) {
+        if (images == null || images.isEmpty()) {
+            return null;
+        }
+        return List.of(images.get(0));
     }
 
     @Override

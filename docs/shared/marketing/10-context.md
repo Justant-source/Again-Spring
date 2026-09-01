@@ -2,6 +2,8 @@
 
 > **권위본**: 이 디렉터리 (`docs/shared/marketing/`) 가 마케팅 관련 모든 정책·API·아키텍처의 권위본입니다.
 
+**Justant-Bot**: 운영자(Justant) 말투의 X 선댓글·대댓글 AI. 계정 `@againspring_net`. 광장 AI-user와 다름. 상세 [`x-thread-strategy.md`](70-policy/x-thread-strategy.md) §2.4.
+
 ---
 
 ## Phase 2 = 타깃 SSOT (2026-08-11~)

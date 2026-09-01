@@ -78,6 +78,24 @@ class MarketingXOpsSettingsServiceTest {
     }
 
     @Test
+    void update_hotMinRepliesZero_isAllowed() {
+        when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
+
+        service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 0, 24,
+            false, false, true, true, "04:30"), "admin");
+
+        ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
+        verify(systemSettingRepository, atLeast(1)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_HOT_MIN_REPLIES.equals(s.getSettingKey())
+                && "0".equals(s.getSettingValue()));
+        assertThat(captor.getAllValues())
+            .anyMatch(s -> MarketingXOpsSettingsService.KEY_HOT_MAX_AGE_HOURS.equals(s.getSettingKey())
+                && "24".equals(s.getSettingValue()));
+    }
+
+    @Test
     void update_invalidTime_throws() {
         assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
             "7:30", "22:00", 2, 20, 40, 12, 3, 6,

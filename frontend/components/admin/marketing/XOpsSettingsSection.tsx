@@ -284,11 +284,11 @@ export function XOpsSettingsSection() {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="x-ops-hot-min">불 난 글 최소 댓글</Label>
+            <Label htmlFor="x-ops-hot-min">최소 댓글 (0=제한 없음)</Label>
             <Input
               id="x-ops-hot-min"
               type="number"
-              min={1}
+              min={0}
               max={50}
               value={settings.hotMinReplies}
               onChange={(e) => patch('hotMinReplies', Number(e.target.value))}

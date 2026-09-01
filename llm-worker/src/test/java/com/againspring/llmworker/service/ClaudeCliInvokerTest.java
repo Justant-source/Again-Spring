@@ -1,7 +1,11 @@
 package com.againspring.llmworker.service;
 
+import com.againspring.llmworker.dto.InvokeImage;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -156,5 +160,53 @@ class ClaudeCliInvokerTest {
         int systemPromptIdx = command.indexOf("--system-prompt");
         assertTrue(disallowedToolsIdx < systemPromptIdx,
             "--disallowedTools should appear before --system-prompt");
+    }
+
+    @Test
+    void buildProcessBuilderWithoutImagesIsBuildCommandPlusPrompt() {
+        ClaudeCliInvoker invoker = newInvoker();
+        ProcessBuilder pb = invoker.buildProcessBuilder("user prompt", "claude-haiku-4-5-20251001");
+        List<String> command = pb.command();
+        List<String> prefix = ClaudeCliInvoker.buildCommand(
+                "claude", "claude-haiku-4-5-20251001", expectedDefaultSystemPrompt());
+        assertEquals(prefix.size() + 1, command.size());
+        assertEquals(prefix, command.subList(0, prefix.size()));
+        assertEquals("user prompt", command.get(command.size() - 1));
+    }
+
+    @Test
+    void jpegBase64WritesTempIncludedInCommandThenCleanup() throws Exception {
+        InvokeImage image = new InvokeImage();
+        image.setMime("image/jpeg");
+        byte[] jpegBytes = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
+        image.setBase64(Base64.getEncoder().encodeToString(jpegBytes));
+
+        List<Path> temps = ClaudeCliInvoker.writeTempImages(List.of(image, image));
+        assertEquals(1, temps.size());
+        Path temp = temps.get(0);
+        assertTrue(Files.exists(temp));
+        assertTrue(temp.getFileName().toString().endsWith(".jpg"));
+        assertArrayEquals(jpegBytes, Files.readAllBytes(temp));
+
+        try {
+            ClaudeCliInvoker invoker = newInvoker();
+            ProcessBuilder pb = invoker.buildProcessBuilder("look", "claude-haiku-4-5-20251001", temps);
+            List<String> command = pb.command();
+            assertEquals(temp.toAbsolutePath().toString(), command.get(command.size() - 1));
+            assertEquals("look", command.get(command.size() - 2));
+        } finally {
+            ClaudeCliInvoker.deleteTempImages(temps);
+        }
+        assertFalse(Files.exists(temp));
+    }
+
+    private static ClaudeCliInvoker newInvoker() {
+        return new ClaudeCliInvoker("claude", new LlmConfigService(""), new ProcessTerminator(1L));
+    }
+
+    private static String expectedDefaultSystemPrompt() {
+        return "당신은 '다시봄' 감정 정리 도우미입니다. 사용자가 보내는 텍스트에 한국어로만 응답합니다. " +
+                "소프트웨어 개발 도움이 아닌, 사람 간의 감정과 관계를 다루는 대화를 합니다. " +
+                "아래 지시에 따라 즉시 응답을 시작하세요.";
     }
 }

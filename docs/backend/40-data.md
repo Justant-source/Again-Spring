@@ -594,7 +594,7 @@ ritual / inbound / outbound 작문·게시 결과. 어드민 REST 없음 — 일
 | `posted_tweet_id` | VARCHAR | 우리가 게시한 트윗 ID (`POSTED`일 때) |
 | `body` | TEXT | 게시 본문 |
 | `status` | VARCHAR | `POSTED` \| `SKIPPED` \| `FAILED` |
-| `skip_reason` | VARCHAR | `NO_VOICE` \| `SAFETY` \| `LLM_ERROR` \| `CAP` \| `DISABLED` \| `DEV_LLM_OFF` |
+| `skip_reason` | VARCHAR(32) | `VIDEO` \| `UNSURE` \| `TOO_LONG` \| `LAUGH_SPAM` \| `ECHO` \| `SAFETY` \| `VISION_FAIL` \| `NO_VOICE` \| `LLM_ERROR` \| `CAP` \| `DISABLED` \| `DEV_LLM_OFF` \| `PUBLISH_FAILED` \| `ASM_ERROR` |
 | `created_at` | TIMESTAMP | 일일 cap·글당 cap 집계 |
 
 인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound).
