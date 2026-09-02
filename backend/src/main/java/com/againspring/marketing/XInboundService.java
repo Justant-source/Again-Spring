@@ -22,7 +22,6 @@ public class XInboundService {
 
     static final int INBOX_SINCE_MINUTES = 90;
     static final int REPLY_WINDOW_MINUTES = 30;
-    static final int MAX_BATCH = 3;
 
     private static final Pattern URLS = Pattern.compile(
         "(?i)(https?://\\S+|www\\.\\S+|t\\.co/\\S+)");
@@ -60,6 +59,7 @@ public class XInboundService {
             return;
         }
 
+        int perTick = Math.max(1, settings.inboundPerTick());
         int batch = 0;
         for (AsmClient.XInboxItem item : inbox) {
             if (item == null || item.tweetId() == null || item.tweetId().isBlank()) {
@@ -92,7 +92,7 @@ public class XInboundService {
                     ? draft.skipReason() : "NO_VOICE";
                 ledger.recordSkipped(XOpsAction.Kind.INBOUND, item.tweetId(), reason, now);
                 batch++;
-                if (batch >= MAX_BATCH) {
+                if (batch >= perTick) {
                     return;
                 }
                 continue;
@@ -120,7 +120,7 @@ public class XInboundService {
                 ledger.recordFailed(XOpsAction.Kind.INBOUND, item.tweetId(), "ASM_ERROR", now);
             }
             batch++;
-            if (batch >= MAX_BATCH) {
+            if (batch >= perTick) {
                 return;
             }
         }

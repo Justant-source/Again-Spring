@@ -57,6 +57,14 @@ public class UpdateMarketingXOpsSettingsRequest {
     @Max(5)
     private Integer originalPostDailyCap;
 
+    @Min(1)
+    @Max(5)
+    private Integer outboundPerTick;
+
+    @Min(1)
+    @Max(10)
+    private Integer inboundPerTick;
+
     public MarketingXOpsSettingsService.XOpsSettings toSettings(
             MarketingXOpsSettingsService.XOpsSettings current) {
         return new MarketingXOpsSettingsService.XOpsSettings(
@@ -75,7 +83,9 @@ public class UpdateMarketingXOpsSettingsRequest {
             personaLearnAt != null ? personaLearnAt : current.personaLearnAt(),
             personaEvalEnabled != null ? personaEvalEnabled : current.personaEvalEnabled(),
             originalPostEnabled != null ? originalPostEnabled : current.originalPostEnabled(),
-            originalPostDailyCap != null ? originalPostDailyCap : current.originalPostDailyCap()
+            originalPostDailyCap != null ? originalPostDailyCap : current.originalPostDailyCap(),
+            outboundPerTick != null ? outboundPerTick : current.outboundPerTick(),
+            inboundPerTick != null ? inboundPerTick : current.inboundPerTick()
         );
     }
 }

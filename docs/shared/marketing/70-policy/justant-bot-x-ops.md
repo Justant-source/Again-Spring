@@ -1,6 +1,6 @@
 ---
 title: Justant-Bot — X 선댓글·대댓글·의식·원글·페르소나 학습
-last_updated: 2026-09-01
+last_updated: 2026-09-02
 ---
 
 # Justant-Bot — X 성장 루프
@@ -9,7 +9,7 @@ last_updated: 2026-09-01
 > 사연 스크린샷 체인(`x_thread`, 게시 후 24h)은 [`x-thread-strategy.md`](x-thread-strategy.md)가 권위본이다. 두 시스템은 같은 `@againspring_net` 계정을 쓰지만 **파이프가 다르다**.
 > 프롬프트 자산: [`x-outbound-reply.md`](../../prompts/marketing/x-outbound-reply.md) · [`x-outbound-donts.md`](../../prompts/marketing/x-outbound-donts.md) · [`x-persona-charter.md`](../../prompts/marketing/x-persona-charter.md) · [`x-persona-judge.md`](../../prompts/marketing/x-persona-judge.md) · [`x-original-post.md`](../../prompts/marketing/x-original-post.md).
 > 어드민 REST: [`50-api.md`](../50-api.md) §4.1.1 · [`rest-spec.md`](../../50-api/rest-spec.md).
-> 스키마: [`docs/backend/40-data.md`](../../../backend/40-data.md) `x_ops_action` · `x_persona_example` · `x_persona_eval`.
+> 스키마: [`docs/backend/40-data.md`](../../../backend/40-data.md) `system_setting` · `x_ops_action` · `x_persona_example` · `x_persona_eval`.
 > 페르소나 볼트(미러): 호스트 `.temp/x-justant-bot/` — 컨테이너는 이 경로에 **쓰지 않는다**.
 
 ## 1. 무엇이 Justant-Bot인가
@@ -42,16 +42,18 @@ last_updated: 2026-09-01
 ## 2. 스위치·한도·스케줄
 
 어드민 `/admin/marketing` → 설정 → **X 운영**.  
-`GET`/`PUT /api/admin/marketing/x-ops`. 키 `marketing.x.*`.
+`GET`/`PUT /api/admin/marketing/x-ops`. 키 `marketing.x.*`. **운영 값의 SSOT는 `system_setting`이다.** 어드민 저장(또는 DB 행만 UPDATE)하면 **커밋 없이** 다음 스케줄 틱부터 반영된다. 아래 「폴백」은 행이 없을 때만 코드가 쓰는 값이다.
 
-| 항목 | 기본 | 키 |
+| 항목 | 폴백 | 키 |
 |---|---|---|
 | 아침 시각 | 07:30 KST | `marketing.x.morning_time` |
 | 밤 시각 | 22:00 KST | `marketing.x.night_time` |
 | 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` (**원글 파이프가 켜져 있을 때 소비**. 실제 발행 = `min(original_post_daily_cap, story_scoops_per_day)`) |
 | 선댓글 /일 | 20 | `marketing.x.outbound_daily_cap` |
+| 선댓글 /틱 | 1 (1–5) | `marketing.x.outbound_per_tick` |
 | 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
 | 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
+| 대댓글 /틱 | 3 (1–10) | `marketing.x.inbound_per_tick` |
 | 불 난 글 최소 댓글 | 3 (`0`이면 댓글 0도 후보) | `marketing.x.hot_min_replies` |
 | 불 난 글 최대 나이 | 6시간 | `marketing.x.hot_max_age_hours` |
 | ritual / inbound / outbound | **false** | `marketing.x.{ritual,inbound,outbound}_enabled` |
@@ -74,14 +76,14 @@ flowchart TD
   tick["tick 매분 KST"] --> ritual["XRitualPublisher.runIfDue"]
   tick --> inbound["XInboundService.run"]
   tick --> original["XOriginalPostService.runIfDue"]
-  outTick["outboundTick 08:00-22:30 30분"] --> outbound["XOutboundService.run"]
+  outTick["outboundTick 08:00-22:30 30분 · 틱당 = outbound_per_tick"] --> outbound["XOutboundService.run"]
   learnTick["XPersonaLearnScheduler 매분"] --> learn["runIfDue personaLearnAt 하루 1회"]
   learn --> eval["Shadow eval persona_eval_enabled"]
   vaultCron["호스트 cron 05:00"] --> export["GET persona-export → .temp 볼트"]
 ```
 
 - `XGrowthLoopScheduler.tick`: `0 * * * * *` Asia/Seoul — ritual + inbound + original(`runIfDue`, 스위치 기본 false).
-- `outboundTick`: `0 0,30 8-22 * * *` — 08:00, 08:30, … **22:30** KST. 틱당 **게시 성공 최대 1건**. 스킵은 다음 후보.
+- `outboundTick`: `0 0,30 8-22 * * *` — 08:00, 08:30, … **22:30** KST. 틱당 게시 성공 상한 = `marketing.x.outbound_per_tick`. 스킵은 다음 후보.
 - `XPersonaLearnScheduler.tick`: 매분. 실제 학습은 `personaLearnAt` 그 시각에만 (`runIfDue`). 말미에 shadow eval (`llmEnabled ∧ persona_eval_enabled`).
 - `llm.enabled=false`(dev L3): 작문·발행 **no-op**. 새벽 학습은 돌아가되 증류는 `INGESTED_LLM_DISABLED`이고 **프로필 JSON은 저장하지 않음**.
 
@@ -113,7 +115,7 @@ flowchart TD
 코드: `XInboundService`. ASM `GET /api/v1/x/inbox?sinceMinutes=90`.
 
 - 수신 후 **3–25분** 지터(`tweetId` 해시)부터 **30분** 창까지. UI에 없음.
-- 틱당 처리 상한 **3** (`MAX_BATCH`). 일일/글당 cap은 설정.
+- 틱당 처리 상한 = `marketing.x.inbound_per_tick`. 일일/글당 cap도 `system_setting`.
 - 스킵: URL만, 맞팔 미끼, 욕설 패턴 → `SAFETY`.
 - 작문: `composeReply` — **인라인 프롬프트 + persona**. outbound JSON 프롬프트·few-shot·`OutboundDraftGuard`를 타지 않는다.
 - 게시 성공 시 outbound와 같은 Telegram 알림.
@@ -267,4 +269,5 @@ flowchart TD
 - **dev**에서 자동 댓글 품질을 검증하지 않는다 (L3, LLM 없음). 학습 적재만 가능. 증류 실패 경로에서도 프로필은 덮어쓰지 않는다.
 - e2e는 `POST /x-ops/learn` · `/outbound`를 호출하지 않는다.
 - 운영자가 자동 댓글·원글을 지우면 다음 새벽(또는 수동 learn)에 avoid로 들어간다. 지운 직후 즉시 학습하려면 `POST /x-ops/learn`.
+- 한도·틱당 건수·스위치는 git이 아니라 `system_setting` / 어드민 X 운영. 코드 숫자는 빈 행 폴백만.
 - 원글 파이프는 게이트 통과 전까지 prod off.

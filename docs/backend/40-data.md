@@ -151,6 +151,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `password_reset_tokens` | 비밀번호 재설정 | BIGINT auto |
 | `revoked_tokens` | JWT 블랙리스트 | BIGINT auto |
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
+| `system_setting` | KV 운영 설정. X 한도·스위치 `marketing.x.*` 포함. 어드민 저장 = 행 UPDATE, 커밋 없음 | `setting_key` VARCHAR(100) **V81** |
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
 | `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) · 품질 진단/재생성 추적 **V115** · 구조화 실패 계약 **V116** · `scheduled_publish_at` NOT NULL **V117** |
 | `marketing_generation_trace` | LLM 생성 기록 (프롬프트·응답·시봄이 선택) | BIGINT auto **V119** |

@@ -11,7 +11,8 @@ import java.time.Instant;
  * Ritual / inbound / original stay on a one-minute KST tick (inbound has a
  * 30-minute reply window; original only fires at 12:30/19:30). Outbound
  * candidate fetches hit X's session APIs, so they run only every 30 minutes
- * during 08:00–22:00 KST — one reply per successful tick.
+ * during 08:00–22:30 KST. Successful replies per tick come from
+ * {@code marketing.x.outbound_per_tick}.
  */
 @Slf4j
 @Component

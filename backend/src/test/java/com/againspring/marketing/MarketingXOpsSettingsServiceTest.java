@@ -50,6 +50,8 @@ class MarketingXOpsSettingsServiceTest {
         assertThat(settings.personaEvalEnabled()).isTrue();
         assertThat(settings.originalPostEnabled()).isFalse();
         assertThat(settings.originalPostDailyCap()).isEqualTo(1);
+        assertThat(settings.outboundPerTick()).isEqualTo(1);
+        assertThat(settings.inboundPerTick()).isEqualTo(3);
     }
 
     @Test
@@ -61,7 +63,7 @@ class MarketingXOpsSettingsServiceTest {
             true, false, true, true, "04:30", true, false, 1), "admin");
 
         ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
-        verify(systemSettingRepository, atLeast(16)).save(captor.capture());
+        verify(systemSettingRepository, atLeast(18)).save(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(SystemSetting::getSettingKey)
             .contains(
@@ -80,7 +82,9 @@ class MarketingXOpsSettingsServiceTest {
                 MarketingXOpsSettingsService.KEY_PERSONA_LEARN_AT,
                 MarketingXOpsSettingsService.KEY_PERSONA_EVAL_ENABLED,
                 MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED,
-                MarketingXOpsSettingsService.KEY_ORIGINAL_POST_DAILY_CAP);
+                MarketingXOpsSettingsService.KEY_ORIGINAL_POST_DAILY_CAP,
+                MarketingXOpsSettingsService.KEY_OUTBOUND_PER_TICK,
+                MarketingXOpsSettingsService.KEY_INBOUND_PER_TICK);
         assertThat(captor.getAllValues())
             .anyMatch(s -> MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED.equals(s.getSettingKey())
                 && "false".equals(s.getSettingValue()));
@@ -151,5 +155,17 @@ class MarketingXOpsSettingsServiceTest {
         assertThat(captor.getAllValues())
             .anyMatch(s -> MarketingXOpsSettingsService.KEY_ORIGINAL_POST_ENABLED.equals(s.getSettingKey())
                 && "false".equals(s.getSettingValue()));
+    }
+
+    @Test
+    void update_outboundPerTickOutOfRange_throws() {
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 1, 0, 3), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 1, 6, 3), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
     }
 }

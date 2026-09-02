@@ -39,10 +39,13 @@ public class MarketingXOpsSettingsService {
     public static final String KEY_PERSONA_EVAL_ENABLED = "marketing.x.persona_eval_enabled";
     public static final String KEY_ORIGINAL_POST_ENABLED = "marketing.x.original_post_enabled";
     public static final String KEY_ORIGINAL_POST_DAILY_CAP = "marketing.x.original_post_daily_cap";
+    public static final String KEY_OUTBOUND_PER_TICK = "marketing.x.outbound_per_tick";
+    public static final String KEY_INBOUND_PER_TICK = "marketing.x.inbound_per_tick";
 
     public static final String DEFAULT_MORNING_TIME = "07:30";
     public static final String DEFAULT_NIGHT_TIME = "22:00";
     public static final int DEFAULT_STORY_SCOOPS_PER_DAY = 2;
+    /** Empty-row fallback only. Live values live in {@code system_setting}. */
     public static final int DEFAULT_OUTBOUND_DAILY_CAP = 20;
     public static final int DEFAULT_INBOUND_DAILY_CAP = 40;
     public static final int DEFAULT_INBOUND_PER_POST_CAP = 12;
@@ -52,6 +55,8 @@ public class MarketingXOpsSettingsService {
     public static final boolean DEFAULT_PERSONA_EVAL_ENABLED = true;
     public static final boolean DEFAULT_ORIGINAL_POST_ENABLED = false;
     public static final int DEFAULT_ORIGINAL_POST_DAILY_CAP = 1;
+    public static final int DEFAULT_OUTBOUND_PER_TICK = 1;
+    public static final int DEFAULT_INBOUND_PER_TICK = 3;
 
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -73,8 +78,37 @@ public class MarketingXOpsSettingsService {
         String personaLearnAt,
         boolean personaEvalEnabled,
         boolean originalPostEnabled,
-        int originalPostDailyCap
+        int originalPostDailyCap,
+        int outboundPerTick,
+        int inboundPerTick
     ) {
+        /** Callers that do not yet set per-tick knobs get 1 outbound / 3 inbound. */
+        public XOpsSettings(
+            String morningTime,
+            String nightTime,
+            int storyScoopsPerDay,
+            int outboundDailyCap,
+            int inboundDailyCap,
+            int inboundPerPostCap,
+            int hotMinReplies,
+            int hotMaxAgeHours,
+            boolean ritualEnabled,
+            boolean inboundEnabled,
+            boolean outboundEnabled,
+            boolean personaLearningEnabled,
+            String personaLearnAt,
+            boolean personaEvalEnabled,
+            boolean originalPostEnabled,
+            int originalPostDailyCap
+        ) {
+            this(
+                morningTime, nightTime, storyScoopsPerDay, outboundDailyCap, inboundDailyCap,
+                inboundPerPostCap, hotMinReplies, hotMaxAgeHours, ritualEnabled, inboundEnabled,
+                outboundEnabled, personaLearningEnabled, personaLearnAt, personaEvalEnabled,
+                originalPostEnabled, originalPostDailyCap,
+                DEFAULT_OUTBOUND_PER_TICK, DEFAULT_INBOUND_PER_TICK);
+        }
+
         /** Callers that do not yet set eval/original knobs get eval on, original off, cap 1. */
         public XOpsSettings(
             String morningTime,
@@ -118,7 +152,9 @@ public class MarketingXOpsSettingsService {
             readTime(KEY_PERSONA_LEARN_AT, DEFAULT_PERSONA_LEARN_AT),
             readBool(KEY_PERSONA_EVAL_ENABLED, DEFAULT_PERSONA_EVAL_ENABLED),
             readBool(KEY_ORIGINAL_POST_ENABLED, DEFAULT_ORIGINAL_POST_ENABLED),
-            readInt(KEY_ORIGINAL_POST_DAILY_CAP, DEFAULT_ORIGINAL_POST_DAILY_CAP, 0, 5)
+            readInt(KEY_ORIGINAL_POST_DAILY_CAP, DEFAULT_ORIGINAL_POST_DAILY_CAP, 0, 5),
+            readInt(KEY_OUTBOUND_PER_TICK, DEFAULT_OUTBOUND_PER_TICK, 1, 5),
+            readInt(KEY_INBOUND_PER_TICK, DEFAULT_INBOUND_PER_TICK, 1, 10)
         );
     }
 
@@ -143,6 +179,8 @@ public class MarketingXOpsSettingsService {
         saveSetting(KEY_PERSONA_EVAL_ENABLED, String.valueOf(incoming.personaEvalEnabled()), now, by);
         saveSetting(KEY_ORIGINAL_POST_ENABLED, String.valueOf(incoming.originalPostEnabled()), now, by);
         saveSetting(KEY_ORIGINAL_POST_DAILY_CAP, String.valueOf(incoming.originalPostDailyCap()), now, by);
+        saveSetting(KEY_OUTBOUND_PER_TICK, String.valueOf(incoming.outboundPerTick()), now, by);
+        saveSetting(KEY_INBOUND_PER_TICK, String.valueOf(incoming.inboundPerTick()), now, by);
         return get();
     }
 
@@ -157,6 +195,8 @@ public class MarketingXOpsSettingsService {
         requireRange("hotMaxAgeHours", s.hotMaxAgeHours(), 1, 48);
         requireHhMm("personaLearnAt", s.personaLearnAt());
         requireRange("originalPostDailyCap", s.originalPostDailyCap(), 0, 5);
+        requireRange("outboundPerTick", s.outboundPerTick(), 1, 5);
+        requireRange("inboundPerTick", s.inboundPerTick(), 1, 10);
     }
 
     private static String normalizeHhMm(String raw) {

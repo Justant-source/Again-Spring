@@ -30,6 +30,8 @@ const DEFAULTS: MarketingXOpsSettings = {
   personaEvalEnabled: true,
   originalPostEnabled: false,
   originalPostDailyCap: 1,
+  outboundPerTick: 1,
+  inboundPerTick: 3,
 };
 
 function formatDeletePct(rate: number | null | undefined): string {
@@ -55,6 +57,8 @@ function mergeXOps(raw: MarketingXOpsSettings): MarketingXOpsSettings {
     personaEvalEnabled: raw.personaEvalEnabled ?? true,
     originalPostEnabled: raw.originalPostEnabled ?? false,
     originalPostDailyCap: raw.originalPostDailyCap ?? 1,
+    outboundPerTick: raw.outboundPerTick ?? 1,
+    inboundPerTick: raw.inboundPerTick ?? 3,
   };
 }
 
@@ -157,6 +161,8 @@ export function XOpsSettingsSection() {
     personaEvalEnabled: s.personaEvalEnabled ?? true,
     originalPostEnabled: s.originalPostEnabled ?? false,
     originalPostDailyCap: s.originalPostDailyCap ?? 1,
+    outboundPerTick: s.outboundPerTick ?? 1,
+    inboundPerTick: s.inboundPerTick ?? 3,
   });
 
   const handleSave = async () => {
@@ -166,7 +172,7 @@ export function XOpsSettingsSection() {
     try {
       setSettings(mergeXOps(await updateMarketingXOpsSettings(writable(settings))));
       setSavedMsg(
-        '저장했습니다. 글·댓글은 해당 스위치가 켜져 있을 때만 나갑니다. dev는 LLM이 꺼져 있어(L3) 작문·발행은 동작하지 않습니다. 페르소나 학습은 새벽 시각에 돌아갑니다.'
+        '저장했습니다. 다음 스케줄 틱부터 반영됩니다. 커밋은 필요 없습니다. 글·댓글은 해당 스위치가 켜져 있을 때만 나갑니다. dev는 LLM이 꺼져 있어(L3) 작문·발행은 동작하지 않습니다.'
       );
     } catch (err: unknown) {
       setError(`저장에 실패했습니다: ${extractError(err)}`);
@@ -334,6 +340,22 @@ export function XOpsSettingsSection() {
             />
           </div>
           <div className="space-y-1">
+            <Label htmlFor="x-ops-outbound-tick">선댓글 /틱</Label>
+            <Input
+              id="x-ops-outbound-tick"
+              type="number"
+              min={1}
+              max={5}
+              value={settings.outboundPerTick ?? 1}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                const clamped = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 1;
+                patch('outboundPerTick', clamped);
+              }}
+            />
+            <p className="text-xs text-gray-500">30분마다. 저장 즉시 DB만 바뀌고 다음 틱에 반영</p>
+          </div>
+          <div className="space-y-1">
             <Label htmlFor="x-ops-inbound-cap">우리 글 대댓글 /일</Label>
             <Input
               id="x-ops-inbound-cap"
@@ -354,6 +376,22 @@ export function XOpsSettingsSection() {
               value={settings.inboundPerPostCap}
               onChange={(e) => patch('inboundPerPostCap', Number(e.target.value))}
             />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="x-ops-inbound-tick">대댓글 /틱</Label>
+            <Input
+              id="x-ops-inbound-tick"
+              type="number"
+              min={1}
+              max={10}
+              value={settings.inboundPerTick ?? 3}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                const clamped = Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 3;
+                patch('inboundPerTick', clamped);
+              }}
+            />
+            <p className="text-xs text-gray-500">1분 스케줄마다 처리 상한</p>
           </div>
           <div className="space-y-1">
             <Label htmlFor="x-ops-hot-min">최소 댓글 (0=제한 없음)</Label>

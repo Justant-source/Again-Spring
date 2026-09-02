@@ -168,16 +168,19 @@ class XOutboundServiceTest {
     }
 
     @Test
-    void maxOnePublishPerTick() {
+    void maxPublishesPerTick_fromSettings() {
+        when(settingsService.get()).thenReturn(outboundOn(20, 2));
         when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
             cand("root-1", "a", "글1", 5, 1.0, false, null),
-            cand("root-2", "b", "글2", 8, 2.0, false, null)));
+            cand("root-2", "b", "글2", 8, 2.0, false, null),
+            cand("root-3", "c", "글3", 9, 1.5, false, null)));
 
         service.run(now);
 
         verify(asmClient).publishX(eq("너무귀여움"), eq("root-1"), isNull(), isNull());
-        verify(asmClient, never()).publishX(any(), eq("root-2"), any(), any());
-        verify(telegramNotifier, times(1)).send(any());
+        verify(asmClient).publishX(eq("너무귀여움"), eq("root-2"), isNull(), isNull());
+        verify(asmClient, never()).publishX(any(), eq("root-3"), any(), any());
+        verify(telegramNotifier, times(2)).send(any());
     }
 
     @Test
@@ -232,9 +235,14 @@ class XOutboundServiceTest {
     }
 
     private static MarketingXOpsSettingsService.XOpsSettings outboundOn(int cap) {
+        return outboundOn(cap, 1);
+    }
+
+    private static MarketingXOpsSettingsService.XOpsSettings outboundOn(int cap, int perTick) {
         return new MarketingXOpsSettingsService.XOpsSettings(
             "07:30", "22:00", 2, cap, 40, 12, 3, 6,
-            false, false, true, true, "04:30");
+            false, false, true, true, "04:30",
+            true, false, 1, perTick, 3);
     }
 
     private static MarketingXOpsSettingsService.XOpsSettings outboundOff() {

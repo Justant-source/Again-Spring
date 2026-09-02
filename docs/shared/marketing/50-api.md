@@ -648,8 +648,8 @@ PUT  /api/admin/marketing/x-ops
 Authorization: Bearer <admin-jwt>
 ```
 
-키 `marketing.x.*`. 기본값: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20 / 대댓글 40·글당 12 / 불난글 댓글≥3·6h / 원글 한도 1(0–5).  
-`ritualEnabled`·`inboundEnabled`·`outboundEnabled`·`originalPostEnabled` 기본 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음. **원글은 95% 게이트(평균 ≥95 ∧ 삭제율 ≤2% ∧ n≥30) 통과 전 prod에서 켜지 말 것.** `storyScoopsPerDay`는 원글 파이프가 켜져 있을 때 소비(`min(originalPostDailyCap, storyScoopsPerDay)`).
+키 `marketing.x.*` (`system_setting`). 행 없을 때 폴백: 아침 `07:30` / 밤 `22:00` / 사연 2 / 선댓글 20·틱당 1 / 대댓글 40·글당 12·틱당 3 / 불난글 댓글≥3·6h / 원글 한도 1(0–5).  
+운영 한도·스위치는 어드민 PUT으로만 바꾼다. git 상수로 올리지 않는다. `ritualEnabled`·`inboundEnabled`·`outboundEnabled`·`originalPostEnabled` 폴백 **false**. 이 플래그가 성장 루프 발행기를 게이팅한다. 꺼져 있으면 작문·게시 없음. **원글은 95% 게이트(평균 ≥95 ∧ 삭제율 ≤2% ∧ n≥30) 통과 전 prod에서 켜지 말 것.** `storyScoopsPerDay`는 원글 파이프가 켜져 있을 때 소비(`min(originalPostDailyCap, storyScoopsPerDay)`).
 
 `personaLearningEnabled` 기본 **true**, `personaLearnAt` 기본 `04:30` KST. `personaEvalEnabled` 기본 **true**(게시 아님 — 새벽 학습 내부 채점). 분 단위 스케줄이 그 시각에 한 번 `@againspring_net` 타임라인을 읽어 **운영자가 직접 단 댓글·인용**은 gold(`TIMELINE`, 부모 `replying_to_status` + `fetchStatus`), **운영자 원글**은 `TIMELINE_POST`, 원장 자동 게시 id(리추얼·원글 포함)는 버린다. 최근 3일 POSTED 선댓글·대댓글이 타임라인에 없으면 `DELETED_AUTO`(avoid). prod에서만 **Sonnet**으로 프로필을 증류한다. 증류 실패·`DISTILL_REJECTED` 시 프로필 무변경, 직전 JSON은 `persona_profile_prev_json`. 코퍼스는 `x_persona_example`. 채점은 `x_persona_eval`.
 
@@ -669,7 +669,7 @@ POST /api/admin/marketing/x-ops/outbound
 - `POST /api/v1/x/publish` — `{ text, imageBase64?, imageMime?, replyToTweetId? }` → social-poster. 성공 시 `{ tweetId, url }`
 - `POST /api/v1/x/ritual` — `{ slot: "morning"|"night", text }` — ASM `assets/x-ritual` 사진 한 장을 붙여 게시
 - `GET /api/v1/x/inbox` — 우리 글에 달린 **남이 단** 최근 댓글 (`tweetId`, `parentId`, `author`, `text`, `createdAt`, `ourPostId`)
-- `GET /api/v1/x/outbound-candidates` — 팔로우 중 최근 원글 중 댓글 수·나이 필터 후보. 필드: `tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`, **`hasVideo`**, **`hasPhoto`**, **`photoJpegBase64`**, **`peerReplies`**. `hasVideo`=네이티브 영상 플레이어(GIF 배지/aria는 영상 아님 → `hasVideo=false`, 사진으로 취급). `hasPhoto`=본문 사진/GIF(og·아바타 제외). `photoJpegBase64`=**첫 사진만** Playwright가 받아 JPEG(긴 변 ~768, ~200KB); AS는 x.com CDN을 직접 받지 않음. `peerReplies`=우리 핸들 제외 비어 있지 않은 답글 텍스트 **최대 10**. AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:00 KST). 틱당 댓글 1개; `hasVideo`면 그 후보는 건너뛰고 다음. Playwright 스크래프가 기본 30s를 넘기므로 `AsmClient`는 **stats 클라이언트**(`ASM_STATS_REQUEST_TIMEOUT_MS`, 기본 300s)로 호출한다. 1분 폴링 금지.
+- `GET /api/v1/x/outbound-candidates` — 팔로우 중 최근 원글 중 댓글 수·나이 필터 후보. 필드: `tweetId`, `author`, `text`, `replyCount`, `ageHours`, `alreadyRepliedByUs`, **`hasVideo`**, **`hasPhoto`**, **`photoJpegBase64`**, **`peerReplies`**. `hasVideo`=네이티브 영상 플레이어(GIF 배지/aria는 영상 아님 → `hasVideo=false`, 사진으로 취급). `hasPhoto`=본문 사진/GIF(og·아바타 제외). `photoJpegBase64`=**첫 사진만** Playwright가 받아 JPEG(긴 변 ~768, ~200KB); AS는 x.com CDN을 직접 받지 않음. `peerReplies`=우리 핸들 제외 비어 있지 않은 답글 텍스트 **최대 10**. AS는 **주간 30분 간격**으로만 호출 (`XGrowthLoopScheduler.outboundTick`, 08:00–22:30 KST). 틱당 댓글 상한은 `marketing.x.outbound_per_tick`; `hasVideo`면 그 후보는 건너뛰고 다음. Playwright 스크래프가 기본 30s를 넘기므로 `AsmClient`는 **stats 클라이언트**(`ASM_STATS_REQUEST_TIMEOUT_MS`, 기본 300s)로 호출한다. 1분 폴링 금지.
 
 흐름·한도·학습: [`justant-bot-x-ops.md`](70-policy/justant-bot-x-ops.md).
 

@@ -13,7 +13,9 @@ import java.util.List;
 /**
  * One outbound reply per daytime 30-minute tick on followed accounts' recent
  * original posts. First reply hits the root; later replies thread under our previous reply.
- * Skips continue to the next candidate; at most one successful publish per tick.
+ * Skips continue to the next candidate; at most
+ * {@code marketing.x.outbound_per_tick} successful publishes per tick
+ * (admin / {@code system_setting}).
  */
 @Slf4j
 @Service
@@ -55,7 +57,15 @@ public class XOutboundService {
             return;
         }
 
+        int perTick = Math.max(1, settings.outboundPerTick());
+        int postedThisTick = 0;
         for (AsmClient.XOutboundCandidate c : candidates) {
+            if (postedThisTick >= perTick) {
+                return;
+            }
+            if (ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now) >= settings.outboundDailyCap()) {
+                return;
+            }
             if (c == null || c.tweetId() == null || c.tweetId().isBlank()) {
                 continue;
             }
@@ -110,7 +120,8 @@ public class XOutboundService {
                         now);
                     telegramNotifier.send(XOpsTelegramAlerts.posted(
                         "Justant-Bot 선댓글", result, replyTo, draft.body()));
-                    return;
+                    postedThisTick++;
+                    continue;
                 }
                 ledger.recordFailed(XOpsAction.Kind.OUTBOUND, replyTo, "PUBLISH_FAILED", now);
             } catch (Exception e) {

@@ -29,6 +29,8 @@ public class MarketingXOpsSettingsResponse {
     private boolean personaEvalEnabled;
     private boolean originalPostEnabled;
     private int originalPostDailyCap;
+    private int outboundPerTick;
+    private int inboundPerTick;
     private String personaLastStatus;
     private Integer personaLastNewCount;
     private String personaLastLearnedAt;
@@ -76,7 +78,9 @@ public class MarketingXOpsSettingsResponse {
             .personaLearnAt(s.personaLearnAt())
             .personaEvalEnabled(s.personaEvalEnabled())
             .originalPostEnabled(s.originalPostEnabled())
-            .originalPostDailyCap(s.originalPostDailyCap());
+            .originalPostDailyCap(s.originalPostDailyCap())
+            .outboundPerTick(s.outboundPerTick())
+            .inboundPerTick(s.inboundPerTick());
         if (learn != null) {
             b.personaLastStatus(learn.status())
                 .personaLastNewCount(learn.newManuals())
