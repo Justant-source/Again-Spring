@@ -36,8 +36,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -86,6 +88,9 @@ public class MarketingJobService {
     @Value("${marketing.active-job-recency-minutes:90}")
     private Integer activeJobRecencyMinutes = 90;
 
+    /** ASM capture pipelines that must not share a job with any other target. */
+    static final Set<String> ASM_ALONE_TARGETS = Set.of("x_thread", "instagram_feed");
+
     /**
      * Create a new marketing job for a post.
      *
@@ -112,6 +117,21 @@ public class MarketingJobService {
                                    Long retryOfJobId, int generationAttempt, String renderProfile) {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
+        }
+        List<List<String>> asmGroups = groupTargetsForAsm(targets);
+        if (asmGroups.size() > 1) {
+            MarketingJob first = null;
+            for (List<String> group : asmGroups) {
+                MarketingJob created = createJob(postId, group, autoPublish, requestedBy,
+                    retryOfJobId, generationAttempt, renderProfile);
+                if (first == null) {
+                    first = created;
+                }
+            }
+            return first;
+        }
+        if (asmGroups.size() == 1) {
+            targets = asmGroups.get(0);
         }
         // Per-platform idempotency: x_thread and instagram_feed each require alone jobs,
         // so concurrent active jobs on *different* platforms for the same post are allowed.
@@ -347,6 +367,7 @@ public class MarketingJobService {
         }
 
         BriefDto brief = BriefDto.builder()
+            .postId(post.getId())
             .title(storyTitle)
             .promoTitle(spokenCopy(masterHook))
             .hookEmotion(hookEmotion)
@@ -822,6 +843,36 @@ public class MarketingJobService {
             if (v != null && !v.isBlank()) return v;
         }
         return null;
+    }
+
+    /**
+     * ASM: {@code x_thread} and {@code instagram_feed} cannot share a job with anything else.
+     * Video platforms may stay together (reels+shorts). Unknown targets stay in the remainder group.
+     */
+    static List<List<String>> groupTargetsForAsm(List<String> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return List.of();
+        }
+        List<List<String>> groups = new ArrayList<>();
+        List<String> remainder = new ArrayList<>();
+        Set<String> seenAlone = new LinkedHashSet<>();
+        for (String raw : targets) {
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            String id = raw.trim().toLowerCase(Locale.ROOT);
+            if (ASM_ALONE_TARGETS.contains(id)) {
+                if (seenAlone.add(id)) {
+                    groups.add(List.of(id));
+                }
+            } else {
+                remainder.add(id);
+            }
+        }
+        if (!remainder.isEmpty()) {
+            groups.add(List.copyOf(remainder));
+        }
+        return groups;
     }
 
     private static boolean containsTarget(List<String> targets, String platform) {

@@ -298,7 +298,7 @@ test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', 
       headers: { Authorization: `Bearer ${adminToken}` },
       data: {
         postId: testPostId,
-        targets: ['naver_blog', 'x_thread'],
+        targets: ['x_thread'],
         autoPublish: false,
       },
     })
@@ -308,7 +308,7 @@ test.describe('Journey 13-C: 마케팅 잡 생성·조회 흐름 (ASM 스텁)', 
     expect(job.id, '잡 ID 존재').toBeTruthy()
     expect(job.status, '초기 상태').toMatch(/^(REQUESTED|QUEUED)$/)
     expect(String(job.postId), 'postId 일치').toBe(String(testPostId))
-    expect(job.targets, 'targets 포함').toContain('naver_blog')
+    expect(job.targets, 'targets 포함').toContain('x_thread')
     createdJobId = job.id
   })
 

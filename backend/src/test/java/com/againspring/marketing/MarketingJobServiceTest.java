@@ -254,6 +254,8 @@ class MarketingJobServiceTest {
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
         CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
+        assertThat(captor.getValue().getSourceId()).isEqualTo(TEST_POST_ID);
+        assertThat(brief.getPostId()).isEqualTo(TEST_POST_ID);
         assertThat(brief.getHasPartnerStory()).isTrue();
         assertThat(brief.getPartnerCaptureSplitAfterLines()).isNotNull();
         assertThat(brief.getPartnerCaptureSplitAfterLines()).isNotEmpty();
@@ -261,6 +263,70 @@ class MarketingJobServiceTest {
         assertThat(brief.getPartnerCaptureBlockCount()).isGreaterThan(0);
         assertThat(brief.getAuthorBody()).isEqualTo("작성자 짧은 본문입니다.");
         assertThat(brief.getPartnerBody()).isEqualTo(partnerBody);
+    }
+
+    @Test
+    void groupTargetsForAsm_splitsAlonePlatforms_keepsVideoTogether() {
+        assertThat(MarketingJobService.groupTargetsForAsm(
+            List.of("instagram_reels", "x_thread", "youtube_shorts", "instagram_feed")))
+            .containsExactly(
+                List.of("x_thread"),
+                List.of("instagram_feed"),
+                List.of("instagram_reels", "youtube_shorts"));
+        assertThat(MarketingJobService.groupTargetsForAsm(List.of("x_thread")))
+            .containsExactly(List.of("x_thread"));
+        assertThat(MarketingJobService.groupTargetsForAsm(
+            List.of("instagram_reels", "youtube_shorts")))
+            .containsExactly(List.of("instagram_reels", "youtube_shorts"));
+    }
+
+    @Test
+    void createJob_mixedXThreadAndVideo_sendsSeparateAsmJobs() throws JsonProcessingException {
+        Post post = Post.builder()
+            .id(TEST_POST_ID)
+            .title("Mixed")
+            .bodyPublished("body")
+            .build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("x_thread"), any(Instant.class)))
+            .thenReturn(0L);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq("instagram_reels"), any(Instant.class)))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(true), eq(false), any()))
+            .thenReturn(new VideoVariantService.Variants(
+                "릴스훅", "릴스대본 공감 비율은?", 30,
+                null, null, null,
+                List.of(plan("side-glance"), plan("stunned"), plan("drained"), plan("indignant")),
+                List.of()
+            ));
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        java.util.concurrent.atomic.AtomicLong ids = new java.util.concurrent.atomic.AtomicLong(50);
+        when(marketingJobRepository.save(any(MarketingJob.class))).thenAnswer(inv -> {
+            MarketingJob job = inv.getArgument(0);
+            if (job.getId() == null) {
+                job.setId(ids.getAndIncrement());
+            }
+            return job;
+        });
+
+        marketingJobService.createJob(
+            TEST_POST_ID, List.of("x_thread", "instagram_reels"), false, "admin");
+
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient, times(2)).createJob(captor.capture(), any(String.class));
+        assertThat(captor.getAllValues()).extracting(CreateJobRequest::getTargets)
+            .containsExactly(List.of("x_thread"), List.of("instagram_reels"));
+        assertThat(captor.getAllValues()).allSatisfy(req -> {
+            assertThat(req.getSourceId()).isEqualTo(TEST_POST_ID);
+            assertThat(req.getBrief().getPostId()).isEqualTo(TEST_POST_ID);
+        });
     }
 
     @Test

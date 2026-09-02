@@ -16,7 +16,7 @@ log() {
 log "=== Watchdog START ==="
 
 set -e
-export PATH="${HOME}/.nvm/versions/node/v22.14.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH="${HOME}/.local/bin:${HOME}/.nvm/versions/node/v22.14.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 STATE_DIR="${LOG_DIR}"
 CANARY_FILE="${STATE_DIR}/canary.ts"
@@ -105,7 +105,19 @@ send_msg() {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 claude_ping() {
-  timeout 30 bash -c 'source ~/.nvm/nvm.sh && claude -p "ping" >/dev/null 2>&1'
+  # Prefer native ~/.local/bin/claude. nvm v22 has no claude; nvm.sh + 30s was
+  # enough to miss a healthy session (canary 3/3 with oauth still valid).
+  timeout 90 env -u ANTHROPIC_API_KEY bash -c '
+    export PATH="${HOME}/.local/bin:${PATH}"
+    if [ -x "${HOME}/.local/bin/claude" ]; then
+      exec "${HOME}/.local/bin/claude" -p ping
+    fi
+    if [ -s "${HOME}/.nvm/nvm.sh" ]; then
+      # shellcheck disable=SC1090
+      . "${HOME}/.nvm/nvm.sh"
+    fi
+    exec claude -p ping
+  ' >/dev/null 2>&1
 }
 
 # 피어(AS)와 같은 oauth를 유지. canary 실패 시 pull, 성공 시 expiresAt 기준 reconcile.

@@ -14,7 +14,7 @@ Content-Type: application/json
 ```json
 {
   "postId": "abc123def456",              // posts.id (VARCHAR(32))
-  "targets": ["naver_blog", "x_thread"], // 지원 플랫폼 목록 참조
+  "targets": ["x_thread"],              // x_thread·instagram_feed는 반드시 단독 잡. 영상(reels+shorts)은 한 잡에 함께 가능. 혼합 요청 시 BE가 그룹으로 쪼갠다.
   "autoPublish": false,                  // true 시 READY 도달 즉시 자동 게시
   "renderProfile": "marketing_v2"        // [선택사항] 렌더 프로필 ('marketing_v2'|'marketing_fast') — 테스트 탭 전용
 }
@@ -31,7 +31,7 @@ Content-Type: application/json
   "remote_status": null,
   "remote_phase": null,
   "progress": 0,
-  "targets": ["naver_blog", "x_thread"],
+  "targets": ["x_thread"],
   "auto_publish": false,
   "render_profile": "marketing_v2",
   "artifacts": null,
@@ -57,6 +57,8 @@ Content-Type: application/json
 `scheduled_publish_at`는 모든 잡에서 NOT NULL이다 (V117) — 생성 시각을 넣는다.
 `autoPublish=true` 잡은 **READY 도달 즉시** 게시되며 이 컬럼으로 시각을 기다리지 않는다.
 `autoPublish=false`(render-only) 잡은 `findDueAutoPublishJobs`에 안 걸린다.
+
+ASM으로 넘길 때 `source_id`와 `brief.post_id`에 사연 id를 넣는다. `x_thread`/`instagram_feed`를 다른 타겟과 한 잡에 넣으면 ASM이 거부하므로 BE가 잡을 나눈다. 혼합 요청의 201 응답은 **첫 그룹** 잡이다.
 
 **오류**
 | 코드 | 이유 |

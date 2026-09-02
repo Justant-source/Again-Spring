@@ -162,7 +162,7 @@ check_claude_session() {
 
     log "INFO" "Claude canary check starting..."
 
-    if timeout 30 claude -p 'ping' > /dev/null 2>&1; then
+    if timeout 90 env -u ANTHROPIC_API_KEY claude -p 'ping' > /dev/null 2>&1; then
         log "INFO" "Claude session OK"
         echo "$now" > "$CANARY_TIMESTAMP_FILE"
         reset_retry_count "claude_session"
@@ -187,7 +187,7 @@ check_claude_session() {
     send_telegram "🔧 [Again-Spring] Claude 세션 이상. WSL(100.115.252.61) 세션을 가져와 재시도 ($((retry_count + 1))/3)"
 
     if [[ -x "$peer_bin" ]] && "$peer_bin" pull "$wsl_ssh" >> "$LOG_FILE" 2>&1 \
-        && timeout 30 claude -p 'ping' > /dev/null 2>&1; then
+        && timeout 90 env -u ANTHROPIC_API_KEY claude -p 'ping' > /dev/null 2>&1; then
         log "INFO" "Claude session recovered from WSL"
         echo "$now" > "$CANARY_TIMESTAMP_FILE"
         reset_retry_count "claude_session"

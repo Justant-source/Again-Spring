@@ -1,5 +1,6 @@
 package com.againspring.marketing.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,6 +38,14 @@ public class CreateJobRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class BriefDto {
+        /**
+         * Again-Spring post id. ASM x_thread/instagram_feed capture requires this
+         * (or {@code source_id}); send both snake_case and camelCase aliases.
+         */
+        @JsonProperty("post_id")
+        @JsonAlias("postId")
+        private String postId;
+
         private String title;
 
         /** 마케팅/IG 훅 제목 (원제 복제+\\n, 줄≤10). 없으면 ASM이 title 폴백. */
