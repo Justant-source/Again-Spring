@@ -860,15 +860,6 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
-  // Group tracks by emotion
-  const emotionGroups: Record<string, BgmTrack[]> = {};
-  tracks.forEach((track) => {
-    if (!emotionGroups[track.emotion]) {
-      emotionGroups[track.emotion] = [];
-    }
-    emotionGroups[track.emotion].push(track);
-  });
-
   useEffect(() => {
     if (typeof Audio !== 'undefined') {
       audioRef.current = new Audio();
@@ -940,16 +931,6 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
     }
   };
 
-  const EMOTION_LABELS: Record<string, string> = {
-    shock: '충격',
-    anger: '분노',
-    tension: '긴장',
-    sad: '슬픔',
-    hype: '하이프',
-  };
-
-  const emotionOrder = ['shock', 'anger', 'tension', 'sad', 'hype'];
-
   return (
     <div className="rounded border border-gray-200 bg-gray-50 p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -978,8 +959,8 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
         </label>
       </div>
       <p className="mb-3 text-xs text-gray-500">
-        영상에 사용할 배경음악을 감정별로 선택합니다. 미리듣기로 확인한 뒤 선택하세요.
-        고르지 않으면 사연의 후킹 감정에 맞춰 자동으로 골라집니다.
+        영상에 사용할 배경음악을 고릅니다. 미리듣기로 확인한 뒤 선택하세요.
+        고르지 않으면 잔잔한 곡 중 무작위로 골라집니다(사연 감정과 무관).
       </p>
       {!enabled && (
         <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -1011,55 +992,44 @@ export function BgmTrackPicker({ value, onChange }: BgmTrackPickerProps) {
             />
             <label htmlFor="bgm-auto" className="min-w-0 flex-1 cursor-pointer">
               <div className="text-sm text-gray-800">자동 선택</div>
-              <div className="text-[10px] text-gray-400">사연의 후킹 감정에 맞는 곡을 매번 골라 씁니다</div>
+              <div className="text-[10px] text-gray-400">잔잔한 곡 5개 중 무작위로 골라 씁니다</div>
             </label>
           </div>
-          {emotionOrder.map((emotion) => {
-            const emotionTracks = emotionGroups[emotion] ?? [];
-            if (emotionTracks.length === 0) return null;
+          {tracks.map((track) => {
+            const isSelected = value === track.path;
             return (
-              <div key={emotion} className="space-y-1">
-                <div className="text-xs font-semibold text-gray-700">
-                  {EMOTION_LABELS[emotion] || emotion}
-                </div>
-                {emotionTracks.map((track) => {
-                  const isSelected = value === track.path;
-                  return (
-                    <div
-                      key={track.path}
-                      className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
-                        isSelected ? 'border-sage bg-white' : 'border-transparent hover:bg-white/70'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        id={`bgm-${track.file}`}
-                        name="bgm_track"
-                        className="accent-[#5F8F76]"
-                        checked={isSelected}
-                        onChange={() => onChange(track.path)}
-                      />
-                      <label htmlFor={`bgm-${track.file}`} className="min-w-0 flex-1 cursor-pointer">
-                        <div className="text-sm text-gray-800">{track.file}</div>
-                        {/* 길이는 카탈로그가 줄 때만 보여준다 — 매번 "미측정"이 붙으면 잡음일 뿐이다 */}
-                        {track.durationSec ? (
-                          <div className="font-mono text-[10px] text-gray-400">
-                            {`${Math.floor(track.durationSec / 60)}:${String(track.durationSec % 60).padStart(2, '0')}`}
-                          </div>
-                        ) : null}
-                      </label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 shrink-0 px-2 text-xs"
-                        onClick={() => handlePreview(track)}
-                      >
-                        {playing === track.path ? '정지' : '미리듣기'}
-                      </Button>
+              <div
+                key={track.path}
+                className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
+                  isSelected ? 'border-sage bg-white' : 'border-transparent hover:bg-white/70'
+                }`}
+              >
+                <input
+                  type="radio"
+                  id={`bgm-${track.file}`}
+                  name="bgm_track"
+                  className="accent-[#5F8F76]"
+                  checked={isSelected}
+                  onChange={() => onChange(track.path)}
+                />
+                <label htmlFor={`bgm-${track.file}`} className="min-w-0 flex-1 cursor-pointer">
+                  <div className="text-sm text-gray-800">{track.title || track.file}</div>
+                  {/* 길이는 카탈로그가 줄 때만 보여준다 — 매번 "미측정"이 붙으면 잡음일 뿐이다 */}
+                  {track.durationSec ? (
+                    <div className="font-mono text-[10px] text-gray-400">
+                      {`${Math.floor(track.durationSec / 60)}:${String(track.durationSec % 60).padStart(2, '0')}`}
                     </div>
-                  );
-                })}
+                  ) : null}
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 px-2 text-xs"
+                  onClick={() => handlePreview(track)}
+                >
+                  {playing === track.path ? '정지' : '미리듣기'}
+                </Button>
               </div>
             );
           })}

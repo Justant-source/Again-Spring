@@ -241,7 +241,8 @@ export async function fetchTtsVoiceSampleBlob(samplePath: string): Promise<Blob>
 // ===== WaggleBot BGM tracks (background music editor) =====
 
 export interface BgmTrack {
-  emotion: string;
+  /** 화면 표시용 곡 제목. 2026-09-02: 감정별 매칭 폐지, 단일 잔잔한 풀. */
+  title: string;
   file: string;
   path: string;
   durationSec?: number;
@@ -418,6 +419,10 @@ export interface MarketingXOpsSettings {
   originalPostEnabled?: boolean;
   /** 원글 /일 상한 0–5. 실제 발행은 min(cap, storyScoopsPerDay). 기본 1. */
   originalPostDailyCap?: number;
+  /** 선댓글 30분 틱당 성공 게시 수. 1–5. 빈 DB 폴백 1. */
+  outboundPerTick?: number;
+  /** 대댓글 1분 틱당 처리 상한. 1–10. 빈 DB 폴백 3. */
+  inboundPerTick?: number;
   mimicryAvg28d?: number | null;
   mimicrySampleCount?: number | null;
   deleteRate28d?: number | null;

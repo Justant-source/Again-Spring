@@ -21,7 +21,7 @@
 | 프로필 | 설명 | 상태 |
 |---|---|---|
 | `marketing_fast` | 현행 운영 중인 기본 프로필. 간편 레이아웃, BGM/SFX/전환 없음 | 활성 |
-| `marketing_v2` | 신규 v2 렌더. BGM(감정별 2곡, `assets/media/bgm/<emotion>/`) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
+| `marketing_v2` | 신규 v2 렌더. BGM(잔잔한 단일 풀 5곡, `assets/media/bgm/calm/` — 2026-09-02부터 감정별 매칭 폐지) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
 
 **SFX 팔레트 — 삽입 지점 17개.** 음원·음량·오프셋은 **어드민 「설정 → 효과음 매핑」에서 직접 고른다**
 (`GET`/`PUT /api/admin/marketing/sfx/mapping` → ASM → WaggleBot `/api/sfx/mapping` → `settings.yaml`의 `sfx.active`).
@@ -54,13 +54,19 @@
 음원은 `assets/media/sfx/_library/<카테고리>/`에 Mixkit 262개(상업 사용 가능·표기 불필요).
 `file` 값은 `assets/media/sfx/` 기준 상대경로이고 하위 경로도 그대로 해석된다(`_resolve_sfx_path`).
 **`assets/`는 gitignore라 음원 파일은 git에 없다** — 출처 URL은 `assets/media/sfx/LICENSES.md`에 기록.
-**BGM 전역 스위치 — `settings.yaml`의 `bgm.enabled` (현재 `false`, 모든 렌더에서 제외)**
+**BGM 전역 스위치 — `settings.yaml`의 `bgm.enabled` (2026-09-02부터 `true`, 전 렌더 적용)**
 
-`false`면 프로필과 무관하게 어떤 렌더에도 BGM이 들어가지 않는다. 고르는 기능
-(카탈로그 API · 어드민 곡 선택 · 잡별 `bgmTrack` · `hook_emotion` 자동 선택)은 그대로 살아 있어
-`true`로 되돌리면 고른 곡 그대로 복귀한다. 어드민 「설정 → 배경음악 (BGM)」 박스의 체크박스로 켜고 끄며,
-`PUT /api/admin/marketing/bgm/settings` → ASM → WaggleBot `PUT /api/bgm/settings`로 전달된다.
-차단은 소비 지점(`_bgm_allowed_for_profile`) 한 곳에서만 한다 — director는 여전히 곡을 고른다.
+`false`면 프로필과 무관하게 어떤 렌더에도 BGM이 들어가지 않는다. 어드민 「설정 → 배경음악 (BGM)」
+박스의 체크박스로 켜고 끄며, `PUT /api/admin/marketing/bgm/settings` → ASM → WaggleBot
+`PUT /api/bgm/settings`로 전달된다. 차단은 소비 지점(`_bgm_allowed_for_profile`) 한 곳에서만 한다 —
+director는 여전히 곡을 고른다.
+
+**2026-09-02: 감정별 매칭(shock/anger/tension/sad/hype) 폐지.** 옛 구조는 `assets/media/bgm/<emotion>/`에
+감정당 2곡씩 있었으나 텅 비어 있었거나(WaggleBot 재배포 시점에 따라) `anger`·`tension`이 동일 Mixkit
+소스 파일이었던 등 감정별 구분이 사실상 무의미했다. 지금은 사연 감정과 무관하게 **잔잔한 곡 5개
+단일 풀**(`assets/media/bgm/calm/`, 전부 OpenGameArt CC0)에서 무작위로 고른다 — `BgmController`가
+목록을 주고 `director._pick_bgm()`이 무작위 선택한다. 어드민이 특정 곡을 지정하면(`bgm_track`) 그 곡이
+우선한다. 출처·라이선스는 `assets/media/bgm/LICENSES.md`.
 
 켜져 있을 때: `volume=0.40` + 사이드체인 더킹(`threshold=0.10 ratio=4`)으로 목소리보다 약 14dB 아래.
 **이 값은 실측으로 잡았다** — 이전 `volume=0.15`·`threshold=0.03 ratio=9`는 원본 −18.5dB를 최종 −44.2dB까지
@@ -68,7 +74,7 @@
 검증은 말이 멈추는 구간 비교가 유일하게 결정적이다(−14dB 신호는 전체 볼륨에 0.2dB만 더한다):
 TTS 원본 −70.4dB(무음) vs 최종본 −22.5dB.
 
-BGM 곡은 어드민 설정에서 직접 고를 수 있고(`shortform_video` 자격증명 `bgm_track`), 비우면 `hook_emotion`으로 자동 선택된다.
+BGM 곡은 어드민 설정에서 직접 고를 수 있고(`shortform_video` 자격증명 `bgm_track`), 비우면 잔잔한 곡 풀에서 무작위 선택된다.
 
 **⚠️ 에셋 위치 중요**: BGM/SFX는 반드시 `assets/media/` 하위에 있어야 합니다. WaggleBot 컨테이너가 `MEDIA_DIR=/app/media`로만 마운트하므로, `assets/voices/`, `assets/images/` 등 다른 디렉터리는 보이지 않습니다.
 

@@ -673,23 +673,16 @@ public class AdminMarketingController {
                 && path.chars().filter(ch -> ch == '/').count() == 5;
     }
 
+    /**
+     * /api/media/bgm/calm/{file}.mp3 만 허용한다.
+     * 2026-09-02: 감정별 매칭(shock/anger/tension/sad/hype)을 폐지하고 사연 감정과
+     * 무관한 잔잔한 곡 5개 단일 풀로 교체했다 — WaggleBot BgmController.POOL_DIR과 동일.
+     */
     private static boolean isAllowedBgmSamplePath(String path) {
         if (path == null || path.contains("..")) {
             return false;
         }
-        // /api/media/bgm/{emotion}/{emotion}_0{1,2}.mp3
-        if (path.startsWith("/api/media/bgm/") && path.chars().filter(ch -> ch == '/').count() >= 4) {
-            // Validate structure: /api/media/bgm/emotion/emotion_0{1,2}.mp3
-            String[] parts = path.split("/");
-            if (parts.length >= 5) {
-                String emotion = parts[4];
-                // Only allow known emotions
-                if (emotion.matches("(shock|anger|tension|sad|hype)")) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return path.matches("/api/media/bgm/calm/[A-Za-z0-9_.-]+\\.mp3");
     }
 
     // ===== YouTube Shorts OAuth 2.0 authorization-code flow =====
