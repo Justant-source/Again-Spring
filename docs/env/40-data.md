@@ -168,6 +168,10 @@ last_updated: 2026-09-01
 | `SELF_CRITIQUE_ENABLED` | 자기비평 루프 | `true` |
 | `SELF_CRITIQUE_THRESHOLD` | pass 기준 | `5` |
 | `SELF_CRITIQUE_EXTRA_CLICHES` | 추가 상투구 차단 | 공란 |
+| `SELF_CRITIQUE_RARE_VOCAB_ENABLED` | 어휘이질(T5) detector — 다크 출시, 캘리브레이션 후 활성화 | `false` |
+| `SELF_CRITIQUE_RARE_VOCAB_RATIO` | 희귀/문어체 어휘 비율 임계값 | `0.18` |
+| `SELF_CRITIQUE_RARE_VOCAB_MIN_TOKENS` | 어휘이질 판정 최소 토큰 수 | `25` |
+| `SELF_CRITIQUE_RARE_VOCAB_PENALTY` | 어휘이질 감점 폭 | `1` |
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
 | `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
