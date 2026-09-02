@@ -50,6 +50,8 @@ claim source (no LLM)
 
 `/v2/generate/thread-plan` 파싱 후 본문·댓글 각각 `critiqueAndRefine`을 탄다. `quickCheck` PASS면 **추가 CLI 호출 없음**. FAIL이면 항목당 짧은 rewrite 1회. 생성 JSON 스키마 호출과는 별개다.
 
+**구조적 AI투 후보 로깅 (2026-09-02, 점수 미반영)**: `quickCheck`가 마지막 문단 요약·"아니라" 대칭 대조 반복(`SelfCritiqueService.hasClosingSummaryParagraph`/`countSymmetricContrast`)을 감지하면 `log.debug`로만 남긴다. score·passed·LLM 호출 횟수에는 영향 없음 — 로컬 블라인드 코퍼스에 AI/사람 라벨이 없어 사전 캘리브레이션이 불가능해 실제 생성물 로그로 데이터를 모으는 단계다. `buildRetryPrompt`의 재시도 프롬프트에는 이 두 패턴을 포함한 구조적 체크리스트를 항상 덧붙인다(신규 호출 없음, 기존 재시도 지시문에 한 줄 추가).
+
 ### 1.4 CLI 도구 오버헤드 + 프롬프트 지시 JSON 모드 (2026-08-21~22)
 
 `claude -p` 호출은 매번 Claude Code CLI의 도구 정의 전체를 프롬프트에 실어 보낸다 — 앱 프롬프트 크기와 무관한 고정 부담(빈 호출 기준 ~25k 토큰). `--disallowedTools "*"`로 대부분 제거 가능하지만, `--json-schema`를 쓰는 구조화 호출은 `StructuredOutput` 도구를 살려둬야 해서(`"*"`를 쓰면 스키마 강제가 깨짐) 명시 disallow 목록만 적용 가능 — 그래도 ~18.8k 토큰이 남는다.

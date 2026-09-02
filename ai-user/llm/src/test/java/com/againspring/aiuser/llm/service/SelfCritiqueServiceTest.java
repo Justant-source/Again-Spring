@@ -87,6 +87,17 @@ class SelfCritiqueServiceTest {
     }
 
     @Test
+    void retryPromptIncludesStructuralTellChecklist() {
+        String prompt = service.buildRetryPrompt(
+                "다들 어떻게 생각해요? 저만 이상한가요 진짜",
+                java.util.List.of("반말 위반(~요/~어요 사용) — ~음/~임/~더라 류 반말로 고쳐라"),
+                "post",
+                "casual");
+        assertTrue(prompt.contains("마지막 문단"));
+        assertTrue(prompt.contains("아니라"));
+    }
+
+    @Test
     void disabledServiceAlwaysPasses() {
         ReflectionTestUtils.setField(service, "enabled", false);
         assertTrue(service.quickCheck("정말 공감되네요 힘내세요 응원합니다", "comment", "polite").passed());
@@ -105,5 +116,35 @@ class SelfCritiqueServiceTest {
         SelfCritiqueService.CritiqueResult clean = service.quickCheck(lowComma, "comment", "casual");
         assertTrue(clean.issues().stream().noneMatch(i -> i.contains("쉼표 과다")),
             "정상 쉼표율 오감지");
+    }
+
+    @Test
+    void detectsClosingSummaryParagraphCandidate() {
+        // 마지막 문단이 요약 표지로 시작 — 코퍼스에 실증 사례는 없어 가설 단계, 로그 전용
+        String withSummary = "어제 회사에서 있었던 일임\n\n정리하자면, 팀장이 문제였다는 거임";
+        assertTrue(SelfCritiqueService.hasClosingSummaryParagraph(withSummary));
+
+        // "결국"이 문단 중간 인과 접속사로만 쓰이는 실제 코퍼스 패턴 — 오탐 아니어야 함
+        String midNarrative = "어제 회사에서 있었던 일임\n\n결국 내가 다시 만들어서 제출했는데 팀장이 동료를 칭찬했음";
+        assertFalse(SelfCritiqueService.hasClosingSummaryParagraph(midNarrative));
+    }
+
+    @Test
+    void countsSymmetricContrastOccurrences() {
+        // blind_kit_v1_20260621125413.md:129, :189 실제 문장 기반
+        String twice = "내가 원하는 건 신뢰가 아니라 그냥 인정임. 한두 마디가 아니라 계속 욕을 했어";
+        assertEquals(2, SelfCritiqueService.countSymmetricContrast(twice));
+
+        String once = "내가 원하는 건 신뢰가 아니라 그냥 인정임";
+        assertEquals(1, SelfCritiqueService.countSymmetricContrast(once));
+    }
+
+    @Test
+    void structuralTellCandidatesDoNotAffectScore() {
+        // 로그만 남기고 score/passed/issues는 절대 안 바뀌어야 함
+        String text = "내가 원하는 건 신뢰가 아니라 그냥 인정임\n\n정리하자면, 그게 다임";
+        SelfCritiqueService.CritiqueResult withoutOtherIssues = service.quickCheck(text, "comment", "casual");
+        assertTrue(withoutOtherIssues.passed(), "구조적 후보만으로는 감점되면 안 됨: " + withoutOtherIssues.issues());
+        assertEquals(7, withoutOtherIssues.score());
     }
 }

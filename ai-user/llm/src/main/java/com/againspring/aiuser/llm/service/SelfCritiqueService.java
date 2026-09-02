@@ -81,6 +81,31 @@ public class SelfCritiqueService {
     /** ㅠ/ㅜ 묶음 — 3회 이상이면 남발. */
     private static final Pattern SOB_RUN = Pattern.compile("[ㅠㅜ]+");
 
+    // ── 구조적 AI투 후보 (2026-09-02, 로그 전용 — 점수 미반영) ──────────────
+    // 로컬 블라인드 코퍼스(.history/.result)에 AI/사람 라벨이 없어 사전 캘리브레이션 불가.
+    // score/issues에 반영하지 않고 log.debug만 남긴다. 실제 생성물 로그가 쌓이면 재검토.
+    // "결국"은 코퍼스에서 8건 모두 문단 중간 인과 접속사로만 나타나므로 제외.
+    private static final Pattern CLOSING_SUMMARY_MARKER =
+        Pattern.compile("^(?:정리하자면|요약하자면|결론적으로|결론은)[,\\s]");
+    private static final Pattern SYMMETRIC_CONTRAST = Pattern.compile("아니라");
+
+    /** 마지막 문단(빈 줄 기준 분리)이 요약 표지로 시작하는지. */
+    static boolean hasClosingSummaryParagraph(String text) {
+        if (text == null || text.isBlank()) return false;
+        String[] paragraphs = text.strip().split("\\n\\s*\\n");
+        String last = paragraphs[paragraphs.length - 1].trim();
+        return CLOSING_SUMMARY_MARKER.matcher(last).find();
+    }
+
+    /** "아니라" 등장 횟수 — 2회 이상이면 대칭 대조 남용 후보. */
+    static int countSymmetricContrast(String text) {
+        if (text == null) return 0;
+        java.util.regex.Matcher m = SYMMETRIC_CONTRAST.matcher(text);
+        int n = 0;
+        while (m.find()) n++;
+        return n;
+    }
+
     // formality 체크용 패턴
     private static final Pattern POLITE_ENDING = Pattern.compile(
         "(?:(?:했|했었|었|이었|이)어요|(?:했|했었|었|이었|이)?에요|(?:했|해)요|습니다|니다|세요|예요)\\s*$",
@@ -237,6 +262,15 @@ public class SelfCritiqueService {
             }
         }
 
+        // 구조적 AI투 후보 — 점수 미반영, 로그만 (캘리브레이션 데이터 수집용)
+        if (hasClosingSummaryParagraph(text)) {
+            log.debug("[STRUCTURAL_TELL_CANDIDATE] closing-summary-paragraph type={}", contentType);
+        }
+        int contrastCount = countSymmetricContrast(text);
+        if (contrastCount >= 2) {
+            log.debug("[STRUCTURAL_TELL_CANDIDATE] symmetric-contrast count={} type={}", contrastCount, contentType);
+        }
+
         boolean passed = score >= passThreshold;
         log.debug("quickCheck type={} score={}/{} passed={} issues={}", contentType, score, 7, passed, issues);
         return new CritiqueResult(passed, score, issues);
@@ -378,6 +412,7 @@ public class SelfCritiqueService {
                 아래 %s만 다시 써라. JSON·스키마·페르소나 목록·원본 생성 프롬프트를 출력하지 마라.
                 %s
                 고칠 문제: %s
+                다음도 피하라: 마지막 문단에서 전체를 요약해 마무리하지 마라. "A가 아니라 B다" 식 대조 구문을 반복하지 마라. 비슷한 구조의 문장을 세 개 나란히 나열하지 마라. 별것 아닌 일을 거창한 의미로 포장하지 마라.
                 의미·사실·줄바꿈 구조를 유지하고 문제만 고쳐라. 본문만 출력하라.
 
                 [원문]
