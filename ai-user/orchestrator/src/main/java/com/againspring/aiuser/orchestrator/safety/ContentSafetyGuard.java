@@ -63,7 +63,7 @@ public class ContentSafetyGuard {
         }
         // 제공자 오류/거절/누출 시그니처 — JSON SSOT 로더 위임 (최종 안전망: 인보커가 놓쳐도 여기서 게시 차단)
         LlmErrorSignatures sig = LlmErrorSignatures.get();
-        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        String lower = text.toLowerCase(Locale.ROOT);
         if (sig.containsSignature(lower)) {
             log.error("ContentSafetyGuard: LLM provider-error signature in content — BLOCKED. 토큰 부족·거절 의심.");
             return GuardResult.blocked("LLM_ERROR_SIGNATURE");

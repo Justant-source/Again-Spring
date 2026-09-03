@@ -21,7 +21,7 @@ public final class LlmErrorSignatures {
     private static final List<String> CANDIDATES = List.of(
             "/app/shared/docs/policies/llm-error-signatures.json",
             "../../docs/shared/policies/llm-error-signatures.json",   // gradle test cwd = ai-user/<module>
-            "../docs/shared/policies/llm-error-signatures.json");      // backend
+            "../docs/shared/policies/llm-error-signatures.json");      // backend gradle test cwd — dead code in this orchestrator copy, only the backend copy's near-identical class actually reaches this candidate at runtime; kept for parity across the 3 Gradle-independent copies
 
     private static volatile LlmErrorSignatures instance;
 
