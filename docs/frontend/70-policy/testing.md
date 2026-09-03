@@ -125,10 +125,19 @@ API 계약(대시보드·크롤·visit validation)은 BE 유닛으로 이관: `A
 import { test, expect } from '../support/no-llm-fixture'
 ```
 
-가드레일이 자동 차단하는 엔드포인트:
+**가드 동작 (사후 감지 아님 — 차단)**: `no-llm-fixture.ts`의 `page` 픽스처는 `page.route('**/*', ...)`로 모든 요청을 가로채, LLM 트리거 패턴에 일치하면 실제로 네트워크에 나가기 전에 `route.abort('blockedbyclient')`로 즉시 차단하고 위반을 기록한다(teardown에서 위반 목록이 비어있는지 최종 확인). 즉 LLM 호출이 "발생한 뒤 감지"되는 게 아니라 **애초에 발송되지 않는다**.
+
+가드레일이 차단하는 엔드포인트 패턴 (`LLM_PATH_PATTERNS`):
 - `POST /api/admin/content/corrections/analyze`
 - `POST /api/admin/ai-rules/history/*/analyze`, `/analyze-batch`
 - `POST /api/admin/marketing/*/(generate|simulation|story)`
+- `/admin/trigger/*` (오케스트레이터 경로 — 프록시될 일은 없지만 명시)
+
+**한계 + 정적 검사 보완**: `page.route`는 Playwright의 `page` 픽스처만 가로챈다 — spec이 `request`(APIRequestContext) 픽스처로 LLM 경로를 직접 치면 이 가드를 우회한다. 이를 정적으로 잡기 위해 `frontend/scripts/check-e2e-no-llm.js`가 `journeys/*.spec.ts`를 스캔해 LLM 경로 문자열 리터럴을 찾는다(`page.route(` 선언 줄과 주석 줄은 정당한 스텁/설명이므로 제외). CI/커밋 전 실행:
+
+```bash
+npm run lint:e2e-llm
+```
 
 **왜 필요한가**: BE의 `RemoteLlmProvider`가 `@Primary` 무조건 → `application-test.yml`의 `llm.provider:mock`은 실행 중인 BE에 무효. 이 가드레일이 실서버 e2e에서 LLM 호출을 차단한다.
 

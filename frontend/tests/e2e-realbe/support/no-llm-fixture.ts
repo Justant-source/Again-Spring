@@ -18,6 +18,7 @@ const LLM_PATH_PATTERNS = [
   /\/api\/admin\/ai-rules\/history\/[^?/]+\/analyze/,
   /\/api\/admin\/ai-rules\/history\/analyze-batch/,
   /\/api\/admin\/marketing\/[^/]+\/(generate|simulation|story)/,
+  /\/admin\/trigger\//,
 ]
 
 type NoLlmFixtures = {
@@ -56,26 +57,20 @@ export const test = base.extend<NoLlmFixtures>({
   ],
 
   page: async ({ page, _llmViolations }, use) => {
-    page.on('request', (req) => {
+    await page.route('**/*', async (route) => {
+      const req = route.request()
       const url = req.url()
-      const method = req.method()
-
       for (const pattern of LLM_PATH_PATTERNS) {
         if (pattern.test(url)) {
-          _llmViolations.push(
-            `[no-llm-guardrail] LLM 트리거 엔드포인트 호출 감지: ${method} ${url}`,
-          )
+          _llmViolations.push(`[no-llm-guardrail] LLM 트리거 엔드포인트 호출 차단: ${req.method()} ${url}`)
+          await route.abort('blockedbyclient')
           return
         }
       }
+      await route.continue()
     })
-
     await use(page)
-
-    expect(
-      _llmViolations,
-      `LLM 가드레일 위반 감지됨:\n${_llmViolations.join('\n')}`,
-    ).toEqual([])
+    expect(_llmViolations, `LLM 가드레일 위반 감지됨:\n${_llmViolations.join('\n')}`).toEqual([])
   },
 })
 

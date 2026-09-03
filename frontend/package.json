@@ -14,6 +14,7 @@
     "lint": "next lint",
     "lint:emoji": "node scripts/check-no-emoji.js",
     "lint:docs": "python3 ../scripts/lint_docs.py",
+    "lint:e2e-llm": "node scripts/check-e2e-no-llm.js",
     "verify:assets": "node scripts/verify-design-assets.js",
     "test": "vitest run",
     "test:watch": "vitest",
