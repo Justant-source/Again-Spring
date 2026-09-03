@@ -2,6 +2,7 @@ package com.againspring.api.admin;
 
 import com.againspring.domain.ai.AiUserGenerationConfig;
 import com.againspring.repository.ai.AiUserGenerationConfigRepository;
+import com.againspring.service.admin.AiUserGatesProxyService;
 import com.againspring.service.admin.AiUserMonitorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -43,6 +44,7 @@ public class AdminAiUserController {
     private final AiUserGenerationConfigRepository configRepository;
     private final JdbcTemplate jdbcTemplate;
     private final AiUserMonitorService aiUserMonitorService;
+    private final AiUserGatesProxyService gatesProxy;
 
     @Value("${ai.user.orchestrator-url:http://againspring-ai-user-orchestrator:8096}")
     private String orchestratorUrl;
@@ -300,6 +302,16 @@ public class AdminAiUserController {
     private static int computePercent(int done, int target) {
         if (target == 0) return 0;
         return Math.min(100, (int) Math.round(100.0 * done / target));
+    }
+
+    // =====================================================================
+    // GET /api/admin/ai-user/effective-gates — 오케스트레이터 프록시
+    // =====================================================================
+
+    @GetMapping("/effective-gates")
+    @Operation(summary = "생성·발행 게이트 해석 결과", description = "env/yml/DB/LLM 게이트를 orchestrator가 한 번에 해석한 결과. 왜 생성/발행이 막혀있는지 reasons로 표시.")
+    public ResponseEntity<Map<String, Object>> effectiveGates() {
+        return ResponseEntity.ok(gatesProxy.effectiveGates());
     }
 
     // =====================================================================
