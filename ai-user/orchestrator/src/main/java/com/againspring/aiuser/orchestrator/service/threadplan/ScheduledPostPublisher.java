@@ -69,9 +69,7 @@ public class ScheduledPostPublisher {
             log.debug("ScheduledPostPublisher skip: yml gate closed");
             return;
         }
-        boolean dbBlocked = configRepository.findById(1)
-                .map(c -> c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true);
-        if (dbBlocked) {
+        if (isDbBlocked()) {
             log.info("ScheduledPostPublisher skip: ai_user_kill_switch or schedule_execution_paused");
             return;
         }
@@ -82,17 +80,33 @@ public class ScheduledPostPublisher {
     }
 
     /**
+     * Admin kill switch / pause. Checked fail-closed (a missing config row blocks). {@code force}
+     * on {@link #publishNow} never bypasses this — {@code force} only skips the slot time and the
+     * QuietHours window, never the operator's kill switch (결함 1 audit, 2026-09).
+     */
+    private boolean isDbBlocked() {
+        return configRepository.findById(1)
+                .map(c -> c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true);
+    }
+
+    /**
      * Single-row immediate publish. {@code force=true} ignores the slot time and the QuietHours
      * ban — <strong>dev canary only</strong>, never for prod use (a forced publish can land in
-     * the KST 02:00–06:00 quiet window).
+     * the KST 02:00–06:00 quiet window). {@code force} does <strong>not</strong> bypass the admin
+     * kill switch / pause — those are checked unconditionally, same as {@link #publishDue()}.
      *
      * @return the published backend {@code postId}, or empty when the id is unknown, already
-     *         claimed elsewhere, or (force=false) not yet due
+     *         claimed elsewhere, blocked by the kill switch/pause, or (force=false) not yet due
      */
     public Optional<String> publishNow(String scheduledId, boolean force) {
         Optional<AiScheduledPost> claimed = leases.claimById(scheduledId, WORKER, Duration.ofMinutes(5));
         if (claimed.isEmpty()) return Optional.empty();
         AiScheduledPost row = claimed.get();
+        if (isDbBlocked()) {
+            log.info("ScheduledPostPublisher.publishNow skip {}: ai_user_kill_switch or schedule_execution_paused", scheduledId);
+            leases.release(scheduledId, WORKER);
+            return Optional.empty();
+        }
         if (!force && row.getScheduledPublishAt() != null && row.getScheduledPublishAt().isAfter(Instant.now())) {
             leases.release(scheduledId, WORKER);
             return Optional.empty();
