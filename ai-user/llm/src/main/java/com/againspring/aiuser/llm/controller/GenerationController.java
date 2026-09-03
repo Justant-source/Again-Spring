@@ -3,6 +3,7 @@ package com.againspring.aiuser.llm.controller;
 import com.againspring.aiuser.llm.dto.*;
 import com.againspring.aiuser.llm.exception.*;
 import com.againspring.aiuser.llm.pool.LlmWorkerPool;
+import com.againspring.aiuser.llm.service.LlmProvider;
 import com.againspring.aiuser.llm.service.OutputSanitizer;
 import com.againspring.aiuser.llm.service.PromptAssembler;
 import com.againspring.aiuser.llm.service.SelfCritiqueService;
@@ -39,7 +40,7 @@ public class GenerationController {
         try {
             String model = (postModel != null && !postModel.isBlank()) ? postModel.trim() : null;
             String prompt = promptAssembler.assemblePostPrompt(req);
-            String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), corrId, req.getBackend());
+            String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), corrId, LlmProvider.parseLegacy(null, req.getBackend()));
             String text = outputSanitizer.sanitizePost(raw, req.getVoiceType());
             // 자기비평 루프 (enabled 시) — 동일 backend·model 승계, formality 전달
             text = selfCritique.critiqueAndRefine(text, "post", prompt, corrId, req.getBackend(), req.getFormality(), model, req.getVoiceType());
@@ -60,7 +61,7 @@ public class GenerationController {
         long start = System.currentTimeMillis();
         try {
             String prompt = promptAssembler.assembleCommentPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
+            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, LlmProvider.parseLegacy(null, req.getBackend()));
             // 센티넬 분리 먼저 (sanitize/critique 전에) — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
             String[] split = splitReactions(raw);
             String reactionsJson = split[1];  // 최초 raw에서 캡처 (critique 재생성으로도 보존됨)
@@ -84,7 +85,7 @@ public class GenerationController {
         long start = System.currentTimeMillis();
         try {
             String prompt = promptAssembler.assembleReplyPrompt(req);
-            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, req.getBackend());
+            String raw = pool.executeSyncTask(prompt, null, req.getTimeoutMs(), corrId, LlmProvider.parseLegacy(null, req.getBackend()));
             // 센티넬 분리 먼저 — OutputSanitizer가 <<<REACT>>> 이하를 파괴하기 전에 추출
             String[] split = splitReactions(raw);
             String text = outputSanitizer.sanitizeComment(split[0], req.getVoiceType()); // same sanitizer (short text)
@@ -111,7 +112,7 @@ public class GenerationController {
         try {
             String prompt = promptAssembler.assembleProofreadPrompt(req);
             long timeoutMs = req.getTimeoutMs() > 0 ? req.getTimeoutMs() : 60000L;
-            String raw = pool.executeSyncTask(prompt, null, timeoutMs, corrId, req.getBackend());
+            String raw = pool.executeSyncTask(prompt, null, timeoutMs, corrId, LlmProvider.parseLegacy(null, req.getBackend()));
             String correctedBody = extractCorrectedBody(raw);
             String text = outputSanitizer.sanitizePost(correctedBody);
             return ResponseEntity.ok(GenResponse.success(text, System.currentTimeMillis() - start, corrId));

@@ -88,18 +88,17 @@ public class LlmWorkerPool {
      * RejectedExecutionException → LlmCapacityException (큐 포화).
      * TimeoutException → LlmTimeoutException.
      */
-    /** 하위 호환용 — backend=null 시 CLI 사용 */
+    /** 하위 호환용 — provider 미지정 시 CLAUDE 사용 */
     public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId)
             throws LlmException {
-        return executeSyncTask(prompt, model, timeoutMs, correlationId, null);
+        return executeSyncTask(prompt, model, timeoutMs, correlationId, LlmProvider.parseLegacy(null, null));
     }
 
-    /** backend: "CLI" | "API" | null (null→CLI) */
-    public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId, String backend)
+    public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId, LlmProvider provider)
             throws LlmException {
         long effectiveTimeout = timeoutMs > 0 ? timeoutMs : defaultTimeoutMs;
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
-        var selectedInvoker = invokerRouter.route(backend);
+        var selectedInvoker = invokerRouter.routeProvider(provider);
         long enqueueTime = System.currentTimeMillis();
 
         CompletableFuture<String> resultFuture = new CompletableFuture<>();

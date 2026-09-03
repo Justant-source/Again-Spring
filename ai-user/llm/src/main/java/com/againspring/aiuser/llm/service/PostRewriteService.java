@@ -28,7 +28,7 @@ public class PostRewriteService {
         String prompt = promptAssembler.assemblePostRewritePrompt(req);
         String model = (postModel != null && !postModel.isBlank()) ? postModel.trim() : null;
         String backend = (req.getBackend() == null || req.getBackend().isBlank()) ? "API" : req.getBackend();
-        String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), correlationId, backend);
+        String raw = pool.executeSyncTask(prompt, model, req.getTimeoutMs(), correlationId, LlmProvider.parseLegacy(null, backend));
         ParsedRewrite parsed = parseRewriteResponse(raw, req);
         return PostRewriteResponse.success(
             parsed.title(),

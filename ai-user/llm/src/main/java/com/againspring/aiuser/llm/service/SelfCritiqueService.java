@@ -321,7 +321,7 @@ public class SelfCritiqueService {
         String retryPrompt = buildRetryPrompt(draft, result.issues(), contentType, formality);
 
         try {
-            String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", backend);
+            String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", LlmProvider.parseLegacy(null, backend));
             String refined = "post".equalsIgnoreCase(contentType)
                 ? outputSanitizer.sanitizePost(raw, voiceType)
                 : outputSanitizer.sanitizeComment(raw, voiceType);

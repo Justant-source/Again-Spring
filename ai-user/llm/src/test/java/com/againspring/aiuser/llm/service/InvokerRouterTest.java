@@ -3,39 +3,28 @@ package com.againspring.aiuser.llm.service;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 class InvokerRouterTest {
 
-    @Test
-    void routeReturnsApiInvokerWhenBackendIsApi() {
-        ClaudeCliInvoker cliInvoker = mock(ClaudeCliInvoker.class);
-        ClaudeApiInvoker apiInvoker = mock(ClaudeApiInvoker.class);
-        InvokerRouter router = new InvokerRouter(cliInvoker, apiInvoker);
+    private final ClaudeCliInvoker claude = mock(ClaudeCliInvoker.class);
+    private final ClaudeApiInvoker api = mock(ClaudeApiInvoker.class);
+    private final CodexCliInvoker codex = mock(CodexCliInvoker.class);
+    private final StubInvoker stub = mock(StubInvoker.class);
 
-        assertSame(apiInvoker, router.route("API"));
-        assertSame(apiInvoker, router.route("api"));
+    @Test
+    void routesEveryProvider() {
+        InvokerRouter router = new InvokerRouter(claude, api, codex, stub);
+        assertSame(claude, router.routeProvider(LlmProvider.CLAUDE));
+        assertSame(codex, router.routeProvider(LlmProvider.CODEX));
+        assertSame(api, router.routeProvider(LlmProvider.API));
+        assertSame(stub, router.routeProvider(LlmProvider.STUB));
     }
 
     @Test
-    void routeFallsBackToCliForNullOrNonApiBackend() {
-        ClaudeCliInvoker cliInvoker = mock(ClaudeCliInvoker.class);
-        ClaudeApiInvoker apiInvoker = mock(ClaudeApiInvoker.class);
-        InvokerRouter router = new InvokerRouter(cliInvoker, apiInvoker);
-
-        assertSame(cliInvoker, router.route(null));
-        assertSame(cliInvoker, router.route("CLI"));
-        assertSame(cliInvoker, router.route("unknown"));
-    }
-
-    @Test
-    void routeProviderSelectsCodexWithoutUsingLegacyApiRoute() {
-        ClaudeCliInvoker claudeInvoker = mock(ClaudeCliInvoker.class);
-        ClaudeApiInvoker apiInvoker = mock(ClaudeApiInvoker.class);
-        CodexCliInvoker codexInvoker = mock(CodexCliInvoker.class);
-        InvokerRouter router = new InvokerRouter(claudeInvoker, apiInvoker, codexInvoker);
-
-        assertSame(claudeInvoker, router.routeProvider(LlmProvider.CLAUDE));
-        assertSame(codexInvoker, router.routeProvider(LlmProvider.CODEX));
+    void nullProviderIsRejected() {
+        InvokerRouter router = new InvokerRouter(claude, api, codex, stub);
+        assertThrows(IllegalArgumentException.class, () -> router.routeProvider(null));
     }
 }
