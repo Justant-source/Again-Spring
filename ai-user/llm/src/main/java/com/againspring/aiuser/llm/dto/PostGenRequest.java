@@ -29,6 +29,12 @@ public class PostGenRequest {
     private String globalForbidRules;
     /** 생성 백엔드: "CLI" | "API" | null (null→CLI). §11 토큰 관제 */
     private String backend;
+    /** CLAUDE | CODEX | API | STUB. 비면 backend(구 필드) → CLAUDE 순으로 해석. */
+    private String provider;
+
+    public com.againspring.aiuser.llm.service.LlmProvider resolveProvider() {
+        return com.againspring.aiuser.llm.service.LlmProvider.parseLegacy(provider, backend);
+    }
     /** 이 페르소나의 최근 글 본문들 ("- …" 개행 구분) — 소재·표현 반복 방지 주입. 없으면 null. */
     private String recentOutputs;
     /** 진행 중인 상황 — CASUAL이 아닌 갈등 글에서 추출한 첫 문장 (이어가기용). 없으면 null. */

@@ -391,10 +391,10 @@ class StructuredGenerationServiceTest {
         // post once + 6 top-level comments (replies skipped)
         verify(critique, times(1)).critiqueAndRefine(
                 eq(response.getPost().getBody()), eq("post"), anyString(), eq("corr-sc"),
-                eq("CLI"), any(), eq("gpt-5.6-terra"), any());
+                eq(LlmProvider.CLAUDE), any(), eq("gpt-5.6-terra"), any());
         verify(critique, times(6)).critiqueAndRefine(
                 anyString(), eq("comment"), anyString(), startsWith("corr-sc-"),
-                eq("CLI"), any(), eq("gpt-5.6-terra"), any());
+                eq(LlmProvider.CLAUDE), any(), eq("gpt-5.6-terra"), any());
         verify(critique, never()).critiqueAndRefine(
                 anyString(), eq("reply"), anyString(), anyString(), any(), any(), any(), any());
     }

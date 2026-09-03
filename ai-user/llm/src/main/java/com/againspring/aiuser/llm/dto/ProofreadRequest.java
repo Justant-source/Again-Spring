@@ -17,4 +17,10 @@ public class ProofreadRequest {
     private long timeoutMs;
     /** 생성 백엔드: "CLI" | "API" | null (null→CLI). */
     private String backend;
+    /** CLAUDE | CODEX | API | STUB. 비면 backend(구 필드) → CLAUDE 순으로 해석. */
+    private String provider;
+
+    public com.againspring.aiuser.llm.service.LlmProvider resolveProvider() {
+        return com.againspring.aiuser.llm.service.LlmProvider.parseLegacy(provider, backend);
+    }
 }

@@ -28,6 +28,12 @@ public class CommentGenRequest {
     private String globalForbidRules;
     /** 생성 백엔드: "CLI" | "API" | null */
     private String backend;
+    /** CLAUDE | CODEX | API | STUB. 비면 backend(구 필드) → CLAUDE 순으로 해석. */
+    private String provider;
+
+    public com.againspring.aiuser.llm.service.LlmProvider resolveProvider() {
+        return com.againspring.aiuser.llm.service.LlmProvider.parseLegacy(provider, backend);
+    }
     /** 번호 매긴 댓글 목록 ("1. 본문\n2. ↳ 대댓글\n..."). 피기백 반응용. 없으면 null. */
     private String reactableComments;
     /** 좋아요/투표 성향 수치 ("좋아요 성향 0.7/1.0, 투표 성향 0.4/1.0"). 없으면 null. */

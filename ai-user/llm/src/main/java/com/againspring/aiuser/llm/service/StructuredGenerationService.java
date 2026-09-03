@@ -209,7 +209,7 @@ public class StructuredGenerationService {
                                                  String model, String correlationId) {
         if (selfCritique == null || parsed == null) return parsed;
         // Critique refine uses session CLI (same as legacy GenerationController), independent of PLAN provider.
-        String backend = "CLI";
+        LlmProvider provider = LlmProvider.CLAUDE;
         Map<String, ThreadPlanRequest.Persona> byId = new HashMap<>();
         for (ThreadPlanRequest.Persona p : req.getPersonas()) {
             if (p != null && !blank(p.getPersonaId())) byId.put(p.getPersonaId(), p);
@@ -219,7 +219,7 @@ public class StructuredGenerationService {
         if (post != null) {
             ThreadPlanRequest.Persona author = resolveAuthorPersona(req);
             String refined = selfCritique.critiqueAndRefine(
-                    post.getBody(), "post", prompt, correlationId, backend,
+                    post.getBody(), "post", prompt, correlationId, provider,
                     resolveFormality(author), model, resolveVoiceType(author));
             post = replacePostBodyIfValid(post, refined);
         }
@@ -232,7 +232,7 @@ public class StructuredGenerationService {
             }
             ThreadPlanRequest.Persona persona = byId.get(item.getPersonaId());
             String refined = selfCritique.critiqueAndRefine(
-                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), backend,
+                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), provider,
                     resolveFormality(persona), model, resolveVoiceType(persona));
             items.add(replaceCommentBodyIfValid(item, refined));
         }
@@ -530,7 +530,7 @@ public class StructuredGenerationService {
     private PairedPhase2Response applyPairedPhase2Critique(PairedPhase2Response parsed, PairedPhase2Request req,
                                                            String prompt, String model, String correlationId) {
         if (selfCritique == null || parsed == null) return parsed;
-        String backend = "CLI";
+        LlmProvider provider = LlmProvider.CLAUDE;
         Map<String, ThreadPlanRequest.Persona> byId = new HashMap<>();
         for (ThreadPlanRequest.Persona p : req.getPersonas()) {
             if (p != null && !blank(p.getPersonaId())) byId.put(p.getPersonaId(), p);
@@ -540,7 +540,7 @@ public class StructuredGenerationService {
         if (partnerPost != null) {
             ThreadPlanRequest.Persona partnerPersona = resolvePartnerPersona(req);
             String refined = selfCritique.critiqueAndRefine(
-                    partnerPost.getBody(), "post", prompt, correlationId, backend,
+                    partnerPost.getBody(), "post", prompt, correlationId, provider,
                     resolveFormality(partnerPersona), model, resolveVoiceType(partnerPersona));
             if (refined != null && !refined.equals(partnerPost.getBody())) {
                 try {
@@ -564,7 +564,7 @@ public class StructuredGenerationService {
             }
             ThreadPlanRequest.Persona persona = byId.get(item.getPersonaId());
             String refined = selfCritique.critiqueAndRefine(
-                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), backend,
+                    item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), provider,
                     resolveFormality(persona), model, resolveVoiceType(persona));
             items.add(replaceCommentBodyIfValid(item, refined));
         }

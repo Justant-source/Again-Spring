@@ -280,33 +280,33 @@ public class SelfCritiqueService {
      * 자기비평 + 재생성.
      * quickCheck FAIL 시 비평 결과를 포함한 재생성 프롬프트로 1회 재시도.
      * 재시도도 빈 텍스트이면 원본 반환 (graceful fallback).
-     * backend: 원래 요청과 동일한 backend("CLI"|"API"|null) — 설정 일관성 유지.
+     * provider: 원래 요청과 동일한 provider — 설정 일관성 유지.
      * formality: "casual" (반말) | "polite" (존댓말) | null (기본값)
      */
-    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend) {
-        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, null);
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, LlmProvider provider) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, provider, null);
     }
 
     /**
      * 자기비평 + 재생성 (formality 고려).
      */
-    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, String backend, String formality) {
-        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, null, null);
+    public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId, LlmProvider provider, String formality) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, provider, formality, null, null);
     }
 
     /**
      * 자기비평 + 재생성 (formality·model 고려). model=null이면 풀 기본 모델.
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId,
-                                    String backend, String formality, String model) {
-        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, backend, formality, model, null);
+                                    LlmProvider provider, String formality, String model) {
+        return critiqueAndRefine(draft, contentType, originalPrompt, corrId, provider, formality, model, null);
     }
 
     /**
      * 자기비평 + 재생성 (formality·model·voiceType 고려). model/voiceType=null이면 기본값.
      */
     public String critiqueAndRefine(String draft, String contentType, String originalPrompt, String corrId,
-                                    String backend, String formality, String model, String voiceType) {
+                                    LlmProvider provider, String formality, String model, String voiceType) {
         if (!enabled || draft == null || draft.isBlank()) return draft;
 
         CritiqueResult result = quickCheck(draft, contentType, formality);
@@ -321,7 +321,7 @@ public class SelfCritiqueService {
         String retryPrompt = buildRetryPrompt(draft, result.issues(), contentType, formality);
 
         try {
-            String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", LlmProvider.parseLegacy(null, backend));
+            String raw = pool.executeSyncTask(retryPrompt, model, 90000L, corrId + "-retry", provider);
             String refined = "post".equalsIgnoreCase(contentType)
                 ? outputSanitizer.sanitizePost(raw, voiceType)
                 : outputSanitizer.sanitizeComment(raw, voiceType);
