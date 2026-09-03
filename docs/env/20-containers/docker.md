@@ -125,7 +125,7 @@ start_period: 30s
 ### llm-worker (`llm-worker/Dockerfile`)
 
 - runtime에 `nodejs`, `npm`, `@anthropic-ai/claude-code` 포함
-- `CLAUDE_HOST_CONFIG_DIR:/root/.claude` bind mount 사용
+- `CLAUDE_HOST_CONFIG_DIR:/home/justant/.claude` bind mount 사용
 
 ### frontend (`frontend/Dockerfile`)
 

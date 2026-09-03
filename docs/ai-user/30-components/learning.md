@@ -217,6 +217,10 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 - `persona_strengthener.py`는 `LLM_AI_USER_URL`을 직접 호출한다.
 - compose는 dev/prod 모두 이 값을 ai-user llm 컨테이너로 override한다.
 - 운영상 이 경로는 `ai-user/docs/personas/profiles/*/voice.yml`를 수정할 수 있다.
+- refusal/error 판정은 하드코딩 목록이 아니라 `ai-user/learning/app/services/llm_error_signatures.py`
+  로더를 거쳐 `docs/shared/policies/llm-error-signatures.json` SSOT를 읽는다(2026-09-03 리팩터,
+  기존 `_looks_like_llm_error`/`LLM_ERROR_SIGNATURES` 하드코딩 목록 폐기). 판정 결과가
+  `voice_profile`에 섞이지 않게 막는 동작 자체는 그대로다 — 상세: `.claude/rules/llm-safety.md` §2.
 
 ## daily topics
 

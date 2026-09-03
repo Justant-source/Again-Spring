@@ -87,7 +87,7 @@ shared ai-user는 `againspring-dev`, `againspring-prod` 네트워크를 외부 �
 
 bind mount:
 
-- `${CLAUDE_HOST_CONFIG_DIR}:/root/.claude`
+- `${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude`
   - `againspring-llm`
   - `againspring-llm-ai-user`
 - `../ai-user/docs/personas:/app/personas:rw`
