@@ -47,19 +47,6 @@ public class ContentSafetyGuard {
         Pattern.compile("니거(?=들)")
     );
 
-    // 내부 프롬프트/첨삭 규칙이 콘텐츠 말미에 누출된 패턴 — 본문으로 게시 금지
-    private static final List<Pattern> PROMPT_LEAK_PATTERNS = List.of(
-        Pattern.compile("(?m)^적용 처리 메모\\s*$"),
-        Pattern.compile("(?m)^\\[작성 노트]\\s*$"),
-        Pattern.compile("(?m)^\\|\\s*항목\\s*\\|\\s*처리\\s*내용\\s*\\|"),
-        Pattern.compile("(?m)^-\\s*트리거:"),
-        Pattern.compile("(?m)^-\\s*어미 변화:"),
-        Pattern.compile("(?m)^-\\s*모바일 오타:"),
-        Pattern.compile("(?m)^-\\s*페르소나 표현:"),
-        Pattern.compile("(?m)^-\\s*온점·쌍따옴표 없음\\s*$"),
-        Pattern.compile("(?m)^\\|\\s*페르소나 quirk\\s*\\|")
-    );
-
     /**
      * Thread-plan / structured-output JSON이 댓글·글 본문으로 샌 경우.
      * 2026-08-11 인시던트: {@code { post: null, comments: [ { ref, parentRef, personaId, body } ] }}
@@ -83,52 +70,12 @@ public class ContentSafetyGuard {
         return false;
     }
 
-    // 제공자(LLM) 오류 문자열 — 토큰/크레딧 소진 또는 프록시 라우팅 오류로 본문에 새는 텍스트.
-    // 절대 prod에 게시 금지 (2026-06-07 인시던트 + 2026-06-10 Kiro/Claude 자기정체 인시던트). 모두 소문자.
-    private static final List<String> LLM_ERROR_SIGNATURES = List.of(
-        // 크레딧/쿼터 오류
-        "credit balance", "too low to access", "purchase credits", "plans & billing",
-        "usage limit", "reached your usage", "5-hour limit", "rate limit", "rate_limit",
-        "overloaded", "invalid_request_error", "authentication_error", "api_error",
-        "anthropic api", "insufficient credit", "too many requests",
-        "service unavailable", "internal server error",
-        // LLM 자기 정체 노출 / 역할극 거절 (프록시 라우팅 오류 등)
-        "i'm kiro", "i am kiro", "저는 kiro", "kiro입니다",
-        "i'm claude", "i am claude", "i'm an ai assistant", "저는 claude",
-        "i can't discuss that", "i cannot roleplay", "i'm not able to roleplay",
-        "not able to roleplay", "not set up to generate",
-        "can't roleplay", "cannot roleplay as", "won't roleplay",
-        "i need to be direct: i can't", "i need to be direct: i'm",
-        "i need to clarify: i'm", "i need to be transparent",
-        "i appreciate you", "i appreciate you sharing", "i appreciate you testing",
-        "i'm an ai", "i am an ai", "as an ai", "저는 ai",
-        // 2026-06-12 인시던트: 시그니처 미스로 거절문이 게시됨 (LlmErrorSignature와 동기 유지 — 절대규칙 #7)
-        "can't help with this", "cannot help with this", "unable to help with",
-        "i can't assist", "cannot assist with", "role-play as", "this is asking me to",
-        "이 요청을 도와드릴 수 없", "요청을 도와드릴 수가 없", "죄송하지만 저는 이 요청",
-        "이 프롬프트는", "프롬프트 인젝션",
-        // 2026-06-18 언어-가드 보완: 시그니처 미스 방어용 보조 패턴
-        "i can't fulfill", "i can't write this",
-        "i can't write this comment", "i can't write this content", "i can't write this response",
-        "i can't do this", "i appreciate the context", "i appreciate the detailed request",
-        "i appreciate the detailed instructions", "these instructions ask me", "the instructions ask me",
-        "actual operating online community", "operating online community",
-        "authentic community member", "genuine community member", "real human user",
-        "posing as a real user", "designed to appear authentic", "inauthentic engagement",
-        "community participation", "이 요청은 도와드릴 수 없습니다", "이 요청은 수행할 수 없습니다",
-        "실제 운영 중인", "실제 온라인 커뮤니티", "진정성 있는 사용자",
-        "허위 정보 및 스푸핑", "조작된 커뮤니티 활동",
-        "가짜 페르소나", "신원 위장", "사용자 조작", "진정성에 손상"
-    );
-
     private static final int MIN_LENGTH = 5;
     // POST 상한: OutputSanitizer(llm) MAX_POST=2000보다 여유 있게 설정해 sanitizer가 실질적 상한이 됨.
     // Phase 5에서 ai-user.limits.max-post/max-comment 환경변수로 통일 예정.
     // TODO Phase 5: @Value("${ai-user.limits.max-post:2200}") 로 교체
     private static final int MAX_LEN_POST    = 2200;
     private static final int MAX_LEN_COMMENT = 350;
-    private static final double MIN_KOREAN_RATIO = 0.10;
-    private static final int MIN_KOREAN_CHECK_LEN = 20;
 
     /** 콘텐츠 타입: executePost→POST, executeComment/executeReply→COMMENT */
     public enum ContentType { POST, COMMENT }
@@ -143,31 +90,18 @@ public class ContentSafetyGuard {
         }
     }
 
-    /** 한국어 AI 콘텐츠에 한글이 사실상 없으면(비율<10%) 영어 거절·오류로 판정. */
-    private static boolean hasInsufficientKorean(String text) {
-        long significant = text.chars().filter(c -> c > 32).count();
-        if (significant < MIN_KOREAN_CHECK_LEN) return false;
-        long korean = text.chars().filter(c ->
-                (c >= 0xAC00 && c <= 0xD7A3)
-                || (c >= 0x1100 && c <= 0x11FF)
-                || (c >= 0x3130 && c <= 0x318F)).count();
-        return (double) korean / significant < MIN_KOREAN_RATIO;
-    }
-
     public GuardResult check(String text, ContentType type) {
         if (text == null || text.isBlank()) {
             return GuardResult.blocked("EMPTY_TEXT");
         }
-        // 제공자 오류 문자열 차단 (최종 안전망: 인보커가 놓쳐도 여기서 게시 차단)
-        String lower = text.toLowerCase();
-        for (String sig : LLM_ERROR_SIGNATURES) {
-            if (lower.contains(sig)) {
-                log.error("ContentSafetyGuard: LLM provider-error signature in content — BLOCKED ('{}'). 토큰 부족 의심.", sig);
-                return GuardResult.blocked("LLM_ERROR_SIGNATURE");
-            }
+        // 제공자 오류/거절/누출 시그니처 — JSON SSOT 로더 위임 (최종 안전망: 인보커가 놓쳐도 여기서 게시 차단)
+        LlmErrorSignatures sig = LlmErrorSignatures.get();
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        if (sig.containsSignature(lower)) {
+            log.error("ContentSafetyGuard: LLM provider-error signature in content — BLOCKED. 토큰 부족·거절 의심.");
+            return GuardResult.blocked("LLM_ERROR_SIGNATURE");
         }
-        // 언어 가드: 한국어 AI 콘텐츠에 한글이 사실상 없으면 무효 처리 (영어 거절문 방어)
-        if (hasInsufficientKorean(text)) {
+        if (sig.hasInsufficientKorean(text)) {
             log.error("ContentSafetyGuard: insufficient Korean content (language-guard) — BLOCKED.");
             return GuardResult.blocked("INSUFFICIENT_KOREAN");
         }
@@ -175,11 +109,9 @@ public class ContentSafetyGuard {
             log.error("ContentSafetyGuard: thread-plan/structured JSON schema leaked into content — BLOCKED.");
             return GuardResult.blocked("STRUCTURED_SCHEMA_LEAK");
         }
-        for (Pattern p : PROMPT_LEAK_PATTERNS) {
-            if (p.matcher(text).find()) {
-                log.error("ContentSafetyGuard: internal prompt/correction note leaked into content — BLOCKED ({})", p.pattern());
-                return GuardResult.blocked("PROMPT_LEAK_META");
-            }
+        if (sig.hasPromptLeak(text)) {
+            log.error("ContentSafetyGuard: internal prompt/correction note leaked into content — BLOCKED.");
+            return GuardResult.blocked("PROMPT_LEAK_META");
         }
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");

@@ -4,6 +4,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard.ContentType;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -113,6 +114,17 @@ class ContentSafetyGuardTest {
         assertFalse(guard.check(incidentBody, ContentType.POST).passed());
         // normal Korean must still pass
         assertTrue(guard.check("갑자기 달라진 남편 적응이 안 되네요 ㅠㅠ", ContentType.COMMENT).passed());
+    }
+
+    /**
+     * Task 1.5: 시그니처가 llm 모듈 하드코딩 목록에만 있고 orchestrator L2에는
+     * 없던 케이스 — JSON SSOT 로더 위임 후에는 orchestrator도 잡아야 한다.
+     */
+    @Test
+    void blocksSignatureThatOnlyExistedInLlmModuleBefore() {
+        ContentSafetyGuard g = new ContentSafetyGuard();
+        assertThat(g.check("permission_error: this account cannot access", ContentType.COMMENT).passed()).isFalse();
+        assertThat(g.check("permission_error: this account cannot access", ContentType.COMMENT).reason()).isEqualTo("LLM_ERROR_SIGNATURE");
     }
 
 }
