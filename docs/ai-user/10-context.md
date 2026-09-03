@@ -29,7 +29,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - **양면 사연 (2026-08-02~)**: 새벽 배치 양면 비율은 `/admin/ai-user` `nightly_paired_share`(기본 0.20). 낮 PairedPostScheduler 부족분 보충은 env `PAIRED_POST_TARGET_SHARE` fallback. 프롬프트: `stance=AUTHOR`·`PARTNER`.
 - **양면 Call1/Call2 (2026-08-04)**: llm-ai-user `POST /v2/generate/paired-phase1`(`PAIRED_PHASE1`) = 작성자 본문+phase1 댓글(작성자만), `paired-phase2`(`PAIRED_PHASE2`) = 상대 본문+phase2 댓글(작성자+상대+공개 최상위 댓글≤8). 상세: [llm.md](30-components/llm.md).
 - **양면 author-public-first (2026-08-04)**: 작성자는 홀딩 후 **즉시 PUBLIC**(KST 02–06 밴). 파트너는 Δ 10m–2h(median ~50–60m) 뒤. `WAIT_FOR_PARTNER` private-until-partner 폐기(enum 호환만). LLM Call1=author+phase1, Call2=partner+phase2(+ live top-level 5–8).
-- **양면 댓글 phase1/phase2**: phase1은 파트너 전(author-only). 파트너 도착 시 미게시 cancel + phase2 both-context(게시된 phase1 보존). outbox REQUESTED만 믿으면 `provider_*=OFF`에서 댓글 0건 — yml fallback 유지.
+- **양면 댓글 phase1/phase2**: phase1은 파트너 전(author-only). 파트너 도착 시 미게시 cancel + phase2 both-context(게시된 phase1 보존). `provider_*=OFF`면 해당 워크로드 생성이 실제로 멈춘다 — yml 폴백 없음(config row가 없을 때만 yml 기본값 적용), 낮 시간 생성을 원하면 `/admin/ai-user`에서 provider를 켠다.
 - 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 paired 스케줄과 동일 replan 계약.
 - `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 DB `ai_user_generation_config.ai_user_kill_switch`다.

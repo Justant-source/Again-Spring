@@ -170,7 +170,7 @@ Hold 직전 맞춤법: `SoftProofread` — 오탈자 휴리스틱이 있을 때�
 |---|---|
 | workload provider `OFF` | 이후 해당 종류의 LLM job을 만들지 않음 |
 | execution pause | 이미 만든 예약 item의 게시만 멈춤 |
-| global kill switch | 새 plan/job과 예약 실행 모두 중단 |
+| global kill switch | 새 plan/job·스레드 발행·**예약 글 발행**·engagement 모두 중단 |
 
 ## LLM 없는 engagement
 

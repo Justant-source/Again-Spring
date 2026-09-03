@@ -139,6 +139,14 @@
 
 비용 추정 패널은 CLAUDE provider(Max5x CLI 경로 추정)와 CODEX provider(호출 수만 표시, $ 비용 추정 미지원)를 분리해서 보여준다.
 
+### 게이트 해석 패널 — `EffectiveGatesPanel` (2026-09-03~)
+
+근거: `frontend/components/admin/ai-user/EffectiveGatesPanel.tsx`, `GET /api/admin/ai-user/effective-gates`(backend가 orchestrator를 프록시).
+
+기존 `allOff` 배지(kill switch + 4 provider)는 yml/env 게이트나 LLM 게이트가 생성을 막는 경우를 드러내지 못했다 — 이 패널이 그 공백을 채운다. "생성 열림/막힘"·"발행 열림/막힘" 배지 2개, 막고 있는 사유 목록(`reasons[]`), 게이트 17개 전체를 이름·출처(`env`/`yml`/`db`)·값·막는 대상 4열 표로 보여준다. 엔드포인트가 없거나(orchestrator 미응답) 오류가 나면 화면을 깨뜨리지 않고 "게이트 상태를 불러올 수 없음" 안내로 대체한다.
+
+이 응답은 **전체 요약**이지 서비스별 정밀 시뮬레이션이 아니다 — 상세: [operations.md](../../../ai-user/60-runtime/operations.md) §3.
+
 > ai-user/orchestrator 오케스트레이터 쪽 구현(스케줄러·배치 서비스)은 `docs/ai-user/` 문서 참조 — 이 문서는 어드민 FE 화면 관점만 기술한다.
 
 ---

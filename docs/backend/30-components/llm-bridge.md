@@ -69,6 +69,15 @@ String sanitized = promptSanitizer.sanitize(userInput);
 
 ---
 
+## LLM 오류·거절·누출 시그니처 (SSOT)
+
+`docs/shared/policies/llm-error-signatures.json` 한 파일이 권위본이다. backend(`service/ai/LlmErrorSignatures`),
+llm-ai-user, orchestrator, ai-learning이 같은 파일을 `/app/shared/docs/policies/`에서 읽는다(`:ro`).
+시그니처 추가 = JSON 수정 + 해당 컨테이너 restart. 코드에 문자열을 넣지 않는다.
+backend는 `SyntheticOutputGuard`로 `users.synthetic=1` 작성자의 글·댓글에만 이 판정을 적용해 422 `LLM_ERROR_OUTPUT`으로 거부한다. 실사용자 입력에는 적용하지 않는다.
+
+---
+
 ## 프롬프트 파일
 
 사람글 최초 게시(`PostComposeService`)는 원문을 그대로 저장한다. 톤 정규화는 파트너 초대 답변 경로에서만 사용한다.
@@ -161,7 +170,7 @@ docker compose restart againspring-llm   # base 스택 (dev·prod 공유)
 
 ### 마케팅 경로 인증 오류 즉시 감지 (2026-08-15)
 
-마케팅 LLM 호출(`VideoVariantService` 등)에서 `LlmErrorSignature`의 `authentication_error` 시그니처가
+마케팅 LLM 호출(`VideoVariantService` 등)에서 `LlmErrorSignatures` SSOT(위 §"LLM 오류·거절·누출 시그니처")의 `authentication_error` 시그니처가
 **연속 2회** 감지되면 `MarketingLlmAuthGuard`가 재시도 없이 즉시 회로를 열고 긴급 텔레그램을 보낸다
 (`🚨 [긴급] Claude 세션 만료 — 수동 재인증 필요`). 인증 오류는 재시도해도 100% 실패하므로
 일반 운영 오류 재시도 정책(총 2회, 5분 후 재큐잉)의 **유일한 예외**다.

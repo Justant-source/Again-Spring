@@ -261,7 +261,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | POST | `/api/admin/ai-user/kill` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/ai-user/effective-gates` | **JWT + ADMIN** | 200 / 502 | [admin.md](admin.md) |
 
-> **2026-09-03~**: `effective-gates`는 orchestrator `GET /admin/trigger/effective-gates`를 그대로 프록시한다(env/yml/DB/LLM 게이트를 한 번에 해석한 `generationAllowed`/`publishingAllowed`/`reasons`/`gates[]`/`stale`). orchestrator 미응답·오류 시 502.
+> **2026-09-03~**: `effective-gates`는 orchestrator `GET /admin/trigger/effective-gates`를 그대로 프록시한다(env/yml/DB/LLM 게이트를 한 번에 해석한 `generationAllowed`/`publishingAllowed`/`reasons[]`/`gates[]` — 17개 게이트 중 `nightly_snapshot_unrestored`는 nightly 배치의 provider 스냅샷 미복원 여부). orchestrator 미응답·오류 시 502.
 
 > **2026-07-31~**: `generation-config` GET/PUT에서 레거시 필드(`backendPost`/`backendComment`/`backendReply`/`promptCaching`/`dailyTokenBudget`/`schedulerMode`)가 삭제되고 PLAN 모드로 일원화됐다. 기존 3개 provider(`providerAiPostBundle`/`providerHumanPostPlan`/`providerHumanInteraction`)에 `providerVoteLike`(`"CLAUDE"|"CODEX"|"OFF"`)가 추가되어 AI 투표·좋아요 생성도 PLAN 파이프라인으로 이관됨. `kill`은 이제 4개 provider 전부를 OFF로 설정한다.
 

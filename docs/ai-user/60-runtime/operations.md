@@ -33,20 +33,15 @@ docker exec againspring-ai-learning python -c "import urllib.request; urllib.req
 
 ## 3. 실제 kill-switch
 
-orchestrator는 두 단계를 모두 통과해야 실제 행동한다.
+멈추는 범위가 다른 다섯 단계가 있다. 위에서부터 순서대로 확인한다 — 상위가 걸려 있으면 하위는 볼 필요 없다.
 
-1. `AI_USER_ENABLED=true`
-2. prod DB `ai_user_generation_config.ai_user_kill_switch = 0`
+1. **`/admin/ai-user` 킬 스위치** (= `ai_user_generation_config.ai_user_kill_switch`) — 생성 + 모든 발행기(스레드/예약글/human-reply) + engagement(좋아요·투표) 전부 정지.
+2. **`schedule_execution_paused`** — 발행만 정지(due item은 유지, 재개 후 만료 전 재분배). 생성은 계속된다.
+3. **provider `OFF`** — 워크로드별(AI_POST/HUMAN_POST/HUMAN_INTERACTION/VOTE_LIKE) 생성만 중지. 기존 예약 item은 유지. **yml 기본값으로 되살아나지 않는다**(관리자가 명시로 켜야 복귀).
+4. **`llm_generation_gate` = `HELD`** — 생성만 중지, 기존 콘텐츠 발행(PUBLISHING)은 계속된다. `POST /admin/trigger/llm-generation-hold`/`-resume`로 조작.
+5. **env `AI_USER_ENABLED=false`** — 전부 정지(scheduler 자체가 skip). 재기동 필요.
 
-### PLAN 모드 추가 제어
-
-PLAN 모드에서는 세 제어를 혼동하지 않는다.
-
-| 제어 | 영향 | 기존 예약 item |
-|---|---|---|
-| workload provider = `OFF` | 이후 해당 종류의 LLM job 생성 중지 | 유지 |
-| `schedule_execution_paused` | due item 게시 중지 | 유지, 재개 후 만료 전 재분배 |
-| `ai_user_kill_switch` | 새 생성과 예약 실행 모두 중지 | 미게시 item은 실행하지 않음 |
+**상태 확인은 한 곳**: `GET /api/admin/ai-user/effective-gates`(backend가 orchestrator `/admin/trigger/effective-gates`를 프록시, orchestrator 미응답 시 502) — 위 5단계 전부와 `nightly_snapshot_unrestored`(§8)를 포함한 게이트 17개 + `generationAllowed`/`publishingAllowed`/`reasons[]`를 한 번에 반환한다. 어드민 `/admin/ai-user` 화면 `EffectiveGatesPanel`이 이 값을 그대로 보여준다. 이 응답은 **전체 요약**이지 서비스별 정밀 시뮬레이션이 아니다 — 예를 들어 `PairedPostScheduler`는 `ai_user_kill_switch`/`schedule_execution_paused`를 직접 읽지 않는다(1·5단계로만 실제 정지).
 
 신고가 `PENDING`인 경우에는 위 제어를 자동으로 변경하지 않는다. 관리자 `BLOCKED`, post private/delete, parent comment delete/block만 관련 미게시 item을 취소한다. 실제 사람/AI 작성 여부에 관계없이 notification은 backend의 정상 게시 경로로 보낸다.
 
@@ -216,6 +211,24 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 
 스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프) /
 `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
+
+### provider 스냅샷 영속화 및 stale 복원 (2026-09-03)
+
+`nightly-ai-user-batch.sh`가 `provider_*`를 임시로 `CLAUDE`로 켜기 전 원래 값을 DB
+`ai_provider_snapshot`(V21, singleton, `restored_at`) 테이블에 먼저 저장한다(기존엔 스크립트
+로컬 변수에만 있어 스크립트가 죽으면 원래 값이 유실됐다). 정상 종료 시 스크립트 자신이
+`updated_by='nightly-batch-restore'`로 복원하고 `restored_at`을 마크한다.
+
+스크립트 시작 시점에도 `restored_at IS NULL`(전날 실행이 SIGKILL 등으로 죽어 복원 못 한 경우)을
+먼저 확인해 원복 후 진행한다(`updated_by='nightly-batch-stale-restore'`). 이 자체 방어와 별개로
+orchestrator `NightlyProviderStaleReconciler`가 **매시 정각+7초** cron으로 같은 조건(`restored_at
+IS NULL AND updated_by='nightly-batch'`)에 **3시간 유예**를 더해 재확인한다 — 스크립트가 다음 날
+03:05까지 아예 재기동되지 않는 최악의 경우에도 최대 3시간 안에 provider가 `CLAUDE`에 고정된 채
+방치되지 않는다. 복원 시 마찬가지로 `updated_by='nightly-batch-stale-restore'`를 남겨 감사 로그로
+구분한다(정상 복원=`nightly-batch-restore`, 지연 복원=`nightly-batch-stale-restore`).
+
+3시간 유예 창 안에서는 `GET /api/admin/ai-user/effective-gates`의 `nightly_snapshot_unrestored`
+게이트(§3)가 `true`로 즉시(유예 없이) 노출되므로, 리컨실러가 돌기 전에도 수동 개입할 수 있다.
 
 ### 새벽 fill — claim 재시도 · LLM 상한 · 부족분 텔레그램
 

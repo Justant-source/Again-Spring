@@ -82,6 +82,13 @@ last_updated: 2026-09-01
 | `ASM_REQUEST_TIMEOUT_MS` | backend → ASM 일반 요청 timeout | `30000` (2026-08-15, 기존 `10000`) |
 | `ASM_STATS_REQUEST_TIMEOUT_MS` | backend → ASM 긴 읽기 (통계 collect · X inbox/outbound Playwright) | `300000` |
 
+## LLM 오류 시그니처 · 안전 정책 경로
+
+| 변수 | 설명 | 기본값 |
+|---|---|---|
+| `LLM_ERROR_SIGNATURES_PATH` | `docs/shared/policies/llm-error-signatures.json` SSOT의 경로 override. backend·llm-ai-user·orchestrator·ai-learning 4곳 모두 이 env를 본다(각 로더의 `LlmErrorSignatures`/`llm_error_signatures.py`). 보통 미설정 — `:ro` 마운트 경로(`/app/shared/docs/policies/llm-error-signatures.json`)를 그대로 쓴다 | `/app/shared/docs/policies/llm-error-signatures.json` (마운트 경로 폴백) |
+| `SAFETY_CRISIS_KEYWORDS_PATH` | backend `CrisisKeywordGuard`가 읽는 위기 관제 키워드 파일 경로(`safety.crisis-keywords-path`). 판정은 audit(`CrisisDetectedEvent`)일 뿐 게시를 막지 않는다 — 과거 `SAFETY_FORBIDDEN_WORDS_PATH`(금지어 필터, `KeywordGuard` 삭제와 함께 폐기)와 혼동 금지 | `classpath:/safety/crisis-keywords.yml` |
+
 ## 마케팅 (Again-Spring & ASM)
 
 | 변수 | 기본값 | 설명 |
@@ -143,6 +150,8 @@ last_updated: 2026-09-01
 | `PAIRED_POST_PARTNER_PUBLISH_BATCH_SIZE` | 상대방 제출 배치 크기 | `5` |
 | `PAIRED_POST_AUTHOR_SLOT_FROM_HOUR` | 작성자 홀딩 슬롯 샘플 시작(KST hour) | `7` |
 | `PAIRED_POST_AUTHOR_SLOT_TO_HOUR` | 작성자 홀딩 슬롯 샘플 끝(KST hour, exclusive-ish) | `23` |
+| `AI_USER_MAX_POST_CHARS` | `ContentSafetyGuard` 글 길이 상한. SSOT=backend DTO(`PostCreateRequest.bodyRaw` `@Size(max=1000)`) — 값을 바꾸려면 이 env가 아니라 backend DTO를 먼저 바꾼다 | `1000` |
+| `AI_USER_MAX_COMMENT_CHARS` | `ContentSafetyGuard` 댓글/대댓글 길이 상한. SSOT=backend DTO(`CommentRequest.body` `@Size(max=1000)`) | `1000` |
 
 중요:
 

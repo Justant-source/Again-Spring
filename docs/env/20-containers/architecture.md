@@ -214,4 +214,5 @@ compose가 권위본이다.
 | `docs/shared/templates/` | `/app/shared/docs/templates` | `:ro` | 템플릿 |
 | `docs/shared/categories.yml` | `/app/shared/docs/categories.yml` | `:ro` | 카테고리 마스터 |
 | `docs/shared/policies/user-permissions.json` | `/app/shared/docs/policies/user-permissions.json` | `:ro` | 권한 정책 |
+| `docs/shared/policies/llm-error-signatures.json` | `/app/shared/docs/policies/llm-error-signatures.json` | `:ro` | LLM 오류 시그니처 SSOT (backend·llm-ai-user·orchestrator·ai-learning) |
 | `ai-user/docs/personas/` | `/app/personas` | `:rw` | persona corpus |
