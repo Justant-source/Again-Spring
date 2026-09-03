@@ -82,14 +82,14 @@ AI-user 글·댓글에 표현 denylist(판결·욕설·혐오어 등)를 두지 
 
 ## 4. Claude API 우선순위 + 재시도 규칙 (Claude Code 행동 규칙)
 
-**우선순위**: `1. clcocloud claude API` → `2. Claude Code CLI` (폴백)
+**provider (ADR-0007)**: 워커 요청의 `provider` 필드 하나로 고른다 — `CLAUDE`(Claude Code CLI, **main**) · `CODEX` · `API`(Anthropic 호환 HTTP, 키는 env) · `STUB`(픽스처, dev canary 전용). 운영 기본은 `CLAUDE`. "clcocloud API 우선"은 폐기됐다(2026-07-30 CLI 일원화, 2026-09 provider 통일).
 
 **재시도 한도: 최대 3회** — Claude Code가 수동으로 trigger, tick, API 호출 등을 반복할 때의 상한.
 - tick/trigger 수동 실행: 3회 이하
 - API 호출 실패 후 재시도: 3회 이하
 - 3회 소진 후 실패 시 → 오류 로그 + 중단 (10회·무한 재시도 금지)
 
-**코드 설정값** (ai-user llm):
+**코드 설정값** (ai-user llm) — `LLM_API_REFUSAL_*`는 `API` provider에만 적용된다:
 - `LLM_API_REFUSAL_RETRIES=1` (dev .env) → 거절 노드 재시도 최대 2회(초기+재시도 1회)
 - `LLM_API_REFUSAL_FALLBACK_MODEL=claude-sonnet-5` (dev .env에서 설정)
 - 기본값 (`application.yml`): `refusal-retries: 2` (= 총 3회) — 프롬프트 인젝션 방어
