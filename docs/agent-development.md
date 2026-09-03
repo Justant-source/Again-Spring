@@ -51,7 +51,7 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | DB migration·JPA domain | `docs/backend/40-data.md` |
 | 포트·compose·nginx | `docs/shared/20-containers.md`, `docs/env/20-containers/architecture.md`, README 포트표 |
 | 환경변수 | `docs/env/40-data.md`, README |
-| LLM 안전·프롬프트·오류 시그니처 | `.claude/rules/llm-safety.md` |
+| LLM 안전·프롬프트·오류 시그니처 | `docs/shared/policies/llm-error-signatures.json`, `.claude/rules/llm-safety.md` |
 | FE 디자인 토큰·global style | `docs/frontend/70-policy/design-system.md` |
 | FE test id·journey 변화 | `frontend/tests/e2e-realbe/support/selectors.ts`, `docs/frontend/70-policy/testing.md` |
 

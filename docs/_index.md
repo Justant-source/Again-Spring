@@ -62,6 +62,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | `docs/shared/prompts/` | LLM 프롬프트 | 컨테이너 `/app/shared/docs/prompts` (backend) | backend restart |
 | `docs/shared/categories.yml` | 분류 정의 | 컨테이너 categories.yml (backend) | backend restart |
 | `docs/shared/policies/user-permissions.json` | 권한 정책 | 컨테이너 policies/ (backend) | backend restart |
+| `docs/shared/policies/llm-error-signatures.json` | LLM 오류·거절·누출 시그니처 SSOT | 컨테이너 `/app/shared/docs/policies/` (backend·llm-ai-user·orchestrator·ai-learning) | 각 컨테이너 restart |
 | `docs/shared/templates/` | 마케팅 템플릿 | 컨테이너 templates/ (ASM) | ASM restart |
 
 정책 **문서**는 `docs/shared/70-policy/` 에 있다. JSON 자산은 `docs/shared/policies/` 에 남긴다.
