@@ -312,11 +312,7 @@ public class PairedPostScheduler {
     private Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
                                        String preferredSource) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
-        String provider = config == null ? props.getThreadPlan().getAiPostProvider()
-                : config.getProviderAiPostBundle();
-        if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
-            provider = props.getThreadPlan().getAiPostProvider();
-        }
+        String provider = config == null ? props.getThreadPlan().getAiPostProvider() : config.getProviderAiPostBundle();
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
             log.info("[PairedPost] Call1 skipped: provider OFF corrId={}", corrId);
             return Call1Attempt.skipped("provider OFF");

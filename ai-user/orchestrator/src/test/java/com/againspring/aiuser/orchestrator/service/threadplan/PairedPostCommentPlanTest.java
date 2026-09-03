@@ -149,8 +149,12 @@ class PairedPostCommentPlanTest {
         assertThat(req.getValue().get("existingBody")).isEqualTo("작성자 본문");
     }
 
+    /**
+     * DB provider is SSOT (Task 4.2): OFF must stay OFF and never fall back to the yml default,
+     * even for paired-post Phase2 generation. Generation is skipped entirely — plan stays REQUESTED.
+     */
     @Test
-    void ensureCommentPlanUsesYmlProviderWhenDbProvidersAreOff() {
+    void ensureCommentPlanSkipsGenerationWhenDbProviderOff() {
         AiThreadPlan plan = AiThreadPlan.builder()
                 .id("plan-paired-1")
                 .postId("post_paired")
@@ -166,58 +170,15 @@ class PairedPostCommentPlanTest {
         when(planRepository.save(plan)).thenReturn(plan);
         when(generationConfig.getProviderAiPostBundle()).thenReturn("OFF");
         when(generationConfig.getCandidatePoolSize()).thenReturn(8);
-        when(threadPlanConfig.getAiPostProvider()).thenReturn("CLAUDE");
-        when(threadPlanConfig.getAiPostModel()).thenReturn("claude-test");
-        when(threadPlanConfig.getPlanPersonaCastMax()).thenReturn(12);
-        when(threadPlanConfig.getBundleTimeoutMs()).thenReturn(60_000L);
-        when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(1);
-        when(threadPlanConfig.getReadyMinItems()).thenReturn(1);
-        when(threadPlanConfig.getStanceShareMax()).thenReturn(0.8);
-        when(personaRepository.findByActiveTrue()).thenReturn(List.of(persona("p1")));
-        when(planPersonaMapper.mapCast(anyList())).thenReturn(List.of(Map.of("id", "p1")));
-        when(planPersonaMapper.castIds(anyList())).thenReturn(Set.of("p1"));
-        when(personaRepository.existsById("p1")).thenReturn(true);
-        when(safetyGuard.check(anyString(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
-        when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        Instant scheduled = Instant.parse("2026-08-02T19:00:00Z");
-        when(llmClient.generateThreadPlan(any())).thenReturn(Optional.of(Map.of(
-                "items", List.of(Map.of(
-                        "ref", "c1",
-                        "personaId", "p1",
-                        "body", "양쪽 입장 다 이해돼요 충분함",
-                        "parentRef", "",
-                        "scheduledAt", scheduled.toString()
-                ))
-        )));
-
-        AtomicInteger finds = new AtomicInteger();
-        when(planRepository.findById("plan-paired-1")).thenAnswer(inv -> {
-            if (finds.getAndIncrement() < 3) {
-                return Optional.of(plan);
-            }
-            plan.setStatus(ThreadPlanStatus.ACTIVE);
-            return Optional.of(plan);
-        });
-        doAnswer(inv -> {
-            plan.setStatus(ThreadPlanStatus.READY);
-            return null;
-        }).when(planService).markReady("plan-paired-1");
-        doAnswer(inv -> {
-            plan.setStatus(ThreadPlanStatus.ACTIVE);
-            return null;
-        }).when(planService).activate("plan-paired-1");
+        when(planRepository.findById("plan-paired-1")).thenReturn(Optional.of(plan));
 
         boolean ok = service.ensureCommentPlanForPairedPost(
                 "post_paired", 2, "제목", "작성자 본문", "상대방 본문", "MARRIED");
 
-        assertThat(ok).isTrue();
-        assertThat(plan.getSourceType()).isEqualTo("AI_POST");
-        assertThat(plan.getSourceBody()).contains("[작성자]", "[상대방]");
-        ArgumentCaptor<Map<String, Object>> req = ArgumentCaptor.forClass(Map.class);
-        verify(llmClient, atLeastOnce()).generateThreadPlan(req.capture());
-        assertThat(req.getValue().get("provider")).isEqualTo("CLAUDE");
-        assertThat(req.getValue().get("kind")).isEqualTo("AI_POST");
-        verify(planService).markGenerating("plan-paired-1", "CLAUDE", "claude-test");
+        assertThat(ok).isFalse();
+        assertThat(plan.getStatus()).isEqualTo(ThreadPlanStatus.REQUESTED);
+        verify(llmClient, never()).generateThreadPlan(any());
+        verify(planService, never()).markGenerating(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -363,7 +324,6 @@ class PairedPostCommentPlanTest {
 
     private void stubPhaseGeneration(AiThreadPlan plan, String planId) {
         when(generationConfig.getProviderAiPostBundle()).thenReturn("CLAUDE");
-        when(threadPlanConfig.getAiPostProvider()).thenReturn("CLAUDE");
         when(threadPlanConfig.getAiPostModel()).thenReturn("claude-test");
         when(threadPlanConfig.getPlanPersonaCastMax()).thenReturn(12);
         when(threadPlanConfig.getBundleTimeoutMs()).thenReturn(60_000L);

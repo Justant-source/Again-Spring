@@ -148,4 +148,19 @@ class ThreadPlanGenerationServiceTest {
         assertThat(result.atZone(ActivityCurve.KST).getMinute()).isEqualTo(0);
     }
 
+    @Test
+    void dbProviderOffIsNotOverriddenByYml() {
+        com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig cfg =
+                mock(com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig.class);
+        when(cfg.getProviderAiPostBundle()).thenReturn("OFF");
+        assertThat(service.resolveProviderForTest("AI_POST", cfg)).isEqualTo("OFF");
+    }
+
+    @Test
+    void missingConfigRowFallsBackToYml() {
+        when(threadPlanConfig.getAiPostProvider()).thenReturn("CODEX");
+        when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
+        assertThat(service.resolveProviderForTest("AI_POST", null)).isEqualTo("CODEX");
+    }
+
 }

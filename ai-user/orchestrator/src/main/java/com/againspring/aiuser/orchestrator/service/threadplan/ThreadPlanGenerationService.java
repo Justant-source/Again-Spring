@@ -110,7 +110,7 @@ public class ThreadPlanGenerationService {
             log.warn("Phase1 plan {} for post {} is {} — skip", plan.getId(), postId, plan.getStatus());
             return false;
         }
-        generatePhase(plan.getId(), true, PHASE1_MAX_TOP_LEVEL, PHASE1_MAX_REPLIES,
+        generatePhase(plan.getId(), PHASE1_MAX_TOP_LEVEL, PHASE1_MAX_REPLIES,
                 PHASE1_READY_MIN_TOP_LEVEL, PHASE1_READY_MIN_ITEMS, t0, partnerAt, false);
         return planReadyOrActive(plan.getId(), postId, "Phase1");
     }
@@ -156,7 +156,7 @@ public class ThreadPlanGenerationService {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
         int roots = Math.min(14, pool);
-        generatePhase(plan.getId(), true, roots, pool - roots,
+        generatePhase(plan.getId(), roots, pool - roots,
                 properties.getThreadPlan().getReadyMinTopLevel(),
                 properties.getThreadPlan().getReadyMinItems(),
                 origin, null, true);
@@ -270,18 +270,10 @@ public class ThreadPlanGenerationService {
 
     /** One retry only, with exactly the same provider/model snapshot. */
     public void generateOne(String planId) {
-        generateOne(planId, false);
-    }
-
-    /**
-     * @param fallbackToYmlWhenOff when true, use application.yml providers if DB config is OFF
-     *        (paired AI posts must ship with scheduled comments even outside the nightly window)
-     */
-    public void generateOne(String planId, boolean fallbackToYmlWhenOff) {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
         int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
         int roots = Math.min(14, pool);
-        generatePhase(planId, fallbackToYmlWhenOff, roots, pool - roots,
+        generatePhase(planId, roots, pool - roots,
                 properties.getThreadPlan().getReadyMinTopLevel(),
                 properties.getThreadPlan().getReadyMinItems(),
                 null, null, false);
@@ -293,7 +285,7 @@ public class ThreadPlanGenerationService {
      * @param partnerAtExclusive when non-null, clamp all scheduledAt strictly before this (phase1)
      * @param clampOnOrAfterOrigin when true and origin non-null, clamp scheduledAt on/after origin (phase2)
      */
-    private void generatePhase(String planId, boolean fallbackToYmlWhenOff,
+    private void generatePhase(String planId,
                                int maxTopLevel, int maxReplies,
                                int readyMinTopLevel, int readyMinItems,
                                Instant scheduleOrigin,
@@ -305,7 +297,7 @@ public class ThreadPlanGenerationService {
             return;
         }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
-        String provider = resolveProvider(plan.getSourceType(), config, fallbackToYmlWhenOff);
+        String provider = resolveProvider(plan.getSourceType(), config);
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) return;
         String model = "AI_POST".equals(plan.getSourceType()) ? properties.getThreadPlan().getAiPostModel()
                 : properties.getThreadPlan().getHumanPlanModel();
@@ -340,22 +332,17 @@ public class ThreadPlanGenerationService {
         }
     }
 
-    private String resolveProvider(String sourceType, AiUserGenerationConfig config, boolean fallbackToYmlWhenOff) {
+    /** DB provider가 SSOT. OFF면 OFF다(관리자 결정을 yml이 뒤집지 않는다). row 자체가 없을 때만 yml 기본값. */
+    private String resolveProvider(String sourceType, AiUserGenerationConfig config) {
         boolean aiPost = "AI_POST".equals(sourceType);
-        String yml = aiPost ? properties.getThreadPlan().getAiPostProvider()
-                : properties.getThreadPlan().getHumanPlanProvider();
         if (config == null) {
-            return yml;
+            return aiPost ? properties.getThreadPlan().getAiPostProvider() : properties.getThreadPlan().getHumanPlanProvider();
         }
         String fromDb = aiPost ? config.getProviderAiPostBundle() : config.getProviderHumanPostPlan();
-        if (fromDb != null && !fromDb.isBlank() && !"OFF".equalsIgnoreCase(fromDb)) {
-            return fromDb;
-        }
-        if (fallbackToYmlWhenOff) {
-            return yml;
-        }
-        return fromDb;
+        return (fromDb == null || fromDb.isBlank()) ? "OFF" : fromDb;
     }
+
+    String resolveProviderForTest(String sourceType, AiUserGenerationConfig config) { return resolveProvider(sourceType, config); }
 
     private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int maxTopLevel, int maxReplies) {
         // Full active pool for rotation (no fixed limit(24)) — but a single request's cast is
@@ -468,8 +455,7 @@ public class ThreadPlanGenerationService {
             return Optional.empty();
         }
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
-        // Daytime hold replay may have DB provider OFF — fall back to yml like paired paths.
-        String provider = resolveProvider("HUMAN_POST", config, true);
+        String provider = resolveProvider("HUMAN_POST", config);
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
             log.warn("Plan {} quality regen skipped: HUMAN_POST provider OFF", planId);
             return Optional.empty();
