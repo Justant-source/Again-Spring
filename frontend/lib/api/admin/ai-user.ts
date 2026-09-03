@@ -209,3 +209,27 @@ export async function getHourlyDistribution(hours?: number): Promise<HourlyDistr
   const res = await api.get(`/api/admin/ai-user/hourly-distribution?${params.toString()}`);
   return res.data;
 }
+
+// ── Effective Gates (env/yml/DB/LLM 게이트 해석 결과) ─────────────────────
+
+/** 개별 게이트 1건. `value`는 boolean(on/off) 또는 provider 문자열('CLAUDE'/'OFF' 등)이다. */
+export interface EffectiveGate {
+  name: string;
+  source: 'env' | 'yml' | 'db';
+  value: boolean | string;
+  blocks: string;
+}
+
+export interface EffectiveGates {
+  generationAllowed: boolean;
+  publishingAllowed: boolean;
+  reasons: string[];
+  gates: EffectiveGate[];
+  /** orchestrator가 stale 스냅샷을 감지했을 때만 채워짐. 아직 미배선. */
+  stale?: boolean;
+}
+
+export async function getEffectiveGates(): Promise<EffectiveGates> {
+  const res = await api.get('/api/admin/ai-user/effective-gates');
+  return res.data;
+}

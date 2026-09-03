@@ -12,6 +12,7 @@ import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { ActionFeed } from '@/components/admin/ai-user/ActionFeed';
 import { PersonaPerformanceTable } from '@/components/admin/ai-user/PersonaPerformanceTable';
 import { HourlyDistributionChart } from '@/components/admin/ai-user/HourlyDistributionChart';
+import { EffectiveGatesPanel } from '@/components/admin/ai-user/EffectiveGatesPanel';
 import {
   getGenerationConfig,
   updateGenerationConfig,
@@ -460,6 +461,9 @@ export default function AiUserPage() {
       {/* 에러 / 성공 메시지 */}
       {error    && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       {savedMsg && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{savedMsg}</div>}
+
+      {/* 게이트 해석 — allOff 배지가 못 드러내는 yml/env/LLM 게이트를 여기서 확인 */}
+      <EffectiveGatesPanel />
 
       {/* 탭 구조 */}
       <Tabs defaultValue="settings" className="w-full">
