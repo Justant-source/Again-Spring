@@ -19,7 +19,7 @@ last_updated: 2026-09-02
 | 50-api | `50-api.md` 🏛 | — | `50-api/` (6) 🏛 | — | — | `50-api.md` |
 | 60-runtime | `60-runtime/` (3) | `60-runtime/` (6) | `60-runtime.md` | `60-runtime/` (3) | `60-runtime/` (4) | `60-runtime.md` |
 | 70-policy | `70-policy.md` | `70-policy/` (7) | `70-policy/` (9) | `70-policy/` (2) | — | `70-policy/` (7) |
-| 90-adr | — | — | `90-adr/` (7) 🏛 | — | — | — |
+| 90-adr | — | — | `90-adr/` (8) 🏛 | — | — | — |
 
 루트: `docs/_index.md` · `docs/agent-development.md` · `docs/ai-user/history.md` · `docs/_active/` (계층 밖).
 런타임 JSON: `docs/shared/policies/user-permissions.json` (이동 금지).
@@ -32,7 +32,7 @@ last_updated: 2026-09-02
 history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 삭제한다 — 이 디렉토리는 항상
 "지금 진행 중인 것"만 담는다.
 
-🏛 = 그 주제의 전역 권위본. `(n)` = 디렉터리 안 본문 파일 수(README 제외). ADR 본문은 0000–0006 일곱 개(+ README).
+🏛 = 그 주제의 전역 권위본. `(n)` = 디렉터리 안 본문 파일 수(README 제외). ADR 본문은 0000–0007 여덟 개(+ README).
 
 ## §2. 작업별 진입 문서
 

@@ -1,7 +1,7 @@
 # ADR-0003: LLM Consolidated to Claude Code CLI
 
 **Date**: 2026-06-02
-**Status**: ✅ Accepted
+**Status**: ⛔ Superseded by [ADR-0007](./0007-llm-provider-abstraction-and-stateless-worker.md) (2026-09) — CLI 단일화·API 키 제거·`/root/.claude` 마운트·`api/llm/RemoteLlmProvider` 경로 서술은 현행과 다르다. 역사 기록으로만 남긴다.
 **Deciders**: Backend infrastructure team
 **Related ADRs**: [ADR-0001](./0001-pivot-to-community-plaza.md) (pivot context)
 

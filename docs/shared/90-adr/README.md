@@ -14,3 +14,4 @@ last_updated: 2026-08-31
 | [0004-onboarding-mbti-hidden-not-removed.md](0004-onboarding-mbti-hidden-not-removed.md) | 온보딩 숨김 | |
 | [0005-marketing-automation-retained-unchanged.md](0005-marketing-automation-retained-unchanged.md) | 마케팅 분리 | |
 | [0006-legacy-deletion-and-git-recovery.md](0006-legacy-deletion-and-git-recovery.md) | 삭제 원장 | |
+| [0007-llm-provider-abstraction-and-stateless-worker.md](0007-llm-provider-abstraction-and-stateless-worker.md) | provider 추상화·환경 인지·무상태 워커 (0003 supersede) | 🏛 |
