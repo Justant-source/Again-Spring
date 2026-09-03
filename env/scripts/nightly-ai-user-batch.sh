@@ -113,6 +113,10 @@ snapshot_providers() {
   SNAP_AI_POST=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $1}')")
   SNAP_HUMAN_POST=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $2}')")
   SNAP_HUMAN_INTERACTION=$(sanitize_provider "$(printf '%s' "$row" | awk '{print $3}')")
+  db "INSERT INTO ai_provider_snapshot (id, provider_ai_post_bundle, provider_human_post_plan, provider_human_interaction, taken_at, taken_by, restored_at)
+      VALUES (1, '${SNAP_AI_POST}', '${SNAP_HUMAN_POST}', '${SNAP_HUMAN_INTERACTION}', UTC_TIMESTAMP(3), 'nightly-batch', NULL)
+      ON DUPLICATE KEY UPDATE provider_ai_post_bundle=VALUES(provider_ai_post_bundle), provider_human_post_plan=VALUES(provider_human_post_plan),
+      provider_human_interaction=VALUES(provider_human_interaction), taken_at=VALUES(taken_at), taken_by='nightly-batch', restored_at=NULL;" || { log "ERROR: snapshot persist failed"; return 1; }
   PROVIDERS_SNAPSHOTTED=1
   log "provider snapshot: ai_post=${SNAP_AI_POST} human_post=${SNAP_HUMAN_POST} human_interaction=${SNAP_HUMAN_INTERACTION}"
   return 0
@@ -125,7 +129,16 @@ restore_providers() {
   fi
   log "trap: restoring providers to snapshot ai_post=${SNAP_AI_POST} human_post=${SNAP_HUMAN_POST} human_interaction=${SNAP_HUMAN_INTERACTION}"
   db "UPDATE ai_user_generation_config SET provider_ai_post_bundle=\"${SNAP_AI_POST}\", provider_human_post_plan=\"${SNAP_HUMAN_POST}\", provider_human_interaction=\"${SNAP_HUMAN_INTERACTION}\", updated_by=\"nightly-batch-restore\", updated_at=UTC_TIMESTAMP() WHERE id=1;" || true
+  db "UPDATE ai_provider_snapshot SET restored_at=UTC_TIMESTAMP(3) WHERE id=1;" || true
 }
+
+# 직전 실행이 SIGKILL 등으로 죽어 복원이 안 된 경우(restored_at IS NULL) — 먼저 원복하고 시작한다.
+STALE=$(db "SELECT COUNT(*) FROM ai_provider_snapshot s JOIN ai_user_generation_config c ON c.id=1 WHERE s.id=1 AND s.restored_at IS NULL AND c.updated_by='nightly-batch';" || echo 0)
+if [ "${STALE:-0}" -gt 0 ]; then
+  log "WARN: previous nightly snapshot not restored — restoring before new run"
+  db "UPDATE ai_user_generation_config c JOIN ai_provider_snapshot s ON s.id=1 SET c.provider_ai_post_bundle=s.provider_ai_post_bundle, c.provider_human_post_plan=s.provider_human_post_plan, c.provider_human_interaction=s.provider_human_interaction, c.updated_by='nightly-batch-stale-restore', c.updated_at=UTC_TIMESTAMP() WHERE c.id=1;" || true
+  db "UPDATE ai_provider_snapshot SET restored_at=UTC_TIMESTAMP(3) WHERE id=1;" || true
+fi
 
 trap restore_providers EXIT
 
