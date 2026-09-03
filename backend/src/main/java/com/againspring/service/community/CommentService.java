@@ -63,8 +63,8 @@ public class CommentService {
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
 
         // 위기 감지
-        syntheticOutputGuard.assertPublishable(authorId, body);
-        if (!syntheticOutputGuard.isSynthetic(authorId)) {
+        boolean synthetic = syntheticOutputGuard.assertPublishableIfSynthetic(authorId, body);
+        if (!synthetic) {
             CrisisScanResult crisis = crisisKeywordGuard.scan(body);
             if (crisis.crisis()) {
                 eventPublisher.publishEvent(new CrisisDetectedEvent(this, authorId, null, crisis.patterns()));
@@ -137,8 +137,8 @@ public class CommentService {
         }
 
         // 위기 감지
-        syntheticOutputGuard.assertPublishable(userId, body);
-        if (!syntheticOutputGuard.isSynthetic(userId)) {
+        boolean synthetic = syntheticOutputGuard.assertPublishableIfSynthetic(userId, body);
+        if (!synthetic) {
             CrisisScanResult crisis = crisisKeywordGuard.scan(body);
             if (crisis.crisis()) {
                 eventPublisher.publishEvent(new CrisisDetectedEvent(this, userId, null, crisis.patterns()));

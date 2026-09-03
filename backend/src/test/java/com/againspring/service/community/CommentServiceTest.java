@@ -121,7 +121,7 @@ class CommentServiceTest {
         String body = "Your credit balance is too low to access the Anthropic API.";
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).build()));
         doThrow(new BusinessException(SyntheticOutputGuard.CODE, "AI 출력 오류 문자열은 게시할 수 없습니다", 422))
-                .when(syntheticOutputGuard).assertPublishable(eq("ai_persona_1"), eq(body));
+                .when(syntheticOutputGuard).assertPublishableIfSynthetic(eq("ai_persona_1"), eq(body));
 
         assertThatThrownBy(() -> commentService.addComment(POST_ID, null, "ai_persona_1", body))
                 .isInstanceOf(BusinessException.class)
@@ -135,7 +135,7 @@ class CommentServiceTest {
     void addComment_realUserSameErrorStringIsPublished() {
         String body = "Your credit balance is too low to access the Anthropic API.";
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId("other-user").build()));
-        when(syntheticOutputGuard.isSynthetic("real_user_1")).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic("real_user_1", body)).thenReturn(false);
         when(crisisKeywordGuard.scan(eq(body))).thenReturn(CrisisScanResult.none());
         when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // syntheticOutputGuard는 실사용자에 대해 stub 없이도(fail-open) 아무 것도 던지지 않는다.
@@ -178,7 +178,7 @@ class CommentServiceTest {
         String body = "이제 정말 죽고싶다는 생각뿐입니다.";
         String authorId = "user-1";
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId(authorId).build()));
-        when(syntheticOutputGuard.isSynthetic(authorId)).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic(authorId, body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(new CrisisScanResult(true, List.of("죽고싶")));
         when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -202,7 +202,7 @@ class CommentServiceTest {
         String body = "오늘 점심 뭐 먹지 고민입니다.";
         String authorId = "user-1";
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId(authorId).build()));
-        when(syntheticOutputGuard.isSynthetic(authorId)).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic(authorId, body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

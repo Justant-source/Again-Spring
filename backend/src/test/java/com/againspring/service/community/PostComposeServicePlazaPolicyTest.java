@@ -56,7 +56,7 @@ class PostComposeServicePlazaPolicyTest {
     void compose_doesNotBlockAnyWording() {
         String body = "결국 경찰 신고와 민사 소송, 그리고 공론화를 결심했습니다. "
                 + "억울하게 피해자가 먼저 떠나야 하는 상황은 절대 만들고 싶지 않습니다.";
-        when(syntheticOutputGuard.isSynthetic("user_bot")).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic("user_bot", body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -77,7 +77,7 @@ class PostComposeServicePlazaPolicyTest {
     @DisplayName("위기 키워드 감지 시에도 게시는 계속되고 CrisisDetectedEvent가 감사 로그용으로 발행된다")
     void compose_crisisDetected_stillPublishesAndEmitsAuditEvent() {
         String body = "이제 정말 죽고싶다는 생각뿐입니다.";
-        when(syntheticOutputGuard.isSynthetic("user_real")).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic("user_real", body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(new CrisisScanResult(true, List.of("죽고싶")));
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -104,7 +104,7 @@ class PostComposeServicePlazaPolicyTest {
     @DisplayName("위기 키워드 미감지 시 CrisisDetectedEvent는 발행되지 않는다")
     void compose_noCrisis_neverPublishesCrisisDetectedEvent() {
         String body = "평범한 일상 이야기입니다.";
-        when(syntheticOutputGuard.isSynthetic("user_real")).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic("user_real", body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -123,7 +123,7 @@ class PostComposeServicePlazaPolicyTest {
     void compose_rejectsSyntheticAuthorErrorOutput() {
         String body = "Your credit balance is too low to access the Anthropic API.";
         doThrow(new BusinessException(SyntheticOutputGuard.CODE, "AI 출력 오류 문자열은 게시할 수 없습니다", 422))
-                .when(syntheticOutputGuard).assertPublishable(eq("ai_persona_1"), eq(body));
+                .when(syntheticOutputGuard).assertPublishableIfSynthetic(eq("ai_persona_1"), eq(body));
 
         assertThatThrownBy(() -> composeService.composeAndPublish(
                 "ai_persona_1", "제목", body,
@@ -138,7 +138,7 @@ class PostComposeServicePlazaPolicyTest {
     @DisplayName("실사용자가 동일한 오류 문자열을 쓰더라도 SyntheticOutputGuard는 막지 않는다(fail-open)")
     void compose_realUserSameErrorStringIsPublished() {
         String body = "Your credit balance is too low to access the Anthropic API.";
-        when(syntheticOutputGuard.isSynthetic("real_user_1")).thenReturn(false);
+        when(syntheticOutputGuard.assertPublishableIfSynthetic("real_user_1", body)).thenReturn(false);
         when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));

@@ -147,9 +147,9 @@ public class PostComposeService {
                                   String hookEmotion) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
-        syntheticOutputGuard.assertPublishable(authorId, bodyRaw);
+        boolean synthetic = syntheticOutputGuard.assertPublishableIfSynthetic(authorId, bodyRaw);
         // 실사용자 위기 키워드 관제(docs/frontend/60-runtime/flows/08-crisis.md): 게시는 계속, 감사 로그만. AI-user 본문엔 적용하지 않는다.
-        if (!syntheticOutputGuard.isSynthetic(authorId)) {
+        if (!synthetic) {
             CrisisScanResult crisis = crisisKeywordGuard.scan(bodyRaw);
             if (crisis.crisis()) {
                 log.warn("Crisis keyword detected on post compose author={} patterns={} — publishing anyway (plaza policy)",
