@@ -14,7 +14,7 @@
 |---|---|---|
 | [01-auth.md](./01-auth.md) | 가입·로그인·게스트·OAuth (`next=/s/{token}` 보존) | ✅ 유지 |
 | [02-permissions.md](./02-permissions.md) | 권한 시스템 (3-tier, TESTER role) | ✅ 유지 |
-| [08-crisis.md](./08-crisis.md) | 위기 감지·CrisisResourceModal | 🔄 전면 재작성 필요 |
+| [08-crisis.md](./08-crisis.md) | 위기 감지 (서버 감사 로그만, 클라이언트 모달 없음) | 🔄 전면 재작성 필요 |
 | [09-admin.md](./09-admin.md) | 관리자 대시보드 | 🔄 전면 재작성 필요 |
 | [09-partner-invite-ownership.md](./09-partner-invite-ownership.md) | 상대 초대 소유권·claim·삭제 tombstone·시한부 투표 제거 | ✅ SSOT (2026-08-11) |
 
@@ -107,7 +107,7 @@ flowchart TD
 ### 3. 게시글 상세 (`/community/[id]`)
 1. 투표 버튼 (작성자/상대방, 로그인 필요) — **마감/시한부 없음**(상시 공감 투표)
 2. 댓글 무한스크롤 (로그인 필요)
-3. 위기 컨텐츠: CrisisResourceModal 표시
+3. 위기 컨텐츠: 클라이언트 모달 없음 — `CrisisKeywordGuard.scan` 감지 시 게시는 그대로 진행, 서버 감사 로그만 기록
 4. 쪽별 tombstone / 완전 삭제 시 「삭제된 게시글」+ 광장 CTA — [09-partner-invite-ownership.md](./09-partner-invite-ownership.md)
 
 ### 3b. 상대 초대 (`/s/[token]`)

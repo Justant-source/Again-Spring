@@ -24,7 +24,7 @@
 - [ ] 투표 비율: 실제값만 표시 (임의값 금지)
 - [ ] 작성자/상대방 진영색 일관
 - [ ] 댓글 섹션: 로그인 미작성 사용자는 댓글 아이콘에 로그인 유도
-- [ ] 위기 컨텐츠: CrisisResourceModal 표시 시 닫기 버튼만 가능 (ESC/바깥클릭 차단)
+- [ ] 위기 컨텐츠: 클라이언트 모달 없음 — `CrisisKeywordGuard.scan` 감지 시에도 게시는 그대로 진행, 서버 감사 로그(`com.againspring.safety.audit`)만 남음
 
 ### 알림 (`/notifications`)
 - [ ] 읽음 처리 후 30일 자동 삭제 (UX: 명시)
@@ -175,10 +175,8 @@
 ## 3. 상황별 체크리스트
 
 ### 위기 컨텐츠 처리
-- [ ] CrisisResourceModal 표시 (관리자 crisis flag 또는 키워드 자동 감지 시)
-- [ ] 핫라인 번호 정확 (1366, 1393, 132 등)
-- [ ] 닫기: 명시적 버튼만 (ESC/바깥클릭 차단 의도적)
-- [ ] 라이선스: 외부 자원 링크 (클릭 후 외부로 이동)
+- [ ] 클라이언트 위기 모달 없음 — 광장형 정책상 게시는 차단하지 않는다
+- [ ] `CrisisKeywordGuard.scan` 감지 시 `CrisisDetectedEvent` → 서버 감사 로그(`com.againspring.safety.audit`, 본문 비노출)만 기록
 
 ### 색상 일관성
 - [ ] A측 (작성자): 피치 계열 (`var(--faction-author)` 또는 `var(--P-a)`)

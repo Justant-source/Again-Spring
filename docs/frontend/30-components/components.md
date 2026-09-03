@@ -123,10 +123,6 @@
 - 일반 사용자: 검정 닉네임, `*` 없음
 - BEST 댓글: 상단 고정
 
-### CrisisResourceModal
-- **절대 불변**: ESC·바깥 클릭으로 닫히지 않음. 닫기 버튼 단일 경로.
-- 표시 시점: crisisFlag 게시글 진입 시 또는 SOS 버튼 클릭 시
-
 ---
 
 ## SVG 아이콘 컴포넌트 (`components/icons/`)

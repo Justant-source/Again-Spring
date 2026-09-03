@@ -80,7 +80,6 @@ frontend/
 │   ├── shared/                 # 공유 컴포넌트
 │   │   ├── MSWProvider.tsx
 │   │   ├── Logo.tsx
-│   │   ├── CrisisResourceModal.tsx   # 위기 모달
 │   │   ├── LegalFooter.tsx
 │   │   └── ...
 │   │
