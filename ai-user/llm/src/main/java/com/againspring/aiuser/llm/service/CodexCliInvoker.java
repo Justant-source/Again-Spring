@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +56,7 @@ public class CodexCliInvoker implements Invoker {
             pb.environment().remove("CODEX_API_KEY");
             Process process = pb.start();
             ExecutionSlot.attachCurrent(process);
-            drainStderr(process);
+            StringBuilder stderrTail = drainStderr(process);
             try (var stdin = process.getOutputStream()) {
                 stdin.write(prompt.getBytes(StandardCharsets.UTF_8));
                 stdin.flush();
@@ -65,7 +64,11 @@ public class CodexCliInvoker implements Invoker {
             String result = readJsonEvents(process);
             int exit = process.waitFor();
             if (exit != 0) {
-                throw new ClaudeCodeException("CODEX_ERROR", "Codex CLI exited with code " + exit, exit, null);
+                String err;
+                synchronized (stderrTail) { err = stderrTail.toString().trim(); }
+                boolean auth = CliAuthFailureDetector.isAuthFailure(err);
+                throw new ClaudeCodeException(auth ? "AUTH_ERROR" : "CODEX_ERROR",
+                        "Codex CLI exited with code " + exit + (err.isEmpty() ? "" : ": " + err), exit, err);
             }
             if (LlmErrorSignature.looksLikeProviderError(result)) {
                 throw new ClaudeCodeException("PROVIDER_ERROR", "Provider error text in Codex CLI output", exit, null);
@@ -132,13 +135,27 @@ public class CodexCliInvoker implements Invoker {
         return extractFinalText(lines);
     }
 
-    private void drainStderr(Process process) {
+    /**
+     * stderr를 데몬 스레드로 drain하되 마지막 2KB(문자)는 보관 — 세션 만료 메시지 분류용.
+     * InputStreamReader 사용 이유: ClaudeCliInvoker.drainStderr 참조 — 원시 바이트 청크를
+     * 직접 디코드하면 멀티바이트 UTF-8 문자가 청크 경계에서 깨질 수 있다.
+     */
+    private StringBuilder drainStderr(Process process) {
+        StringBuilder tail = new StringBuilder();
         Thread t = new Thread(() -> {
-            try (OutputStream sink = OutputStream.nullOutputStream()) {
-                process.getErrorStream().transferTo(sink);
+            try (var reader = new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8)) {
+                char[] buf = new char[1024];
+                int n;
+                while ((n = reader.read(buf)) > 0) {
+                    synchronized (tail) {
+                        tail.append(buf, 0, n);
+                        if (tail.length() > 2048) tail.delete(0, tail.length() - 2048);
+                    }
+                }
             } catch (Exception ignored) { }
         }, "codex-stderr-drain");
         t.setDaemon(true);
         t.start();
+        return tail;
     }
 }

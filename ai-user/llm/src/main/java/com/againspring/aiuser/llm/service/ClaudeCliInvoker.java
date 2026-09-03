@@ -138,7 +138,7 @@ public class ClaudeCliInvoker implements Invoker {
         try {
             Process process = pb.start();
             ExecutionSlot.attachCurrent(process);
-            drainStderr(process, "sync");
+            StringBuilder stderrTail = drainStderr(process, "sync");
             writeUserPromptToStdin(process, split.userPart());
             StreamResult result = readStreamingOutput(process, null, corrId, model, 1, startMs);
             int exitCode = process.waitFor();
@@ -147,10 +147,13 @@ public class ClaudeCliInvoker implements Invoker {
                 return result.text;
             }
             if (exitCode != 0) {
+                String err;
+                synchronized (stderrTail) { err = stderrTail.toString().trim(); }
                 long duration = System.currentTimeMillis() - startMs;
-                logLlmStats(model, 1, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
-                throw new ClaudeCodeException("CLAUDE_ERROR",
-                        "Claude CLI exited with code " + exitCode, exitCode, null);
+                boolean auth = CliAuthFailureDetector.isAuthFailure(err);
+                logLlmStats(model, 1, auth ? "AUTH_ERROR" : "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
+                throw new ClaudeCodeException(auth ? "AUTH_ERROR" : "CLAUDE_ERROR",
+                        "Claude CLI exited with code " + exitCode + (err.isEmpty() ? "" : ": " + err), exitCode, err);
             }
             return result.text;
         } catch (ClaudeCodeException e) {
@@ -195,7 +198,7 @@ public class ClaudeCliInvoker implements Invoker {
         ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, null);
         Process process = pb.start();
         inv.attachProcess(process);
-        drainStderr(process, inv.getInvocationId());
+        StringBuilder stderrTail = drainStderr(process, inv.getInvocationId());
         writeUserPromptToStdin(process, split.userPart());
 
         StreamResult result = readStreamingOutput(process, inv, corrId, model, 1, startMs);
@@ -206,10 +209,13 @@ public class ClaudeCliInvoker implements Invoker {
         }
         if (exitCode != 0 && !result.text.isBlank()) return result.text;
         if (exitCode != 0) {
+            String err;
+            synchronized (stderrTail) { err = stderrTail.toString().trim(); }
             long duration = System.currentTimeMillis() - startMs;
-            logLlmStats(model, 1, "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
-            throw new ClaudeCodeException("CLAUDE_ERROR",
-                    "Claude CLI exited with code " + exitCode, exitCode, null);
+            boolean auth = CliAuthFailureDetector.isAuthFailure(err);
+            logLlmStats(model, 1, auth ? "AUTH_ERROR" : "CLAUDE_ERROR", 0, 0, 0, 0, 0, "FAIL", duration, corrId);
+            throw new ClaudeCodeException(auth ? "AUTH_ERROR" : "CLAUDE_ERROR",
+                    "Claude CLI exited with code " + exitCode + (err.isEmpty() ? "" : ": " + err), exitCode, err);
         }
         return result.text;
     }
@@ -312,15 +318,29 @@ public class ClaudeCliInvoker implements Invoker {
         return result.text;
     }
 
-    /** stderr를 데몬 스레드로 drain — 파이프 버퍼 포화(데드락) 방지 */
-    private void drainStderr(Process process, String invId) {
+    /**
+     * stderr를 데몬 스레드로 drain하되 마지막 2KB(문자)는 보관 — 세션 만료 메시지 분류용.
+     * InputStreamReader를 사용 — 원시 바이트를 1024B 청크로 직접 디코드하면 멀티바이트
+     * UTF-8 문자가 청크 경계에서 잘려 대체문자(U+FFFD)로 깨질 수 있다. InputStreamReader는
+     * 미완성 바이트 시퀀스를 내부 디코더 상태로 보관했다가 다음 read()에 이어붙이므로 안전하다.
+     */
+    private StringBuilder drainStderr(Process process, String invId) {
+        StringBuilder tail = new StringBuilder();
         Thread t = new Thread(() -> {
-            try (OutputStream sink = OutputStream.nullOutputStream()) {
-                process.getErrorStream().transferTo(sink);
+            try (var reader = new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8)) {
+                char[] buf = new char[1024];
+                int n;
+                while ((n = reader.read(buf)) > 0) {
+                    synchronized (tail) {
+                        tail.append(buf, 0, n);
+                        if (tail.length() > 2048) tail.delete(0, tail.length() - 2048);
+                    }
+                }
             } catch (Exception ignored) {}
         }, "stderr-drain-" + invId);
         t.setDaemon(true);
         t.start();
+        return tail;
     }
 
     private record SplitPrompt(String systemPart, String userPart) { }
