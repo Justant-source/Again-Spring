@@ -1,0 +1,15 @@
+{
+  "post": {
+    "title": "룸메이트가 생활비 정산을 계속 미뤄요",
+    "body": "같이 사는 룸메이트가 두 달째 생활비 정산을 미루고 있어요 먼저 얘기를 꺼내면 그때마다 나중에 하자고 해서 이제는 어떻게 말을 꺼내야 할지도 모르겠어요",
+    "promo_title": "생활비 정산 두 달째 미루는 룸메",
+    "hook_emotion": "tension",
+    "capture_split_after_lines": null,
+    "capture_split_after_line": null,
+    "metaphor_id": null
+  },
+  "comments": [
+    { "ref": "c1", "parentRef": null, "personaId": "__PERSONA_1__", "stance": "작성자 공감", "priority": 1, "body": "돈 문제는 미루면 미룰수록 더 꺼내기 힘들어지더라고요 지금이라도 날짜 정해서 얘기하세요" },
+    { "ref": "c2", "parentRef": null, "personaId": "__PERSONA_2__", "stance": "상대방 이해", "priority": 2, "body": "룸메이트도 그럴 만한 사정이 있을 수 있으니 한 번 편하게 물어보는 것도 좋을 것 같아요" }
+  ]
+}

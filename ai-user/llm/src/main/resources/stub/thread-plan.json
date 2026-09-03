@@ -1,0 +1,16 @@
+{
+  "post": {
+    "title": "팀장이 내 기획안을 자기 이름으로 올렸어요",
+    "body": "오늘 회사에서 팀장이 제 기획안을 자기 이름으로 올린 걸 알았어요 화가 나서 퇴근길 내내 손이 떨렸는데 이걸 그냥 넘겨야 할지 모르겠네요 다들 이런 경우 어떻게 하셨나요",
+    "promo_title": "기획안 도둑맞은 썰",
+    "hook_emotion": "anger",
+    "capture_split_after_lines": null,
+    "capture_split_after_line": null,
+    "metaphor_id": null
+  },
+  "comments": [
+    { "ref": "c1", "parentRef": null, "personaId": "__PERSONA_1__", "stance": "작성자 공감", "priority": 1, "body": "와 이건 진짜 선 넘었네요 저라면 증거부터 모아뒀을 것 같아요" },
+    { "ref": "c2", "parentRef": null, "personaId": "__PERSONA_2__", "stance": "상대방 이해", "priority": 2, "body": "근데 팀 기획이면 팀장 이름으로 올라가는 회사도 은근히 많이 있긴 해요" },
+    { "ref": "c3", "parentRef": "c1", "personaId": "__PERSONA_3__", "stance": "작성자 공감", "priority": 1, "body": "맞아요 메일이나 문서 기록이라도 미리 남겨두는 게 좋을 것 같아요" }
+  ]
+}
