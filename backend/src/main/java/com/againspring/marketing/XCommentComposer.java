@@ -292,14 +292,7 @@ public class XCommentComposer {
         if (XPersonaLearnService.looksLikeLlmError(body)) {
             return Draft.skipped("LLM_ERROR");
         }
-        if (containsVerdictBelt(body)) {
-            return Draft.skipped("SAFETY");
-        }
-        String filtered = body;
-        if (filtered == null || filtered.isBlank() || containsVerdictBelt(filtered)) {
-            return Draft.skipped("SAFETY");
-        }
-        return Draft.of(filtered);
+        return Draft.of(body);
     }
 
     private JsonNode parseOutboundJson(String raw) {
@@ -464,14 +457,7 @@ public class XCommentComposer {
             || "SKIPPED".equalsIgnoreCase(compact)) {
             return Draft.skipped("NO_VOICE");
         }
-        if (containsVerdictBelt(body)) {
-            return Draft.skipped("SAFETY");
-        }
-        String filtered = body;
-        if (filtered == null || filtered.isBlank() || containsVerdictBelt(filtered)) {
-            return Draft.skipped("SAFETY");
-        }
-        return Draft.of(filtered);
+        return Draft.of(body);
     }
 
     private Draft toOriginalDraft(String raw) {
@@ -503,14 +489,6 @@ public class XCommentComposer {
             }
         }
         return false;
-    }
-
-    private static boolean containsVerdictBelt(String text) {
-        return text.contains("판결")
-            || text.contains("유죄")
-            || text.contains("무죄")
-            || text.contains("가해자")
-            || text.contains("피해자");
     }
 
     private String readProfile() {

@@ -116,14 +116,13 @@ class XCommentComposerTest {
     }
 
     @Test
-    void composeReply_verdictLanguage_skipsSafety() throws Exception {
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("그건 작성자 쪽 판결이야");
+    void composeReply_verdictWordingIsPublished() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("그건 작성자 쪽 판결이야 ㅋㅋ");
 
         XCommentComposer.Draft draft = composer.composeReply("누가 잘못한 거야?", null);
 
-        assertThat(draft.skip()).isTrue();
-        assertThat(draft.skipReason()).isEqualTo("SAFETY");
-        assertThat(draft.body()).isNull();
+        assertThat(draft.skip()).isFalse();
+        assertThat(draft.body()).contains("판결");
     }
 
     @Test
