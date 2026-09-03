@@ -38,6 +38,31 @@ public class StubInvoker implements Invoker {
         return substitute(read(schemaFileBase(schema) + ".json"), prompt);
     }
 
+    /**
+     * {@code LLM_STRUCTURED_PROMPT_MODE=true}(프롬프트 주입 모드)에서는
+     * {@code StructuredGenerationService.executeProviderTaskWithSchemaMode}가 스키마를 프롬프트에
+     * 텍스트로 박아 넣고 {@code schema=null}로 넘긴다({@code LlmWorkerPool.executeProviderTask}가
+     * null이면 이 2-인자 오버로드를 호출). 부모 {@link Invoker}의 기본 구현은 이걸 그냥
+     * {@link #invoke}(plain.txt)로 흘려보내 JSON이 아닌 텍스트를 돌려주므로, 실제 LLM과 달리
+     * 어떤 스키마인지 스스로 알아내야 한다 — 주입된 스키마 JSON의 {@code "title"} 필드가
+     * 프롬프트에 그대로 남아있다는 사실을 이용해 역추적한다(각 schemas/*.schema.json의 title은
+     * 서로 겹치지 않는다).
+     */
+    @Override
+    public String invokeSingleAttempt(String prompt, String model) throws LlmException {
+        StructuredOutputSchema schema = detectSchemaFromPrompt(prompt);
+        return schema == null ? invoke(prompt, model) : invokeSingleAttempt(prompt, model, schema);
+    }
+
+    private static StructuredOutputSchema detectSchemaFromPrompt(String prompt) {
+        if (prompt == null) return null;
+        if (prompt.contains("Again Spring thread plan")) return StructuredOutputSchema.THREAD_PLAN;
+        if (prompt.contains("Again Spring human reply batch")) return StructuredOutputSchema.HUMAN_REPLIES;
+        if (prompt.contains("Again Spring paired Call1")) return StructuredOutputSchema.PAIRED_PHASE1;
+        if (prompt.contains("Again Spring paired Call2")) return StructuredOutputSchema.PAIRED_PHASE2;
+        return null;
+    }
+
     @Override
     public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv) {
         String out = read("plain.txt");

@@ -93,4 +93,57 @@ class StubInvokerTest {
         assertFalse(out.contains("__PERSONA_"));
         assertEquals(1, out.split("\"ref\"").length - 1, "only c1 survives");
     }
+
+    /**
+     * LLM_STRUCTURED_PROMPT_MODE=true 경로: StructuredGenerationService가 스키마를 프롬프트
+     * 문자열에 주입하고 schema=null로 넘겨 이 2-인자 오버로드가 호출된다(부모 Invoker의 기본
+     * 구현은 그냥 invoke()=plain.txt로 흘러가 버려 JSON이 아닌 응답을 내는 버그가 있었다 —
+     * 2026-09-03 canary 실행 중 발견). 스키마 title 문자열로 역추적해 올바른 픽스처를 골라야 한다.
+     */
+    @Test
+    void schemaLessOverloadDetectsThreadPlanFromInjectedSchemaTitle() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String augmented = "system prompt...\n===== 스키마 지시 (필수) =====\n스키마:\n"
+                + "{\"title\":\"Again Spring thread plan\",\"type\":\"object\", ... }";
+        String out = stub.invokeSingleAttempt(augmented, "m");
+        JsonNode root = JSON.readTree(out);
+        assertTrue(root.has("post"));
+        assertTrue(root.has("comments"));
+    }
+
+    @Test
+    void schemaLessOverloadDetectsHumanRepliesFromInjectedSchemaTitle() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String augmented = "{\"title\":\"Again Spring human reply batch\",\"type\":\"object\"}";
+        String out = stub.invokeSingleAttempt(augmented, "m");
+        JsonNode root = JSON.readTree(out);
+        assertTrue(root.has("replies"));
+    }
+
+    @Test
+    void schemaLessOverloadDetectsPairedPhase1FromInjectedSchemaTitle() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String augmented = "{\"title\":\"Again Spring paired Call1 (author + phase1 comments)\"}";
+        String out = stub.invokeSingleAttempt(augmented, "m");
+        JsonNode root = JSON.readTree(out);
+        assertTrue(root.has("post"));
+        assertTrue(root.has("comments"));
+    }
+
+    @Test
+    void schemaLessOverloadDetectsPairedPhase2FromInjectedSchemaTitle() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String augmented = "{\"title\":\"Again Spring paired Call2 (partner body + phase2 comments)\"}";
+        String out = stub.invokeSingleAttempt(augmented, "m");
+        JsonNode root = JSON.readTree(out);
+        assertTrue(root.has("partner_post"));
+    }
+
+    @Test
+    void schemaLessOverloadFallsBackToPlainInvokeWhenNoSchemaTitleFound() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String out = stub.invokeSingleAttempt("아무 스키마 지시도 없는 프롬프트", "m");
+        long hangul = out.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count();
+        assertTrue(hangul > 10, "no schema title in prompt → falls back to plain.txt");
+    }
 }
