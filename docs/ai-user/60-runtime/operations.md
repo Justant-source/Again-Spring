@@ -78,12 +78,12 @@ docker exec againspring-ai-user-orchestrator wget -qO- http://localhost:8096/act
 curl --fail http://localhost:8099/health
 ```
 
-prod DB에서 확인:
+prod DB에서 확인한다. `ai_user_runtime.enabled`는 V20에서 제거됐다(읽는 코드가 없던 dead kill-switch) — 실제 kill switch는 `ai_user_generation_config.ai_user_kill_switch`다.
 
 ```bash
 docker exec -it againspring-mariadb-prod mariadb \
   -u againspring -p'<prod-db-password>' againspring \
-  -e "SELECT id, enabled, daily_global_cap, actions_today, day_bucket FROM ai_user_runtime;"
+  -e "SELECT id, ai_user_kill_switch FROM ai_user_generation_config; SELECT id, daily_global_cap, actions_today, day_bucket FROM ai_user_runtime;"
 ```
 
 ## 4. 일일 cap
@@ -221,7 +221,7 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 
 스크립트 시작 시점에도 `restored_at IS NULL`(전날 실행이 SIGKILL 등으로 죽어 복원 못 한 경우)을
 먼저 확인해 원복 후 진행한다(`updated_by='nightly-batch-stale-restore'`). 이 자체 방어와 별개로
-orchestrator `NightlyProviderStaleReconciler`가 **매시 정각+7초** cron으로 같은 조건(`restored_at
+orchestrator `NightlyProviderStaleReconciler`가 **매시 7분** cron으로 같은 조건(`restored_at
 IS NULL AND updated_by='nightly-batch'`)에 **3시간 유예**를 더해 재확인한다 — 스크립트가 다음 날
 03:05까지 아예 재기동되지 않는 최악의 경우에도 최대 3시간 안에 provider가 `CLAUDE`에 고정된 채
 방치되지 않는다. 복원 시 마찬가지로 `updated_by='nightly-batch-stale-restore'`를 남겨 감사 로그로

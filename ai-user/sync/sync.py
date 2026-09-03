@@ -61,10 +61,10 @@ DEV = dict(
 # 24h full
 SYNC_CRON = _env("SYNC_CRON", "30 5 * * *")
 # 5분 콘텐츠 증분
-SYNC_CONTENT_CRON = _env("SYNC_CONTENT_CRON", "*/5 * * * *")
+SYNC_CONTENT_CRON = _env("SYNC_CONTENT_CRON", "0 * * * *")
 SYNC_TIMEZONE = ZoneInfo(_env("SYNC_TIMEZONE", "Asia/Seoul"))
 BACKFILL_DAYS = int(_env("SYNC_BACKFILL_DAYS", "7"))
-CONTENT_LOOKBACK_MINUTES = int(_env("SYNC_CONTENT_LOOKBACK_MINUTES", "15"))
+CONTENT_LOOKBACK_MINUTES = int(_env("SYNC_CONTENT_LOOKBACK_MINUTES", "75"))
 
 
 @dataclass(frozen=True)

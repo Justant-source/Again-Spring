@@ -334,10 +334,10 @@ services:
       DEV_DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
       DEV_DB_NAME: ${DEV_DB_NAME:-againspring_dev}
       SYNC_CRON: ${SYNC_CRON:-30 5 * * *}
-      SYNC_CONTENT_CRON: ${SYNC_CONTENT_CRON:-*/5 * * * *}
+      SYNC_CONTENT_CRON: ${SYNC_CONTENT_CRON:-0 * * * *}
       SYNC_TIMEZONE: ${SYNC_TIMEZONE:-Asia/Seoul}
       SYNC_BACKFILL_DAYS: ${SYNC_BACKFILL_DAYS:-7}
-      SYNC_CONTENT_LOOKBACK_MINUTES: ${SYNC_CONTENT_LOOKBACK_MINUTES:-15}
+      SYNC_CONTENT_LOOKBACK_MINUTES: ${SYNC_CONTENT_LOOKBACK_MINUTES:-75}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pidof", "python"]

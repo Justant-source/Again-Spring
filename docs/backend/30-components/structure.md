@@ -58,7 +58,6 @@ flowchart TD
 | `service/marketing/` | 마케팅 자동화 (dev 전용) |
 | `service/notification/` | 알림 서비스 |
 | `service/notify/` | 위기 알림 이메일 · 피드백 이메일 발신 |
-| `service/crisis/` | 위기 감지 (CrisisDetector 위임) |
 | `service/retention/` | 30일 보존 스케줄러 · 일일 통계 집계 |
 | `domain/` | JPA 엔티티 + Enum |
 | `domain/community/` | Post · PostComment · Vote · PostLike |
@@ -134,8 +133,6 @@ com.againspring/
 │   │   └── SystemHealthService
 │   ├── category/
 │   │   └── CategoryCatalog
-│   ├── crisis/
-│   │   └── CrisisDetector
 │   ├── marketing/
 │   │   └── (마케팅 자동화 서비스들)
 │   ├── community/
@@ -240,14 +237,9 @@ com.againspring/
 │
 ├── safety/
 │   ├── CrisisDetectedEvent
-│   ├── CrisisDetector
-│   ├── CrisisResponse
 │   ├── CrisisKeywordGuard
-│   ├── Level
 │   ├── RatioEnforcer
-│   ├── SafetyAuditLogger
-│   ├── SafetyTriggerEvent
-│   └── ScanResult
+│   └── SafetyAuditLogger
 │
 ├── security/
 │   ├── JwtAuthFilter                   # OncePerRequestFilter

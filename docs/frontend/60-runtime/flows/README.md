@@ -136,7 +136,7 @@ flowchart TD
 - 401/403/402/429 에러 처리
 
 ### [08-crisis.md](./08-crisis.md) — 전면 재작성 필요
-**현행**: 사용자 입력 필터 미적용 → 자동 위기 감지(`CrisisDetector`) + `/admin/crisis` 관제
+**현행**: 사용자 입력 필터 미적용 → `CrisisKeywordGuard` 감사 로그만(게시 차단 없음), `/admin/crisis` 백엔드 엔드포인트 없음
 
 ### [09-admin.md](./09-admin.md) — 전면 재작성 필요
 - `(admin)/admin/reports/` — 신고 처리

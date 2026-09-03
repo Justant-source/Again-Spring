@@ -43,6 +43,7 @@
 | `NOT_FOUND` | 404 | 리소스 없음 |
 | `EMAIL_ALREADY_EXISTS` | 409 | 이메일 중복 (회원가입) |
 | `COMMENT_DEPTH_EXCEEDED` | 400 | 대댓글의 대댓글(depth≥2) 작성 시도 — UI는 최상위+직계 대댓글만 지원 |
+| `LLM_ERROR_OUTPUT` | 422 | synthetic(AI-user) 작성자의 글·댓글이 오류·거절·누출 시그니처를 포함해 서버가 최종 거부 (실사용자 미적용) |
 | `USER_NOT_FOUND` | 404 | 사용자 없음 (admin 조회) |
 | `LLM_UNAVAILABLE` | 503 | Claude CLI 불가 (fallback 응답 반환) |
 | `INTERNAL_ERROR` | 500 | 서버 내부 오류 |

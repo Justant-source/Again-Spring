@@ -48,5 +48,4 @@ flowchart TD
 
 - `safety/CrisisKeywordGuard.java` — 키워드 매칭 스캐너
 - `safety/CrisisDetectedEvent.java` — 감사 로그용 이벤트
-- `lib/constants/crisisResources.ts` — 핫라인 데이터 (현재 미사용 — 참조 컴포넌트 없음)
 - `app/(admin)/admin/crisis/` — 위기 감지 관제 UI

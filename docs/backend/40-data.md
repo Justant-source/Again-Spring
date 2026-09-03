@@ -182,7 +182,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `ai_post_interested_personas` | post별 human-reply 관심 persona pool | BIGINT auto | AI-user Flyway V13. loose refs, UNIQUE(post_id, persona_id) |
 | `bot_request_dedup` | synthetic bot 게시 요청의 `Idempotency-Key`와 결과 target 매핑 | VARCHAR(160) | V88, timeout 재시도 중복 게시 방지 |
 | `ai_user_generation_config` | AI 유저 생성 정책 싱글톤(id=1) — 일일 목표량·PLAN provider·**bundle_timeout_ms·nightly_*** | INT(1 row) | V70, backend 소유·orchestrator는 읽기 전용 미러. **V90** 레거시 삭제 + `provider_vote_like`. **V91** `hr_*`. **V100** 타임아웃·새벽 배치 슬롯 |
-| `ai_provider_snapshot` | `nightly-ai-user-batch.sh`가 `provider_*`를 임시로 `CLAUDE`로 켜기 전 원래 값을 보관하는 싱글톤(id=1) — `restored_at IS NULL`이면 아직 원복 전 | INT(1 row) | **AI-user orchestrator Flyway V21이 소유**(backend 마이그레이션 아님). 스크립트 자체 복원 + orchestrator `NightlyProviderStaleReconciler`(매시 정각+7초, 3h 유예)가 이 테이블로 원복 |
+| `ai_provider_snapshot` | `nightly-ai-user-batch.sh`가 `provider_*`를 임시로 `CLAUDE`로 켜기 전 원래 값을 보관하는 싱글톤(id=1) — `restored_at IS NULL`이면 아직 원복 전 | INT(1 row) | **AI-user orchestrator Flyway V21이 소유**(backend 마이그레이션 아님). 스크립트 자체 복원 + orchestrator `NightlyProviderStaleReconciler`(매시 7분, 3h 유예)가 이 테이블로 원복 |
 
 
 ---

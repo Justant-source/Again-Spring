@@ -49,7 +49,7 @@ grep '^AI_USER_ENABLED=' /home/justant/Data/Again-Spring/env/.env.ai-user
 
 docker exec -it againspring-mariadb-prod mariadb \
   -u againspring -p'<prod-db-password>' againspring_prod \
-  -e "UPDATE ai_user_runtime SET enabled = 1 WHERE id = 1;"
+  -e "UPDATE ai_user_generation_config SET ai_user_kill_switch = 0 WHERE id = 1;"
 ```
 
 상태 확인:
@@ -57,7 +57,7 @@ docker exec -it againspring-mariadb-prod mariadb \
 ```bash
 docker exec -it againspring-mariadb-prod mariadb \
   -u againspring -p'<prod-db-password>' againspring_prod \
-  -e "SELECT id, enabled, daily_global_cap, actions_today FROM ai_user_runtime;"
+  -e "SELECT id, ai_user_kill_switch, target_posts, updated_by FROM ai_user_generation_config; SELECT id, daily_global_cap, actions_today, day_bucket FROM ai_user_runtime;"
 ```
 
 ## 5. 로그 보기
