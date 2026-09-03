@@ -105,3 +105,7 @@
 ## 2026-09 결함 2: provider 추상화·무상태 워커·dev canary — 실측 (Task 7.4 최종 게이트)
 
 단위: llm/backend OK, orchestrator 374건 중 실패 8건(AiPostBundleServiceTest NPE, 계획 이전부터 있던 기지 결함 — 무관), sync 8/8 PASS(.venv), frontend vitest 62/62 + lint:docs·lint:e2e-llm PASS(lint:emoji는 baseline부터 있던 기지 위반이라 범위 밖), docs lint 11/11 PASS. dev 배포 검증 PASS=2/WARN=0/SKIP=2(방문 트래픽 없음, 정상)/FAIL=0. AI-user canary `✅ [canary] PASS scheduled=03f2b0cb-717c-4fd5-9010-567d58f09b9e post=post_d4efe71010454927b736`(정리 후 종료, orchestrator-dev는 상시 서비스라 유지). e2e-realbe(`:8090`) 125/125 PASS(2.7m). 결함 2 계획 종결.
+
+## 2026-09-03 결함 1·2 prod 반영 (사용자 명시 지시)
+
+`scripts/deploy.sh prod --i-mean-it` PASS(백업 `prod-20260903-180527.sql`, health/verify PASS=2/FAIL=0) → `env/rebuild-stacks.sh ai-user`로 공유 스택(llm-ai-user·ai-learning·`ai-user-orchestrator`[prod]·`prod-dev-sync`) 재기동. `ai-user-orchestrator-dev`는 profile 게이트라 무영향(계속 가동). prod 로그 `[EnvironmentGuard] env=PROD db=againspring-mariadb-prod backend=againspring-backend-prod` 확인. `AI_USER_INTERNAL_TOKEN`을 `.env.ai-user`·`.env.prod`에 동일 값으로 배선(둘 다 gitignored, 미커밋) — `repairBotUserAccounts: upserted=100 passwordSynced=150`, 실패 0건으로 orchestrator→backend 내부 API 인증이 prod에서도 성립함을 실측. `llm-ai-user`는 prod에서도 hikari/datasource 로그 0건(무상태 확인), `/v1/providers/status` 내부 조회로 4개 provider 전부 UP. orchestrator·backend-prod 재기동 후 ERROR 로그 0건. `ai_user_orch` 전용 DB 계정(Task 4.5 SQL)은 prod에 아직 미생성 — 필요 시 별도 요청.
