@@ -31,7 +31,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -60,9 +59,6 @@ public class AdminAiRulesController {
     private final AiPromptTemplateRepository promptTemplateRepository;
     private final ObjectMapper objectMapper;
     private final SystemSettingRepository systemSettingRepository;
-
-    @Value("${ai.prompt.llm-url:http://againspring-llm-ai-user:8092}")
-    private String llmAiUserUrl;
 
     @Value("${llm.remote.base-url:http://againspring-llm:8090}")
     private String llmWorkerUrl;
@@ -360,7 +356,7 @@ public class AdminAiRulesController {
     }
 
     @PutMapping("/prompts/{category}/{name}")
-    @Operation(summary = "AI 유저 기본 프롬프트 수정", description = "내용을 저장하고 ai-user/llm 서비스에 즉시 반영(best-effort)한다.")
+    @Operation(summary = "AI 유저 기본 프롬프트 수정", description = "내용을 저장한다. orchestrator가 5분 내 반영한다.")
     @Auditable(action = "AI_PROMPT_UPDATE", targetType = "AI_PROMPT", targetId = "#category + '/' + #name")
     public ResponseEntity<AiPromptTemplate> updatePromptTemplate(
             @PathVariable String category,
@@ -376,19 +372,7 @@ public class AdminAiRulesController {
         tpl.setUpdatedBy(auth.getName());
         promptTemplateRepository.save(tpl);
 
-        triggerLlmReload();
         return ResponseEntity.ok(tpl);
-    }
-
-    private void triggerLlmReload() {
-        try {
-            RestClient.create().post()
-                    .uri(llmAiUserUrl + "/internal/prompts/reload")
-                    .retrieve().toBodilessEntity();
-            log.info("[ai-rules] llm-ai-user reload triggered");
-        } catch (Exception e) {
-            log.warn("[ai-rules] llm-ai-user reload failed (best-effort): {}", e.getMessage());
-        }
     }
 
     // =====================================================================
