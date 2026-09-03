@@ -39,7 +39,7 @@ services:
       SELF_CRITIQUE_EXTRA_CLICHES: ${SELF_CRITIQUE_EXTRA_CLICHES:-}
       LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
       LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
-      LLM_STUB_FIXTURE_DIR: ${LLM_STUB_FIXTURE_DIR:-}
+      LLM_STUB_FIXTURE_DIR: /app/stub-fixtures
       LLM_AUTH_DOWN_TTL_MINUTES: ${LLM_AUTH_DOWN_TTL_MINUTES:-10}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
       HOME: /home/justant
@@ -47,6 +47,7 @@ services:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude
       - ${CODEX_HOST_CONFIG_DIR:-/home/justant/.codex}:/home/justant/.codex
       - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
+      - ${LLM_STUB_FIXTURE_HOST_DIR:-../.temp/llm-stub-fixtures}:/app/stub-fixtures:ro
     restart: unless-stopped
     networks:
       - againspring

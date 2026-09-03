@@ -35,7 +35,7 @@ public class StubInvoker implements Invoker {
 
     @Override
     public String invokeSingleAttempt(String prompt, String model, StructuredOutputSchema schema) throws LlmException {
-        return read(schemaFileBase(schema) + ".json");
+        return substitute(read(schemaFileBase(schema) + ".json"), prompt);
     }
 
     @Override
@@ -56,6 +56,35 @@ public class StubInvoker implements Invoker {
      */
     static String schemaFileBase(StructuredOutputSchema schema) {
         return schema.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    private static final java.util.regex.Pattern HEX32 = java.util.regex.Pattern.compile("(?<![0-9a-f_])[0-9a-f]{32}(?![0-9a-f_])");
+    private static final java.util.regex.Pattern PLACEHOLDER = java.util.regex.Pattern.compile("__PERSONA_(\\d+)__");
+
+    /** 프롬프트에 등장한 32-hex persona id를 순서대로 __PERSONA_n__에 대입. 부족한 자리의 comment 객체는 제거. */
+    static String substitute(String fixture, String prompt) {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        java.util.regex.Matcher m = HEX32.matcher(prompt == null ? "" : prompt);
+        while (m.find()) if (!ids.contains(m.group())) ids.add(m.group());
+        if (ids.isEmpty()) return fixture;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = om.readTree(fixture);
+            com.fasterxml.jackson.databind.JsonNode comments = root.get("comments");
+            if (comments != null && comments.isArray()) {
+                java.util.Iterator<com.fasterxml.jackson.databind.JsonNode> it = comments.iterator();
+                while (it.hasNext()) {
+                    com.fasterxml.jackson.databind.JsonNode c = it.next();
+                    java.util.regex.Matcher pm = PLACEHOLDER.matcher(c.path("personaId").asText(""));
+                    if (pm.matches() && Integer.parseInt(pm.group(1)) > ids.size()) it.remove();
+                }
+            }
+            String json = om.writeValueAsString(root);
+            for (int i = 0; i < ids.size(); i++) json = json.replace("__PERSONA_" + (i + 1) + "__", ids.get(i));
+            return json;
+        } catch (Exception e) {
+            return fixture;
+        }
     }
 
     private String read(String name) {

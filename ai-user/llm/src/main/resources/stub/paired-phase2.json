@@ -4,7 +4,7 @@
     "capture_split_after_lines": null
   },
   "comments": [
-    { "ref": "c3", "parentRef": null, "personaId": "__PERSONA_3__", "stance": "상대방 이해", "priority": 1, "body": "바빠서 깜빡했다는 말도 이해는 가지만 그래도 먼저 한마디 해줬으면 좋았을 텐데요" },
-    { "ref": "c4", "parentRef": "c3", "personaId": "__PERSONA_1__", "stance": "작성자 공감", "priority": 2, "body": "맞아요 바쁜 건 이해해도 정산 얘기는 먼저 챙겨주는 게 서로 편했을 것 같아요" }
+    { "ref": "c3", "parentRef": null, "personaId": "__PERSONA_1__", "stance": "상대방 이해", "priority": 1, "body": "바빠서 깜빡했다는 말도 이해는 가지만 그래도 먼저 한마디 해줬으면 좋았을 텐데요" },
+    { "ref": "c4", "parentRef": "c3", "personaId": "__PERSONA_3__", "stance": "작성자 공감", "priority": 2, "body": "맞아요 바쁜 건 이해해도 정산 얘기는 먼저 챙겨주는 게 서로 편했을 것 같아요" }
   ]
 }

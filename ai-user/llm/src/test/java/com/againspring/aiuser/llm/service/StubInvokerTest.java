@@ -75,4 +75,22 @@ class StubInvokerTest {
         assertTrue(first.has("personaId"));
         assertTrue(first.has("body"));
     }
+
+    @Test
+    void substitutesPersonaPlaceholdersFromPromptIds() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String prompt = "personas:\n- id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\n- id: ffffffffffffffffffffffffffffffff\n- id: 0123456789abcdef0123456789abcdef\n";
+        String out = stub.invokeSingleAttempt(prompt, "m", StructuredOutputSchema.THREAD_PLAN);
+        assertFalse(out.contains("__PERSONA_"), "all placeholders must be substituted");
+        assertTrue(out.contains("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"));
+    }
+
+    @Test
+    void dropsCommentsWhosePlaceholderHasNoPersona() throws Exception {
+        StubInvoker stub = new StubInvoker(null);
+        String prompt = "- id: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\n"; // 1개만
+        String out = stub.invokeSingleAttempt(prompt, "m", StructuredOutputSchema.THREAD_PLAN);
+        assertFalse(out.contains("__PERSONA_"));
+        assertEquals(1, out.split("\"ref\"").length - 1, "only c1 survives");
+    }
 }
