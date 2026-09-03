@@ -12,4 +12,9 @@ class LlmErrorSignaturesTest {
         assertThat(com.againspring.marketing.XPersonaLearnService.looksLikeLlmError("as an AI I can't")).isTrue();
         assertThat(com.againspring.marketing.XPersonaLearnService.looksLikeLlmError("힘빠지긴 할듯")).isFalse();
     }
+
+    @Test
+    void containsSignature_apiErrorWithSpace() {
+        assertThat(LlmErrorSignatures.get().containsSignature("api error: something broke")).isTrue();
+    }
 }

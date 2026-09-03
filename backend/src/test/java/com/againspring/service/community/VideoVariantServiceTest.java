@@ -256,6 +256,15 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void looksLikeLlmError_apiErrorWithSpace_classifiedAsError_catalogOverloadedStillNot() {
+        // "api error" (space) is the SSOT JSON signature restored in Phase 2 fix round 1 —
+        // the catalog image_id "overloaded" exemption must keep passing alongside it.
+        assertThat(VideoVariantService.looksLikeLlmError("API error: quota")).isTrue();
+        assertThat(VideoVariantService.looksLikeLlmError(
+                "{\"sibom_plan\":[{\"image_id\": \"overloaded\"}]}")).isFalse();
+    }
+
+    @Test
     void generate_acceptsSibomPlanWithCatalogIdOverloaded() throws Exception {
         when(llmProvider.invoke(anyString(), anyString())).thenReturn("""
             {"hook_reels":"책임질수록 밀려난다","script_reels":"15년 다니며 본 것. 책임 앞에 먼저 비틀어 지킨 선배들은 만신창이였다.","sibom_plan":[

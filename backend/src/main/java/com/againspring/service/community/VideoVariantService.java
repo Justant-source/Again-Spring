@@ -824,12 +824,10 @@ public class VideoVariantService {
         if (t.contains("overloaded") && !hasProviderOverload(t)) {
             // 카탈로그 image_id "overloaded"는 정상 콘텐츠 — 'overloaded' 시그니처만 제외하고 나머지 검사
             String masked = t.replace("\"image_id\": \"overloaded\"", "").replace("overloaded", "");
-            return com.againspring.service.ai.LlmErrorSignatures.get().containsSignature(masked)
-                    || t.contains("session limit") || t.contains("hit your session") || t.contains("prompt is too long");
+            return com.againspring.service.ai.LlmErrorSignatures.get().containsSignature(masked);
         }
         return com.againspring.service.ai.LlmErrorSignatures.get().containsSignature(t)
-                || hasProviderOverload(t)
-                || t.contains("session limit") || t.contains("hit your session") || t.contains("prompt is too long");
+                || hasProviderOverload(t);
     }
 
     /** Anthropic 529 / CLI "Overloaded" — not the catalog image_id string. */
