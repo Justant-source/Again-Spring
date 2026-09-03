@@ -1,26 +1,15 @@
 # LLM 안전 규칙 — 다시봄
 
-> 이 파일은 CLAUDE.md 절대 규칙 #3·#7에서 추출한 상세 규칙이다.
-> CLAUDE.md는 이 파일을 `@import`한다. **코드 가드와 반드시 동기화.**
+> 이 파일은 AGENTS.md 절대 규칙 #3·#7의 상세다. AGENTS.md가 이 파일을 `@import`한다.
 
 ---
 
-## 1. AI 출력 금지 표현 (절대 규칙 #3)
+## 1. AI-user 콘텐츠는 검열하지 않는다 (절대 규칙 #3)
 
-**권위본**: `docs/shared/policies/forbidden-words.md`
+AI-user 글·댓글에 표현 denylist(판결·욕설·혐오어 등)를 두지 않는다. 사후 통제는 실사용자 신고뿐이다.
+"콘텐츠 검열"과 "깨진 출력 판정"(§2)을 혼동하지 않는다 — §2는 LLM이 *글을 쓰지 못한* 경우만 잡는다.
 
-AI 생성 출력(AI-user 글·댓글 등)에서 아래 표현은 **절대 금지**. 위반 시 미게시·ERROR 처리.
-
-| 금지 | 대체 |
-|---|---|
-| 판결·판사·판정 | 공감·관점 |
-| 처방·진단 | 상황 분석 |
-| 승자·패자·가해자·피해자 | 작성자(A)·상대방(B) |
-| 유죄·무죄 | — |
-| 가스라이팅·나르시시스트·소시오패스 | — |
-| 과실비율 | 공감 비율 |
-
-**사용자 입력에는 필터 미적용** — 필터는 AI 출력에만 적용 (CLAUDE.md FE 불변 규칙).
+**실사용자 입력에도 어떤 필터도 적용하지 않는다.** 예외는 위기 키워드 관제(`CrisisKeywordGuard`, 자살·폭력) — 게시를 막지 않고 감사 로그만 남긴다.
 
 ---
 
@@ -30,7 +19,7 @@ AI 생성 출력(AI-user 글·댓글 등)에서 아래 표현은 **절대 금지
 추가: 2026-06-12 clcocloud Haiku 거절 노드 — "I can't help with this request"·역할극 거절문.
 추가: 2026-06-18 NATEPAN 62% 오염 — 언어 가드(한글 비율<10%) 도입 + ML corpus 정화(171행, 11개 커뮤니티 삭제).
 
-### 방어 4계층 — 시그니처 추가 시 반드시 코드/문서 모두 갱신
+### 방어 4계층 — 시그니처 추가 시 JSON만 갱신
 
 | 계층 | 위치 | 역할 |
 |---|---|---|
@@ -39,14 +28,16 @@ AI 생성 출력(AI-user 글·댓글 등)에서 아래 표현은 **절대 금지
 | L3 페르소나 히스토리 | `ActionExecutor.writeHistory` + `loadRecentBodies` | guard 통과분만 history 반영 / 과거 오염 재주입 차단 |
 | L4 페르소나 강화 | `ai-user/learning/app/services/persona_strengthener.py` | refusal/error 응답·필드가 `voice_profile`에 합쳐지지 않게 차단 |
 
-### 현재 시그니처 카테고리 (코드 참조: `LlmErrorSignature.java`)
+### 시그니처 SSOT — `docs/shared/policies/llm-error-signatures.json`
 
-- **언어 가드 (2026-06-18)**: 한글 char 비율 < 10% → 무효. 영어 거절·오류 근본 탐지 → L1에서 감지 시 Sonnet 폴백 발동
-- **제공자 오류**: `credit balance`, `rate_limit`, `overloaded`, `authentication_error`, `api_error`
-- **자기 정체 노출**: `i'm kiro`, `i'm claude`, `저는 claude`, `나는 claude`
-- **역할극 거절**: `cannot roleplay`, `can't help with this`, `I can't help with this request`, `역할극`, `프롬프트 인젝션`, `i can't fulfill`, `i can't write this`, `i can't do this`
-- **2026-06-19 거절 노드**: `i appreciate the context`, `i appreciate the detailed request`, `these instructions ask me`, `operating online community`, `actual operating online community`, `authentic community member`, `이 요청은 수행할 수 없습니다`, `실제 온라인 커뮤니티`, `가짜 페르소나`, `신원 위장`, `사용자 조작`
-- **일반 거절**: 거절문 패턴 (§18 `ai-user/docs/llm.md` 참조)
+| 키 | 의미 |
+|---|---|
+| `signatures[]` | 소문자 `contains` 매칭 문자열 (provider 오류·자기정체·거절문) |
+| `prompt_leak_patterns[]` | 다중행 정규식 — 내부 첨삭 메모·표가 본문 꼬리에 붙은 경우 |
+| `korean_ratio_min` / `korean_check_min_chars` | 언어 가드 (한글 비율 < 0.10 → 무효, 20자 미만은 검사 안 함) |
+
+로더: `ai-user/llm/.../service/LlmErrorSignatures.java` · `ai-user/orchestrator/.../safety/LlmErrorSignatures.java` · `backend/.../service/ai/LlmErrorSignatures.java` · `ai-user/learning/app/services/llm_error_signatures.py`.
+시그니처 추가 = **JSON 한 곳만** 수정 + 컨테이너 재시작(`:ro` 마운트). 코드 수정 없음.
 
 ### 오염 루프 방지
 

@@ -1,6 +1,6 @@
 ---
-description: LLM·AI 출력 안전 — 금지어, 오류 시그니처, PromptSanitizer
-globs: backend/**/llm/**,backend/**/safety/**,ai-user/**,docs/shared/prompts/**,docs/shared/70-policy/forbidden-words.md
+description: LLM·AI 출력 안전 — 오류 시그니처 SSOT, PromptSanitizer
+globs: backend/**/llm/**,backend/**/safety/**,ai-user/**,docs/shared/prompts/**,docs/shared/policies/llm-error-signatures.json
 alwaysApply: false
 ---
 
@@ -8,24 +8,16 @@ alwaysApply: false
 
 # LLM 안전
 
-상세 권위: `.claude/rules/llm-safety.md` · `docs/shared/70-policy/forbidden-words.md`
+상세 권위: `.claude/rules/llm-safety.md`
 
-## AI 출력 금지 → 대체
+## AI-user 콘텐츠는 검열하지 않는다
 
-| 금지 | 대체 |
-|---|---|
-| 판결·판사·판정 | 공감·관점 |
-| 처방·진단 | 상황 분석 |
-| 승자·패자·가해자·피해자 | 작성자(A)·상대방(B) |
-| 유죄·무죄 / 과실비율 | — / 공감 비율 |
-| 가스라이팅·나르시시스트·소시오패스 | — |
-
-사용자 입력에는 필터 미적용. 필터는 AI 출력에만.
+표현 denylist 없음(욕설 포함). 사후 통제 = 실사용자 신고.
 
 ## 오류·거절 = 콘텐츠 아님
 
 `credit balance`, rate_limit, 자기 정체 노출, 역할극 거절문 등은 **게시 금지**.
-시그니처 추가 시 **LlmErrorSignature + ContentSafetyGuard 둘 다** 갱신.
+시그니처 SSOT = `docs/shared/policies/llm-error-signatures.json`. 코드에 문자열 하드코딩 금지.
 
 ## 입력 보안
 

@@ -55,7 +55,7 @@ python3 scripts/lint_docs.py
 | LLM 브릿지 (메인 시스템) | `backend/.../llm/` | `docs/backend/30-components/llm-bridge.md` |
 | AI 유저 (생성·오케스트레이션·학습) | `ai-user/` | `docs/ai-user/10-context.md` |
 | API 명세 + DB 스키마 | — | `docs/shared/api/` |
-| 정책 (금지어·인증·약관·권한) | — | `docs/shared/70-policy/` |
+| 정책 (인증·약관·권한) | — | `docs/shared/70-policy/` |
 | LLM 프롬프트 (런타임 자산) | `docs/shared/prompts/` | 同 위치 |
 | 환경/인프라/배포 | `env/` | `docs/env/60-runtime/deployment.md` · `docs/env/20-containers/architecture.md` |
 | 환경 변수 사전 | — | `docs/env/40-data.md` |
@@ -71,14 +71,14 @@ python3 scripts/lint_docs.py
 
 1. **FE는 LLM 직접 호출 금지** — 모든 LLM 요청은 BE 경유 (REST API)
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
-3. **LLM 프롬프트/출력 수정 시** `docs/shared/70-policy/forbidden-words.md` 확인. AI 출력에 판결/처방/승패 표현 금지 → "공감/관점/작성자/상대방" (상세: `.claude/rules/llm-safety.md`)
+3. **AI-user 콘텐츠는 검열하지 않는다** — AI-user가 쓴 글·댓글에 금지어·표현 denylist를 두지 않는다(욕설 포함). 유일한 사후 통제는 실사용자 신고(`community_reports`)다. 단, LLM 오류·거절·누출 문자열은 콘텐츠가 아니라 오류다(#7).
 4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **dev/prod 완전 격리**. 필수 순서:
    ① local unit/build → ② **`scripts/deploy.sh dev`** (기동+헬스대기+검증 일체) → ③ e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
    → ④ (명시 지시 시에만) **`scripts/deploy.sh prod --i-mean-it`** (백업+기동+헬스대기+검증 일체) → ⑤ main commit & push
    **prod에서 e2e·직접 반영 금지.** `prod-dev-sync`=5분 콘텐츠+24h full. **dev LLM 금지(L3)**. e2e는 `:8090`만(E3).
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`·`CLAUDE.md`·`AGENTS.md`만. 모든 상세 문서는 `docs/` 하위만.
-7. **🚨 LLM 토큰/크레딧 소진 = 오류, 콘텐츠 아님** — 오류 문자열을 글·댓글 본문으로 절대 게시 금지. 방어 2계층: `LlmErrorSignature` + `ContentSafetyGuard`. 시그니처 추가 시 **두 곳 모두** 갱신. (상세: `.claude/rules/llm-safety.md`)
+7. **🚨 LLM 토큰/크레딧 소진·거절·누출 = 오류, 콘텐츠 아님** — 오류 문자열을 글·댓글 본문으로 절대 게시 금지. 시그니처 SSOT = `docs/shared/policies/llm-error-signatures.json` 한 파일. 4개 모듈(llm·orchestrator·backend·learning) 로더가 같은 파일을 읽는다 — **코드에 시그니처 문자열을 하드코딩하지 않는다.** (상세: `.claude/rules/llm-safety.md`)
 8. **🚨 SSOT Doc-Sync 게이트** — commit/push 전 필수:
    ① `git diff --staged --name-only` → `docs/_index.md` 트리거맵 조회
    ② 대응 문서 + README를 코드에 맞춰 **같은 커밋**에서 갱신
@@ -95,7 +95,6 @@ python3 scripts/lint_docs.py
 
 - **진영색**: 작성자=피치 `#C9785A` / 상대방=세이지 `#5F8F76` — 앱 전체 일관
 - AI-user·AI 생성 콘텐츠는 AI임을 명확히 구분, 사용자 글과 시각 구분
-- **사용자 입력에 금지어 필터 미적용** (책임은 사용자) — 필터는 AI 출력에만 적용
 
 ---
 
@@ -116,7 +115,7 @@ cd backend && ./gradlew bootRun           # :8080
 cd frontend && npm run dev                # :3000
 
 # 검증 — FE
-cd frontend && npm run lint:words && npm run lint:docs && npm run build
+cd frontend && npm run lint:docs && npm run build
 npm run test                              # vitest
 E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe   # 실서버 e2e = dev만
 
@@ -155,7 +154,7 @@ scripts/deploy.sh prod --i-mean-it        # (명시 지시만) 백업 → base+p
 
 ## ✅ 수정 시 체크 (요약)
 
-- **FE**: `lint:words` · `lint:docs` · `build` 통과 / `data-testid` 변경 → `tests/e2e-realbe/support/selectors.ts` 동기화 / journeys e2e 동기화 / pre-commit vitest (긴급 우회 `SKIP_TESTS=1`)
+- **FE**: `lint:docs` · `build` 통과 / `data-testid` 변경 → `tests/e2e-realbe/support/selectors.ts` 동기화 / journeys e2e 동기화 / pre-commit vitest (긴급 우회 `SKIP_TESTS=1`)
 - **BE**: `docs/shared/api/rest-spec.md` 일치 / LLM 호출은 `PromptSanitizer` 경유 / 커버리지 80%+ / journeys e2e 동기화
 - **prod 배포 전**: 절대 규칙 #4 (dev 배포·수동·e2e → 명시 지시 → 백업 → prod:8091 → push)
 
