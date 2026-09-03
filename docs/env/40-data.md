@@ -172,7 +172,8 @@ last_updated: 2026-09-01
 | `AI_INTERACTION_CLAUDE_MODEL` | 사람 글 계획·사람 반응 batch의 Claude(Haiku) 모델 | `claude-haiku-4-5-20251001` |
 | `AI_INTERACTION_CODEX_MODEL` | 사람 글 계획·사람 반응 batch의 Codex(Luna) 모델 | `gpt-5.6-luna` |
 | `CODEX_HOST_CONFIG_DIR` | Codex 로그인 세션을 컨테이너 `/root/.codex`로 마운트할 호스트 경로 | `/home/justant/.codex` |
-| `ANTHROPIC_API_KEY` | direct API 경로용 키 (LLM 컨테이너 `.env.ai-user`) | 공란; BE는 vault `llm.anthropic_api_key` |
+| `ANTHROPIC_API_KEY` | direct API 경로용 키 (LLM 컨테이너 `.env.ai-user`). `system_setting` DB 조회 폐기(2026-09) — env만 읽는다 | 공란; BE는 vault `llm.anthropic_api_key` |
+| `ANTHROPIC_BASE_URL` | direct API 경로 base URL (LLM 컨테이너 `.env.ai-user`). env만 읽는다(2026-09, DB 미접속) | `https://api.anthropic.com` |
 | `AI_USER_LLM_POOL_SIZE` | AI-user worker pool | `20` |
 | `AI_USER_LLM_QUEUE_CAPACITY` | AI-user queue | `100` |
 | `AI_USER_LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `30000` |

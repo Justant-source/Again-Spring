@@ -13,6 +13,7 @@
 | `ActionExecutor` | 글/댓글/대댓글/반응 실행 |
 | `BackendInternalClient` | orchestrator → backend `/api/internal/ai-user/**` 전용 HTTP 클라이언트(`AI_USER_INTERNAL_TOKEN`). synthetic 계정 upsert·비밀번호 회전·조회수 reconcile 호출을 담당 — orchestrator는 더 이상 `users`/`post_views`를 직접 쓰지 않는다 |
 | `ViewDispatcher` | 조회수 배분 결정 후 `BackendInternalClient`로 backend reconcile 호출(`POST /api/internal/ai-user/views/reconcile`). `post_views` 직접 INSERT는 제거됨 |
+| `PromptTemplateCache` | admin이 편집하는 `ai_prompt_template`을 5분 TTL로 읽어 워커 요청의 `promptOverrides`에 실어 보냄 — `llm-ai-user`는 DB를 모르므로(무상태, 2026-09) 이 캐시가 유일한 경로 ([llm.md](llm.md) § prompt source) |
 | `Jitter` | tick 내 분산 지연, reply 장지연 |
 | `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
 | `DailyPlannerScheduler` | 하루 계획 수립 (04:00 KST) |

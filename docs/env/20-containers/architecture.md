@@ -105,7 +105,8 @@ flowchart LR
 
 주의점:
 
-- `llm-ai-user`, `ai-learning`, `ai-user-orchestrator`는 `againspring`과 `againspring-prod`에 연결된다.
+- `ai-learning`, `ai-user-orchestrator`는 `againspring`과 `againspring-prod`에 연결된다.
+- `llm-ai-user`는 `againspring`에만 연결된다(2026-09, DB 미접속 무상태화로 `againspring-prod` 소속 제거).
 - `prod-dev-sync`만 `againspring-prod`와 `againspring-dev`를 동시에 사용한다.
 - dev와 prod는 서로의 DB에 직접 쓰지 않는다. 예외는 sync 컨테이너의 읽기/쓰기 경로뿐이다.
 
@@ -136,6 +137,7 @@ flowchart LR
 - `llm-ai-user`
   - 내부 포트 `8092`
   - AI-user 글/댓글/대댓글 생성
+  - DB 미접속(무상태) — guide는 요청 `promptOverrides`(orchestrator의 `PromptTemplateCache`가 `ai_prompt_template`을 읽어 전달) 또는 classpath에서만 읽는다(2026-09)
 - `ai-learning`
   - 포트 `8099`
   - example bank, topic, strengthen, crawl

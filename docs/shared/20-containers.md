@@ -71,6 +71,7 @@ flowchart TB
 - ai-user 런타임은 `env/docker-compose.ai-user.yml` 하나를 공통으로 사용한다.
 - PLAN-first 경로: outbox → orchestrator(plan/hold/inbox) → CLI 구조화 생성 → `ai_scheduled_posts` 홀딩 → 슬롯 도래 시 REST 게시 → due item 댓글.
 - orchestrator와 learning의 실제 주력 대상은 prod DB와 prod backend다.
+- `llm-ai-user`는 DB 미접속(무상태, 2026-09) — guide는 orchestrator가 실어 보내는 요청 `promptOverrides` 또는 classpath에서만 읽는다.
 - `prod-dev-sync`는 5분 콘텐츠 + 24h full, prod→dev 비식별 upsert.
 
 포트·볼륨 표는 `docs/env/` (compose 권위본)에 둔다.

@@ -181,12 +181,12 @@ compose는 dev/prod 모두 `SELF_CRITIQUE_ENABLED=true`를 넘긴다. rare vocab
 
 ## prompt source
 
-guide는 두 군데에서 읽을 수 있다.
+**무상태 원칙(2026-09)**: `llm-ai-user`는 DB 커넥션이 전혀 없다(DataSource·`ai_prompt_template` 조회 삭제). guide는 두 군데에서 읽는다.
 
-1. DB `ai_prompt_template`
-2. classpath `voice/*.md`
+1. 요청 `promptOverrides`(orchestrator가 `PromptTemplateCache`로 admin이 편집한 `ai_prompt_template`을 읽어 실어 보냄 — [orchestrator.md](orchestrator.md) 참고)
+2. classpath `voice/*.md` — override 미존재/공백 시 폴백
 
-`/internal/prompts/reload`는 두 소스를 다시 읽는다. DB 내용이 있으면 classpath보다 우선한다.
+우선순위는 `promptOverrides` > classpath. `/internal/prompts/reload`는 classpath만 다시 읽는다(DB는 보지 않음).
 
 ## 분석 API
 
