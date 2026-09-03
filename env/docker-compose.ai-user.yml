@@ -48,6 +48,7 @@ services:
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude
       - ${CODEX_HOST_CONFIG_DIR:-/home/justant/.codex}:/home/justant/.codex
+      - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
     restart: unless-stopped
     networks:
       - againspring
@@ -75,6 +76,8 @@ services:
       AI_LEARNING_CRAWL_ENABLED: ${AI_LEARNING_CRAWL_ENABLED:-false}
       CRAWL_MIN_POPULARITY_PCT: ${CRAWL_MIN_POPULARITY_PCT:-0.50}
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
+    volumes:
+      - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
     ports:
       - "8099:8099"
     restart: unless-stopped
@@ -199,6 +202,7 @@ services:
       AI_USER_ML_TIMEOUT_MS: ${AI_USER_ML_TIMEOUT_MS:-500}
     volumes:
       - ../ai-user/docs/personas:/app/personas:rw
+      - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
     restart: unless-stopped
     networks:
       - againspring
@@ -306,6 +310,7 @@ services:
       AI_USER_ML_ENABLED: false
     volumes:
       - ../ai-user/docs/personas:/app/personas:rw
+      - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
     restart: unless-stopped
     networks:
       - againspring

@@ -90,6 +90,7 @@ services:
       - ../docs/shared/prompts:/app/shared/docs/prompts:ro
       - ../docs/shared/categories.yml:/app/shared/docs/categories.yml:ro
       - ../docs/shared/policies/user-permissions.json:/app/shared/docs/policies/user-permissions.json:ro
+      - ../docs/shared/policies/llm-error-signatures.json:/app/shared/docs/policies/llm-error-signatures.json:ro
       - ../docs/shared/templates:/app/shared/docs/templates:ro
     depends_on:
       mariadb-prod:
