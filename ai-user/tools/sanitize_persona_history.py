@@ -5,59 +5,11 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 from pathlib import Path
 
-MIN_KOREAN_RATIO = 0.10
-MIN_KOREAN_CHECK_LEN = 20
-ERROR_SIGNATURES = [
-    "i can't write",
-    "i can't do this",
-    "i can't fulfill",
-    "i appreciate the context",
-    "i appreciate the detailed",
-    "these instructions ask me",
-    "the instructions ask me",
-    "actual operating online community",
-    "operating online community",
-    "authentic community member",
-    "genuine community member",
-    "designed to appear authentic",
-    "community participation",
-    "이 요청은 도와드릴 수 없습니다",
-    "이 요청은 수행할 수 없습니다",
-    "실제 운영 중인",
-    "실제 온라인 커뮤니티",
-    "진정성 있는 사용자",
-    "허위 정보 및 스푸핑",
-    "조작된 커뮤니티 활동",
-    "가짜 페르소나",
-    "신원 위장",
-    "사용자 조작",
-    "진정성에 손상",
-]
-
-
-def has_insufficient_korean(text: str) -> bool:
-    significant = sum(1 for ch in text if not ch.isspace())
-    if significant < MIN_KOREAN_CHECK_LEN:
-        return False
-    korean = sum(
-        1
-        for ch in text
-        if "\uac00" <= ch <= "\ud7a3"
-        or "\u1100" <= ch <= "\u11ff"
-        or "\u3130" <= ch <= "\u318f"
-    )
-    return korean / significant < MIN_KOREAN_RATIO
-
-
-def looks_like_llm_error(text: str) -> bool:
-    if not text or not text.strip():
-        return False
-    if has_insufficient_korean(text):
-        return True
-    lower = re.sub(r"\s+", " ", text).strip().lower()
-    return any(sig in lower for sig in ERROR_SIGNATURES)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "learning"))
+from app.services.llm_error_signatures import looks_like_llm_error  # noqa: E402
 
 
 def extract_body(block: str, kind: str) -> str | None:
