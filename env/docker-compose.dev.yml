@@ -49,6 +49,8 @@ services:
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
       AS_SECRET_MASTER_KEY: ${AS_SECRET_MASTER_KEY}
+      # orchestrator → backend 내부 API(/api/internal/ai-user/**) Bearer 토큰. 비면 가드가 전량 401(fail-closed).
+      AI_USER_INTERNAL_TOKEN: ${AI_USER_INTERNAL_TOKEN:-}
       # App secrets (JWT/OAuth/mail/ASM tokens) → encrypted_secret vault only (do not inject empty env)
       LLM_PROVIDER: deny
       LLM_CHAT_PROVIDER: deny
