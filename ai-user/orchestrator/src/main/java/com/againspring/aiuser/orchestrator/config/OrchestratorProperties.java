@@ -13,11 +13,13 @@ import java.util.Map;
 @Component
 @ConfigurationProperties(prefix = "ai-user")
 public class OrchestratorProperties {
+    /** prod|dev — {@link EnvironmentGuard}가 기동 시 검증. 기본값 없음(필수). */
+    private String env = "";
     private boolean enabled = false;
     private String tickCron = "0 */10 * * * *";
     private int dailyGlobalCap = 200;
     private String botPassword = "ai-user-dev-pw-2026";
-    private String backendBaseUrl = "http://againspring-backend-dev:8080";
+    private String backendBaseUrl = "";
     private String llmAiUserUrl = "http://againspring-llm-ai-user:8092";
     private int personaTarget = 10;
     private String personasDir = "/app/personas";

@@ -41,6 +41,7 @@ management:
       show-details: always
 
 ai-user:
+  env: ${AI_USER_ENV:}
   enabled: ${AI_USER_ENABLED:false}
   matcher:
     author-threshold: ${AI_USER_MATCHER_AUTHOR_THRESHOLD:0.35}
@@ -49,7 +50,7 @@ ai-user:
   tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}
   bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
-  backend-base-url: ${BACKEND_BASE_URL:http://againspring-backend-prod:8080}
+  backend-base-url: ${BACKEND_BASE_URL:}
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user:8092}
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}
   # 반복 가드: 생성문 vs 최근 출력 2-gram Jaccard 임계 (초과 시 1회 재생성)
