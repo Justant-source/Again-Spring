@@ -11,6 +11,8 @@
 | `BehaviorEngine` | kill-switch, cap, feed 로드, quota, persona 선택 |
 | `ActionPlanner` | 어떤 행동을 할지 결정 |
 | `ActionExecutor` | 글/댓글/대댓글/반응 실행 |
+| `BackendInternalClient` | orchestrator → backend `/api/internal/ai-user/**` 전용 HTTP 클라이언트(`AI_USER_INTERNAL_TOKEN`). synthetic 계정 upsert·비밀번호 회전·조회수 reconcile 호출을 담당 — orchestrator는 더 이상 `users`/`post_views`를 직접 쓰지 않는다 |
+| `ViewDispatcher` | 조회수 배분 결정 후 `BackendInternalClient`로 backend reconcile 호출(`POST /api/internal/ai-user/views/reconcile`). `post_views` 직접 INSERT는 제거됨 |
 | `Jitter` | tick 내 분산 지연, reply 장지연 |
 | `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
 | `DailyPlannerScheduler` | 하루 계획 수립 (04:00 KST) |
