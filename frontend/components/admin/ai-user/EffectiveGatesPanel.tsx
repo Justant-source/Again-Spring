@@ -84,6 +84,13 @@ export function EffectiveGatesPanel({ className }: { className?: string }) {
               </Badge>
             </div>
 
+            <p
+              className="text-xs text-gray-400"
+              data-testid="ai-user-gates-caveat"
+            >
+              요약 판정입니다. 워크로드별 실제 동작은 gates 표와 각 스케줄러 로그를 기준으로 확인하세요.
+            </p>
+
             {gates.reasons.length > 0 && (
               <ul
                 className="list-disc pl-5 space-y-1 text-sm text-gray-600"

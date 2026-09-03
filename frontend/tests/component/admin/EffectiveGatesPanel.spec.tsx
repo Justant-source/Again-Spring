@@ -81,6 +81,19 @@ describe('EffectiveGatesPanel', () => {
     expect(table).toHaveTextContent('LLM_WORKER_URL');
   });
 
+  it('renders a caveat that the verdict is a summary, not per-workload truth', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: buildGates() });
+
+    render(<EffectiveGatesPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-user-gates-caveat')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('ai-user-gates-caveat')).toHaveTextContent(
+      '요약 판정입니다. 워크로드별 실제 동작은 gates 표와 각 스케줄러 로그를 기준으로 확인하세요.'
+    );
+  });
+
   it('shows an open verdict without an error state when both gates allow', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: buildGates({ gates: [{ name: 'ai.user.enabled', source: 'yml', value: true, blocks: '' }] }),
