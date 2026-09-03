@@ -12,6 +12,7 @@ import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.enums.ScheduledPartnerAnswerStatus;
 import com.againspring.aiuser.orchestrator.notification.ScheduledPostTelegramNotifier;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPartnerAnswerRepository;
+import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -60,10 +61,20 @@ public class ScheduledPostPublisher {
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final SourceReservationSupport sourceReservationSupport;
     private final ScheduledPostTelegramNotifier telegramNotifier;
+    private final AiUserGenerationConfigRepository configRepository;
 
     public void publishDue() {
         if (!properties.isEnabled() || !properties.getThreadPlan().isEnabled()
-                || !properties.getThreadPlan().isScheduledPostPublisherEnabled()) return;
+                || !properties.getThreadPlan().isScheduledPostPublisherEnabled()) {
+            log.debug("ScheduledPostPublisher skip: yml gate closed");
+            return;
+        }
+        boolean dbBlocked = configRepository.findById(1)
+                .map(c -> c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true);
+        if (dbBlocked) {
+            log.info("ScheduledPostPublisher skip: ai_user_kill_switch or schedule_execution_paused");
+            return;
+        }
         int batchSize = properties.getThreadPlan().getScheduledPostPublishBatchSize();
         for (AiScheduledPost row : leases.claimDue(WORKER, batchSize, Duration.ofMinutes(5), Instant.now())) {
             publish(row);
