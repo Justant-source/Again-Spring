@@ -20,8 +20,8 @@
 
 **클라이언트 위기 모달은 없습니다.** 과거 존재하던 `CrisisResourceModal`(SOS 버튼·crisisFlag 게시글 진입 시 표시되는
 상시 핫라인 모달)은 어떤 화면에서도 트리거되지 않는 죽은 컴포넌트였다 — import 0건이 확인되어 2026-09-03 삭제됨
-(Phase 3 리뷰 지적). 핫라인 데이터셋 `lib/constants/crisisResources.ts`는 코드에 남아 있으나 현재 어떤 컴포넌트도
-참조하지 않는다.
+(Phase 3 리뷰 지적). 핫라인 데이터셋 `lib/constants/crisisResources.ts`도 참조 컴포넌트가 없는 것으로 확인되어
+같은 날 함께 삭제됐다 — 코드에는 더 이상 존재하지 않는다.
 
 ---
 
