@@ -125,8 +125,10 @@ docker logs -f againspring-prod-dev-sync
 `prod-dev-sync`는 **5분 콘텐츠 증분** + **KST 일 1회 full**을 실행하며, 컨테이너 기동 시에도 full→content 순으로 1회 동기화한다.
 
 - full cron: `SYNC_CRON` 기본 `30 5 * * *` / timezone `Asia/Seoul`
-- content cron: `SYNC_CONTENT_CRON` 기본 `*/5 * * * *` / lookback `SYNC_CONTENT_LOOKBACK_MINUTES` 기본 15
+- content cron: `SYNC_CONTENT_CRON` 기본 `0 * * * *` / lookback `SYNC_CONTENT_LOOKBACK_MINUTES` 기본 75
 - 실사용자 계정은 dev에서 비식별화되고 로그인 불가 상태로 반영된다.
+- 실사용자 `posts`/`post_comments`는 제목·본문이 마스킹되고, `PRIVATE`/`DRAFT`/삭제된 글은 제외되며,
+  `invite_token`은 (작성자 불문) 복사하지 않는다.
 - 5분 잡은 posts/comments/votes/likes(+vote_options)와 참조 users·personas만 (T1+U1).
 - full 잡은 아래 전체 표.
 - D1: prod 우선 upsert. e2e 잔여는 cleanup.
@@ -137,8 +139,25 @@ docker logs -f againspring-prod-dev-sync
 - `users`, `posts`, `vote_options`, `post_comments`, `votes`, `post_likes`
 - `personas`, `persona_relationships`, `persona_seen_posts`, `persona_action_log`
 - `persona_history_entries`, `persona_life_state`, `persona_daily_quota`
-- `ai_user_runtime`, `ai_user_generation_config`
-- `ai_content_corrections`, `ai_global_rules`, `ai_prompt_template`, `system_setting`
+- `ai_content_corrections`, `ai_global_rules`
+
+설정 테이블(`ai_user_runtime`·`ai_user_generation_config`·`system_setting`·`ai_prompt_template`)은
+dev 튜닝을 prod 값으로 덮어써버리므로 sync 대상에서 제외한다(2026-09).
+
+### 기존 dev 원문 정리
+
+이 마스킹 규칙(§7 상단)은 2026-09 이후 sync부터 적용된다. 그 이전에 이미 dev DB로 복사된
+실사용자 `posts`/`post_comments` 원문은 1회성 스크립트로 정리한다: `ai-user/tools/scrub_dev_real_user_content.py`
+
+```bash
+cd ai-user/sync && DEV_DB_HOST=127.0.0.1 DEV_DB_PORT=3309 DEV_DB_USER=againspring \
+  DEV_DB_PASSWORD="$(grep ^DEV_MARIADB_PASSWORD= ../../env/.env.ai-user | cut -d= -f2-)" DEV_DB_NAME=againspring_dev \
+  python3 ../tools/scrub_dev_real_user_content.py            # dry-run — 카운트만 출력, DB 미변경
+# 카운트가 타당하면 --apply로 실제 반영 (명시 승인 후에만 실행)
+```
+
+`--apply` 없이 실행하면 dry-run이며 DB는 변경되지 않는다. 호스트가 dev가 아니면(호스트명에
+`mariadb-dev`가 없고 `127.0.0.1`/`localhost`도 아니면) 스크립트가 거부한다.
 
 ## 8. 새벽 배치 — 예약글 파이프라인 (2026-07-31~)
 
