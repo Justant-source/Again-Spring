@@ -108,11 +108,11 @@ services:
     env_file:
       - ${TELEGRAM_ENV_FILE:-/home/justant/.config/again-spring-watchdog/telegram.env}
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      AI_USER_ENV: prod
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}
-      BACKEND_BASE_URL: ${AI_USER_BACKEND_URL:-http://againspring-backend-prod:8080}
+      BACKEND_BASE_URL: http://againspring-backend-prod:8080
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ENABLED: ${AI_USER_ENABLED:-true}
       AI_USER_TICK_CRON: "${AI_USER_TICK_CRON:-0 */10 * * * *}"
@@ -222,7 +222,7 @@ services:
     env_file:
       - ${TELEGRAM_ENV_FILE:-/home/justant/.config/again-spring-watchdog/telegram.env}
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      AI_USER_ENV: dev
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${DEV_DB_NAME:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
