@@ -494,12 +494,6 @@ public class OutputSanitizer {
         return COMPLETE_ENDING.matcher(trimmed).matches();
     }
 
-    private String cutAtPattern(String text, Pattern pattern) {
-        Matcher matcher = pattern.matcher(text);
-        if (!matcher.find()) return text;
-        return text.substring(0, matcher.start()).stripTrailing();
-    }
-
     /** 내부 메모/표가 본문 뒤에 누출되면 첫 매치 지점부터 꼬리를 자른다 (패턴 SSOT = llm-error-signatures.json). */
     private static String cutTrailingLeak(String text) {
         int cut = -1;

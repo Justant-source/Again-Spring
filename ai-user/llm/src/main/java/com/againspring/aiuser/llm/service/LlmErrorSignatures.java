@@ -21,7 +21,7 @@ public final class LlmErrorSignatures {
     private static final List<String> CANDIDATES = List.of(
             "/app/shared/docs/policies/llm-error-signatures.json",
             "../../docs/shared/policies/llm-error-signatures.json",   // gradle test cwd = ai-user/<module>
-            "../docs/shared/policies/llm-error-signatures.json");      // backend
+            "../docs/shared/policies/llm-error-signatures.json");      // backend 모듈 전용 fallback — 이 llm 모듈 cwd에서는 도달 불가한 죽은 경로지만, 3개 gradle-독립 모듈 사본을 동일하게 유지하려고 남겨둔다
 
     private static volatile LlmErrorSignatures instance;
 
