@@ -36,4 +36,6 @@ public class PairedPhase1Request {
     private Integer minTopLevel;
     /** Default = minTopLevel when null. */
     private Integer minItems;
+    /** 요청별 프롬프트 가이드 오버라이드 (key="voice/paired_phase1" 등 → 본문). classpath 기본값보다 우선. 없으면 null. */
+    private Map<String, String> promptOverrides;
 }

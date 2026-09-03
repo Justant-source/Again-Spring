@@ -1,6 +1,7 @@
 package com.againspring.aiuser.llm.dto;
 
 import lombok.*;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -35,4 +36,6 @@ public class PostRewriteRequest {
     private String originalTitle;
     private String originalBody;
     private String rewriteInstruction;
+    /** 요청별 프롬프트 가이드 오버라이드 (key="voice/post" 등 → 본문). classpath 기본값보다 우선. 없으면 null. */
+    private Map<String, String> promptOverrides;
 }

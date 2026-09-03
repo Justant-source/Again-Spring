@@ -35,6 +35,8 @@ public class PairedPhase2Request {
     private Integer maxReplies = 10;
     private Integer minTopLevel;
     private Integer minItems;
+    /** 요청별 프롬프트 가이드 오버라이드 (key="voice/paired_phase2" 등 → 본문). classpath 기본값보다 우선. 없으면 null. */
+    private Map<String, String> promptOverrides;
 
     @Data
     public static class AuthorPost {

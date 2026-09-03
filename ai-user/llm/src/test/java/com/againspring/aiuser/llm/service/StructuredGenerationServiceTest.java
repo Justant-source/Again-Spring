@@ -457,7 +457,9 @@ class StructuredGenerationServiceTest {
         com.againspring.aiuser.llm.notification.StructuredGenerationParseFailTelegramNotifier notifier =
             org.mockito.Mockito.mock(com.againspring.aiuser.llm.notification.StructuredGenerationParseFailTelegramNotifier.class);
         com.againspring.aiuser.llm.config.LlmProperties props = new com.againspring.aiuser.llm.config.LlmProperties();
-        StructuredGenerationService service = new StructuredGenerationService(pool, critique, sampler, schemaCatalog, rateLimiter, notifier, props);
+        PromptAssembler promptAssembler = new PromptAssembler();
+        promptAssembler.loadGuides();
+        StructuredGenerationService service = new StructuredGenerationService(pool, critique, sampler, schemaCatalog, rateLimiter, notifier, props, promptAssembler);
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");

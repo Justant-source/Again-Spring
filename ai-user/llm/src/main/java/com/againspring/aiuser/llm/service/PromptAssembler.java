@@ -3,87 +3,47 @@ package com.againspring.aiuser.llm.service;
 import com.againspring.aiuser.llm.dto.*;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
 public class PromptAssembler {
     private static final String SEP = "<<<USER_PROMPT>>>";
 
-    private volatile String postGuide = "";
-    private volatile String commentGuide = "";
-    private volatile String replyGuide = "";
-    private volatile String partnerGuide = "";
-    /** 양면 사연 작성자(A) 가이드 — stance=AUTHOR일 때 사용. */
-    private volatile String pairedAuthorGuide = "";
-    /** R9 Track B: 일상 글 모드 가이드 (voice/post_casual.md). 빈 문자열이면 인라인 기본값 사용. */
-    private volatile String casualPostGuide = "";
-
-    @Autowired(required = false)
-    private JdbcTemplate jdbcTemplate;
+    private final Map<String, String> classpathGuides = new ConcurrentHashMap<>();
+    private static final List<String> GUIDE_KEYS = List.of(
+        "voice/post", "voice/comment", "voice/reply", "voice/partner", "voice/post_paired_author",
+        "voice/post_casual", "voice/reconstruct", "voice/paired_phase1", "voice/paired_phase2");
 
     @PostConstruct
-    public void loadGuides() {
-        reload();
-    }
+    public void loadGuides() { reload(); }
 
-    /** 관리자 요청 또는 스케줄에 의한 DB 기반 재로드. */
+    /** classpath 가이드를 다시 읽는다. DB는 보지 않는다(무상태 워커, 2026-09). */
     public synchronized void reload() {
-        // % 문자를 %% 로 이스케이프 — buildSystem()에서 String.formatted()에 넘기기 때문
-        postGuide       = loadGuide("voice/post",        "voice/post.md").replace("%", "%%");
-        commentGuide    = loadGuide("voice/comment",     "voice/comment.md").replace("%", "%%");
-        replyGuide      = loadGuide("voice/reply",       "voice/reply.md").replace("%", "%%");
-        partnerGuide    = loadGuide("voice/partner",     "voice/partner.md").replace("%", "%%");
-        pairedAuthorGuide = loadGuide("voice/post_paired_author", "voice/post_paired_author.md").replace("%", "%%");
-        // R9 Track B: 일상 글 모드 가이드 (D-51) — 없으면 "" (assembleCasualPostPrompt 인라인 폴백)
-        String rawCasual = loadGuide("voice/post_casual", "voice/post_casual.md");
-        casualPostGuide = rawCasual != null ? rawCasual.replace("%", "%%") : "";
-        log.info("Voice guides loaded: post={}c comment={}c reply={}c partner={}c pairedAuthor={}c casual={}c",
-            postGuide.length(), commentGuide.length(), replyGuide.length(), partnerGuide.length(),
-            pairedAuthorGuide.length(), casualPostGuide.length());
+        for (String key : GUIDE_KEYS) {
+            classpathGuides.put(key, loadResourceOrEmpty(key + ".md"));
+        }
+        log.info("Voice guides loaded from classpath: {}", GUIDE_KEYS);
     }
 
-    private String loadGuide(String dbKey, String classpathPath) {
-        if (jdbcTemplate != null) {
-            try {
-                List<String> rows = jdbcTemplate.queryForList(
-                    "SELECT content FROM ai_prompt_template WHERE `key` = ? AND content != ''",
-                    String.class, dbKey);
-                if (!rows.isEmpty() && rows.get(0) != null && !rows.get(0).isBlank()) {
-                    log.debug("Voice guide '{}' loaded from DB ({}c)", dbKey, rows.get(0).length());
-                    return rows.get(0);
-                }
-            } catch (Exception e) {
-                log.warn("DB read failed for '{}', falling back to classpath: {}", dbKey, e.getMessage());
-            }
-        }
-        if (classpathPath == null) return null;
-        String content = loadResource(classpathPath);
-        // 첫 기동 시 classpath 내용을 DB에 시드 (빈 레코드만 업데이트)
-        if (jdbcTemplate != null && !content.isBlank()) {
-            try {
-                jdbcTemplate.update(
-                    "UPDATE ai_prompt_template SET content = ? WHERE `key` = ? AND (content IS NULL OR content = '')",
-                    content, dbKey);
-            } catch (Exception e) {
-                log.warn("DB seed failed for '{}': {}", dbKey, e.getMessage());
-            }
-        }
-        return content;
+    /** 요청 오버라이드 > classpath > "". 반환값은 String.formatted 안전(% 이스케이프). */
+    public String guide(String key, Map<String, String> overrides) {
+        String v = overrides == null ? null : overrides.get(key);
+        if (v == null || v.isBlank()) v = classpathGuides.getOrDefault(key, "");
+        return v.replace("%", "%%");
     }
 
-    private String loadResource(String path) {
+    private String loadResourceOrEmpty(String path) {
         try {
             return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {
-            log.warn("Could not load voice guide '{}': {}", path, e.getMessage());
             return "";
         }
     }
@@ -152,7 +112,7 @@ public class PromptAssembler {
             return assembleCasualPostPrompt(req);
         }
         // 기존 로직 유지 (단독 사연 — stance 미지정)
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), postGuide, req.getFormality(),
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/post", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -192,8 +152,9 @@ public class PromptAssembler {
     }
 
     public String assemblePostRewritePrompt(PostRewriteRequest req) {
-        String guide = postGuide != null && !postGuide.isBlank() ? postGuide : "기존 갈등 사연을 자연스럽게 교정한다";
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+        String guideText = guide("voice/post", req.getPromptOverrides());
+        if (guideText.isBlank()) guideText = "기존 갈등 사연을 자연스럽게 교정한다";
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guideText, req.getFormality(),
             req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String sourceCategory = req.getCategory() != null ? req.getCategory() : "OTHER";
         String targetCategory = req.getTargetCategory() != null ? req.getTargetCategory() : sourceCategory;
@@ -239,11 +200,11 @@ public class PromptAssembler {
     /**
      * 재구성 프롬프트 — 단일 크롤 원본을 페르소나 보이스로 사연으로 재서사.
      * post.md 가이드의 "실제 사건 원문 복제 금지(완전 창작)" 규칙과 충돌하므로
-     * 별도 reconstruct 가이드를 사용하고 postGuide를 쓰지 않음.
-     * DB에 voice/reconstruct 키가 있으면 그것을, 없으면 인라인 가이드를 사용.
+     * 별도 reconstruct 가이드를 사용하고 voice/post 가이드를 쓰지 않음.
+     * 요청 오버라이드 또는 classpath에 voice/reconstruct 키가 있으면 그것을, 없으면 인라인 가이드를 사용.
      */
     private String assembleReconstructPrompt(PostGenRequest req) {
-        String reconstructGuide = loadGuide("voice/reconstruct", null);
+        String reconstructGuide = guide("voice/reconstruct", req.getPromptOverrides());
         if (reconstructGuide == null || reconstructGuide.isBlank()) {
             reconstructGuide = """
 아래 지시에 따라 외부 커뮤니티 원본 글을 한국 갈등 커뮤니티 스타일 사연으로 재구성합니다.
@@ -257,7 +218,7 @@ public class PromptAssembler {
 """;
         }
         String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(),
-                reconstructGuide.replace("%", "%%"), req.getFormality(),
+                reconstructGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -287,14 +248,15 @@ public class PromptAssembler {
     /**
      * R9 Track B: 일상 글 모드 프롬프트 (D-51).
      * 갈등 서사 금지, 사건(trigger) 의무 없음. user 블록이 system의 "핵심 4가지" 보다 구체적으로 지시.
-     * guide = casualPostGuide(voice/post_casual.md) → buildSystem의 "커뮤니티 스타일 가이드" 섹션에 주입.
+     * guide = guide("voice/post_casual", overrides) → buildSystem의 "커뮤니티 스타일 가이드" 섹션에 주입.
      */
     private String assembleCasualPostPrompt(PostGenRequest req) {
         // 일상 가이드: 없으면 인라인 최소 기본값 사용
-        String guide = (casualPostGuide != null && !casualPostGuide.isBlank())
-            ? casualPostGuide
-            : "일상 글 모드 — 갈등/분쟁 서사 금지. 일상 관찰·취향·수다·경험 공유. 큰 결론 없이 끝내도 됨.";
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+        String casualGuide = guide("voice/post_casual", req.getPromptOverrides());
+        if (casualGuide.isBlank()) {
+            casualGuide = "일상 글 모드 — 갈등/분쟁 서사 금지. 일상 관찰·취향·수다·경험 공유. 큰 결론 없이 끝내도 됨.";
+        }
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), casualGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -333,9 +295,9 @@ public class PromptAssembler {
      * 상대방(B)이 같은 사건을 다른 시각으로 받아칠 앵커를 남긴다.
      */
     private String assembleAuthorPairedPrompt(PostGenRequest req) {
-        String guide = (pairedAuthorGuide != null && !pairedAuthorGuide.isBlank())
-            ? pairedAuthorGuide : postGuide;
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide, req.getFormality(),
+        String pairedGuide = guide("voice/post_paired_author", req.getPromptOverrides());
+        if (pairedGuide.isBlank()) pairedGuide = guide("voice/post", req.getPromptOverrides());
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), pairedGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -375,7 +337,7 @@ public class PromptAssembler {
     }
 
     private String assemblePartnerPrompt(PostGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), partnerGuide, req.getFormality(),
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/partner", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -413,7 +375,7 @@ public class PromptAssembler {
     }
 
     public String assembleCommentPrompt(CommentGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), commentGuide, req.getFormality(),
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/comment", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
@@ -459,7 +421,7 @@ public class PromptAssembler {
     }
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), replyGuide, req.getFormality(),
+        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/reply", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"

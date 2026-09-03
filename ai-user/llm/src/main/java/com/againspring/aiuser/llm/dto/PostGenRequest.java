@@ -1,6 +1,7 @@
 package com.againspring.aiuser.llm.dto;
 
 import lombok.*;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -52,4 +53,6 @@ public class PostGenRequest {
     private String voiceType;
     /** 글 생성 모드: "CONFLICT"(갈등 서사, 기본) | "CASUAL"(일상/잡담). PromptAssembler 분기용. */
     private String postKind;
+    /** 요청별 프롬프트 가이드 오버라이드 (key="voice/post" 등 → 본문). classpath 기본값보다 우선. 없으면 null. */
+    private Map<String, String> promptOverrides;
 }

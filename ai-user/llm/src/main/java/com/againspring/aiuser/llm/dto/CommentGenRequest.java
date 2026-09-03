@@ -1,6 +1,7 @@
 package com.againspring.aiuser.llm.dto;
 
 import lombok.*;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -46,4 +47,6 @@ public class CommentGenRequest {
     private String modeHint;
     /** 커뮤니티 voice 타입 (NATEPAN/DCINSIDE/THEQOO 등) — OutputSanitizer 분포 매칭용. 없으면 null. */
     private String voiceType;
+    /** 요청별 프롬프트 가이드 오버라이드 (key="voice/comment" 등 → 본문). classpath 기본값보다 우선. 없으면 null. */
+    private Map<String, String> promptOverrides;
 }

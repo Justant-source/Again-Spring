@@ -13,10 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -50,6 +48,7 @@ public class StructuredGenerationService {
     private final ParseFailureRateLimiter parseFailureRateLimiter;
     private final StructuredGenerationParseFailTelegramNotifier parseFailNotifier;
     private final LlmProperties llmProperties;
+    private final PromptAssembler promptAssembler;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
     @Value("${llm.post-model:claude-sonnet-5}") private String claudePostModel;
@@ -626,8 +625,8 @@ public class StructuredGenerationService {
                 AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines; keep each block short (about 1~2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / at most 3 cuts). Prefer even-ish meaningful chunks (e.g. 20 lines → [7,14]). If ≤8 lines, set capture_split_after_lines to null.
                 AI_POST metaphor_ids rules (hard): pick 3 to 5 ids from METAPHOR_CATALOG, ordered from best-fit to weakest-fit, that match the emotional core of the story (object-as-feeling metaphor). The FIRST id is the representative/primary metaphor and will be used as the video's opening image — it must be the single best match. The remaining ids will illustrate different beats of the story body, so prefer some variety in mood/tone across the list rather than 5 near-duplicates. Prefer group/tone fit over category label. Required for AI_POST.
                 Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
-                """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase1.md")) +
-                "\nAUTHOR_VOICE=\n" + clean(classpathText("voice/post_paired_author.md")) +
+                """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase1", req.getPromptOverrides())) +
+                "\nAUTHOR_VOICE=\n" + clean(promptAssembler.guide("voice/post_paired_author", req.getPromptOverrides())) +
                 "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) +
                 grounding +
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
@@ -666,8 +665,8 @@ public class StructuredGenerationService {
                 Use only supplied personaIds. No personal data, internal notes, or AI identity claims. Use 작성자/상대방.
                 STORY_PERSONA_RULE (hard): never assign the 작성자 or 상대방 personaId to any comment or reply. Those accounts already wrote the story sides; comments are other community members only.
                 Partner body line rules: one Korean sentence per newline; short blocks. If >8 non-empty lines, set capture_split_after_lines (semantic cuts, each part ≤8, max 4 parts); else null.
-                """ + "\nGUIDE=\n" + clean(classpathText("voice/paired_phase2.md")) +
-                "\nPARTNER_VOICE=\n" + clean(classpathText("voice/partner.md")) +
+                """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase2", req.getPromptOverrides())) +
+                "\nPARTNER_VOICE=\n" + clean(promptAssembler.guide("voice/partner", req.getPromptOverrides())) +
                 "\nCATEGORY=" + clean(req.getCategory()) +
                 "\nAUTHOR_POST=" + json(Map.of(
                         "title", clean(req.getAuthorPost().getTitle()),
@@ -677,14 +676,6 @@ public class StructuredGenerationService {
                 "\nINCLUDE_PARTNER_POST=" + wantPartner +
                 "\nPERSONAS=" + json(req.getPersonas()) +
                 "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
-    }
-
-    private static String classpathText(String path) {
-        try {
-            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return "";
-        }
     }
 
     private String planPrompt(ThreadPlanRequest req) {
