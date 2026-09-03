@@ -106,5 +106,6 @@ exec java $JAVA_OPTS \
     ${NEO4J_PASSWORD:+-Dspring.data.neo4j.authentication.password="$NEO4J_PASSWORD"} \
     -Djwt.secret="$JWT_SECRET" \
     ${ANTHROPIC_API_KEY:+-Dllm.claude-api.key="$ANTHROPIC_API_KEY"} \
+    ${AI_USER_INTERNAL_TOKEN:+-Dai-user.internal-token="$AI_USER_INTERNAL_TOKEN"} \
     -Dllm.provider="$LLM_PROVIDER" \
     -jar /app/app.jar

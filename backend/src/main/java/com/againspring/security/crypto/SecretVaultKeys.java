@@ -26,6 +26,7 @@ public final class SecretVaultKeys {
         m.put("mail.gmail_app_password", new String[] {"spring.mail.password", "GMAIL_APP_PASSWORD"});
         m.put("llm.anthropic_api_key", new String[] {"ANTHROPIC_API_KEY"});
         m.put("ai_user.bot_password", new String[] {"AI_USER_BOT_PASSWORD"});
+        m.put("ai_user.internal_token", new String[] {"ai-user.internal-token", "AI_USER_INTERNAL_TOKEN"});
         m.put("sync.dev_mariadb_password", new String[] {"DEV_MARIADB_PASSWORD"});
         m.put("asm.api_token", new String[] {"asm.api-token", "ASM_API_TOKEN"});
         m.put("asm.callback_token", new String[] {"asm.callback-token", "ASM_CALLBACK_TOKEN"});

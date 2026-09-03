@@ -144,6 +144,10 @@ ai:
   user:
     orchestrator-url: ${AI_USER_ORCHESTRATOR_URL:http://againspring-ai-user-orchestrator:8096}
 
+ai-user:
+  # orchestrator → backend 내부 채널(/api/internal/ai-user/**) 전용 Bearer 토큰. JWT 미사용, fail-closed.
+  internal-token: ${AI_USER_INTERNAL_TOKEN:}
+
 asm:
   base-url: ${ASM_BASE_URL:http://100.115.252.61:8200}
   api-token: ${ASM_API_TOKEN:asm-dev-token-change-in-prod}

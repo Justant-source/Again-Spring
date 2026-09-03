@@ -72,4 +72,10 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Query("SELECT u.id FROM User u WHERE u.synthetic = true")
     Set<String> findAllSyntheticIds();
+
+    /** 삭제되지 않은 synthetic 계정 전체의 비밀번호 회전 (AI_USER_BOT_PASSWORD 변경 시). */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("UPDATE User u SET u.passwordHash = :hash, u.updatedAt = :now WHERE u.synthetic = true AND u.deletedAt IS NULL")
+    int rotateSyntheticPasswordHash(@Param("hash") String hash, @Param("now") java.time.Instant now);
 }

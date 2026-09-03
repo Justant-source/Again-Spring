@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .requestMatchers("POST", "/api/internal/marketing/redrive").permitAll()
                         // 컨트롤러가 ASM_CALLBACK_TOKEN을 상수시간 비교로 자체 검증한다 (callback/redrive와 동일)
                         .requestMatchers("GET", "/api/internal/marketing/persona-export").permitAll()
+                        .requestMatchers("/api/internal/ai-user/**").permitAll()
+                        // 컨트롤러가 AI_USER_INTERNAL_TOKEN을 상수시간 비교로 자체 검증한다 (JWT 미사용 내부 채널)
                         .requestMatchers("/api/auth/agree").authenticated()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
