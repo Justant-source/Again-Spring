@@ -31,6 +31,9 @@ usage() {
 
   dev   : 즉시 진행. base + dev 스택 기동 → /api/health/deep 대기(:8090)
           → scripts/verify-deploy.sh dev 자동 실행.
+          --ai-user-canary : verify 통과 후 scripts/ai-user-canary.sh 실행
+            (STUB provider로 generate→publish 1사이클, LLM 미호출, dev 전용).
+            예: scripts/deploy.sh dev --ai-user-canary
 
   prod  : 기본적으로 거부한다 (AGENTS.md 절대 규칙 #4 — prod 배포는 사용자의
           명시적 "prod에 배포해줘" 지시가 있을 때만). 진행하려면 아래 중 하나:
@@ -49,9 +52,11 @@ TARGET_ENV="${1:-}"
 shift || true
 
 I_MEAN_IT=""
+AI_USER_CANARY=""
 for arg in "$@"; do
   case "$arg" in
     --i-mean-it) I_MEAN_IT="1" ;;
+    --ai-user-canary) AI_USER_CANARY="1" ;;
     *)
       echo "🚨 알 수 없는 인자: $arg" >&2
       usage
@@ -63,6 +68,11 @@ case "$TARGET_ENV" in
   dev|prod) ;;
   *) usage ;;
 esac
+
+if [[ "$TARGET_ENV" == "prod" && "$AI_USER_CANARY" == "1" ]]; then
+  echo "🚨 --ai-user-canary는 dev 전용이다. prod에서는 사용할 수 없다." >&2
+  usage
+fi
 
 # prod 경로에서 e2e를 곁들여 돌리려는 시도를 조기 차단한다. 이 스크립트 자체는
 # e2e를 절대 호출하지 않지만, RUN_E2E=1로 감싸 실행하는 실수를 막는다.
@@ -143,3 +153,8 @@ echo "▶ scripts/verify-deploy.sh ${TARGET_ENV} 실행 (분리 불가 — 실�
 bash "$VERIFY_SCRIPT" "$TARGET_ENV"
 
 echo "✅ ${TARGET_ENV} 배포 + 검증 완료" >&2
+
+if [[ "${AI_USER_CANARY:-}" == "1" ]]; then
+  echo "▶ AI-user canary (dev, STUB, LLM 미호출)" >&2
+  bash "$SCRIPT_DIR/ai-user-canary.sh"
+fi
