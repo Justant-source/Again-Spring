@@ -83,5 +83,4 @@ flowchart TD
 
 - `components/shared/CrisisResourceModal.tsx` — 핫라인 모달 (ESC/바깥클릭 없음)
 - `lib/constants/crisisResources.ts` — 핫라인 데이터
-- `lib/constants/forbiddenWords.ts` — CRISIS_KEYWORDS, WARNING_KEYWORDS (관리자 판단 참고용, 사용자 입력 차단 아님)
 - `app/(admin)/admin/crisis/` — 위기 감지 관제 UI

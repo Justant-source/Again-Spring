@@ -93,7 +93,7 @@ frontend/
 │   │   └── client.ts           # axios 인스턴스 + Bearer 인터셉터
 │   │
 │   ├── constants/
-│   │   ├── forbiddenWords.ts   # CRISIS_KEYWORDS, WARNING_KEYWORDS, FORBIDDEN_UI_WORDS
+│   │   ├── crisisResources.ts  # 핫라인 리소스 (CRISIS_RESOURCES_IMMEDIATE/LEGAL)
 │   │   ├── userPermissions.ts  # permissionsFor() 함수, 3-tier 권한
 │   │   └── ...
 │   │

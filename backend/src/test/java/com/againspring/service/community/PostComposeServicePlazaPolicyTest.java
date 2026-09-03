@@ -31,8 +31,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 광장형 정책: 사연 본문의 금지어/LEVEL1(피해자·소송 등)은 게시 차단 사유가 아니다.
- * 2026-08-10: PostComposeService가 KeywordGuard isBlocked()로 예약 발행을 막던 회귀.
+ * 광장형 정책: 사연 본문의 위기 키워드(피해자·소송 등)는 게시 차단 사유가 아니다.
+ * 2026-08-10: PostComposeService가 (구)KeywordGuard isBlocked()로 예약 발행을 막던 회귀.
+ * 현재는 CrisisKeywordGuard.scan()이 CrisisDetectedEvent만 남기고 게시는 항상 진행한다.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("PostComposeService — 광장형 입력 미차단")
@@ -50,7 +51,7 @@ class PostComposeServicePlazaPolicyTest {
     @InjectMocks private PostComposeService composeService;
 
     @Test
-    @DisplayName("LEVEL1(피해자·소송) 본문도 게시된다 — CRISIS_DETECTED로 막지 않는다")
+    @DisplayName("위기 키워드(피해자·소송) 본문도 게시된다 — CRISIS_DETECTED로 막지 않는다")
     void compose_doesNotBlockAnyWording() {
         String body = "결국 경찰 신고와 민사 소송, 그리고 공론화를 결심했습니다. "
                 + "억울하게 피해자가 먼저 떠나야 하는 상황은 절대 만들고 싶지 않습니다.";
