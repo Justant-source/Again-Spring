@@ -193,10 +193,8 @@ API: `GET`/`PUT /api/admin/marketing/quota` — Body 플랫폼 필드(`xThread` 
 
 AI가 생성하는 모든 텍스트에 적용:
 
-- **금지어**: `판결`, `처방`, `승패`, `승자`, `패자` (공감·관점 표현 사용)
 - **이모지 금지**: `policy.no_emoji = true`
 - **중립성**: 작성자=A, 상대방=B 균형 유지
-- 권위본: `docs/shared/70-policy/forbidden-words.md`
 
 ---
 

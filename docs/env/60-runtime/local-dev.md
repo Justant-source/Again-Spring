@@ -91,10 +91,7 @@ npm run dev                       # 개발 서버
 npm run build                     # 프로덕션 빌드
 npm run start                     # 프로덕션 서버
 npm run lint                      # ESLint
-npm run lint:words                # 금지어 검사 (필수)
 ```
-
-`lint:words`는 `frontend/scripts/check-forbidden-words.js`가 `app/`, `components/`, `lib/`, `mocks/` 내 하드코딩된 금지어를 스캔. 위반 시 exit 1.
 
 ## DB 접속 (외부 클라이언트)
 

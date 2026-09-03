@@ -53,7 +53,7 @@ frontend/
 │   ├── admin/, auth/, feedback/, icons/, legal/, profile/, shared/, ui/
 ├── lib/
 │   ├── api/                      # API 클라이언트 (community, user 등)
-│   ├── constants/                # userPermissions, forbiddenWords 등
+│   ├── constants/                # userPermissions 등
 │   └── store/                    # uiStore (Zustand)
 ├── mocks/
 │   └── handlers/                 # MSW 핸들러 (community, notifications, user)
@@ -78,7 +78,6 @@ frontend/
 | **UX 원칙 (권위본)** | [`docs/ux/principles.md`](docs/ux/principles.md) |
 | HAX 컴포넌트 체크리스트 | [`docs/ux/hax-checklist.md`](docs/ux/hax-checklist.md) |
 | 디자인 시스템 | [`docs/design/README.md`](docs/design/README.md) |
-| 금지어 린트 | [`docs/policies/forbidden-words-lint.md`](docs/policies/forbidden-words-lint.md) |
 
 ---
 
@@ -87,7 +86,6 @@ frontend/
 ```bash
 npm run dev          # 개발 서버 (localhost:3000)
 npm run build        # 프로덕션 빌드
-npm run lint:words   # 금지어 하드코딩 검사
 npm run lint:emoji   # 이모지 금지 검사
 npm run test         # Vitest 유닛 테스트
 npm run test:e2e:realbe  # 실서버 e2e (Playwright)
@@ -101,7 +99,7 @@ npm run test:e2e:realbe  # 실서버 e2e (Playwright)
 
 - **AI 신뢰성 최우선**: AI-user·AI 생성 콘텐츠는 AI임을 명확히 표시, 사용자 글과 시각 구분
 - **작성자=피치(peach #C9785A), 상대방=세이지(sage #5F8F76)** — 앱 전체 일관 유지. 상세: [docs/design/system.md](docs/design/system.md)
-- **사용자 입력에 금지어 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
+- **사용자 입력에 표현 필터 미적용** — 사용자가 쓴 텍스트의 책임은 사용자에게 있음
 - **위기 모달**: ESC·바깥클릭 차단 (명시적 버튼으로만 닫힘)
 
 ---
@@ -119,7 +117,6 @@ npm run test:e2e:realbe  # 실서버 e2e (Playwright)
 
 ## PR 병합 전 체크리스트
 
-- [ ] `npm run lint:words` 통과
 - [ ] 변경된 컴포넌트의 `docs/ux/hax-checklist.md` 항목 확인
 - [ ] `npm run build` 성공
 - [ ] 해당하면 `data-testid` 변경 + `tests/e2e-realbe/support/selectors.ts` 동기화

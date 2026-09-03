@@ -38,7 +38,7 @@ flowchart TD
     subgraph INF["인프라"]
         direction LR
         I1["llm/: RemoteLlmProvider\nPromptSanitizer\nconfig/ · fallback/ · monitoring/"]
-        I2["safety/: KeywordGuard · CrisisDetector\nsecurity/: JWT · SecurityConfig\nconfig/: OpenAPI · CORS · Async"]
+        I2["safety/: CrisisKeywordGuard\nsecurity/: JWT · SecurityConfig\nconfig/: OpenAPI · CORS · Async"]
     end
 
     API --> SVC
@@ -72,7 +72,7 @@ flowchart TD
 | `llm/prompt/` | 프롬프트 어셈블 + 로더 |
 | `llm/fallback/` | 로컬 fallback (개발 전용) |
 | `llm/monitoring/` | LLM 호출 지표 수집 |
-| `safety/` | KeywordGuard · CrisisDetector · SafetyAuditLogger |
+| `safety/` | CrisisKeywordGuard · SafetyAuditLogger |
 | `security/` | JwtFilter · SecurityConfig · RateLimitFilter · UserDetailsService |
 | `config/` | 빈 설정 (CORS · Async · Scheduling · OpenAPI) |
 | `common/` | 공통 예외 (BusinessException · GlobalExceptionHandler) |
@@ -242,7 +242,7 @@ com.againspring/
 │   ├── CrisisDetectedEvent
 │   ├── CrisisDetector
 │   ├── CrisisResponse
-│   ├── KeywordGuard
+│   ├── CrisisKeywordGuard
 │   ├── Level
 │   ├── RatioEnforcer
 │   ├── SafetyAuditLogger
@@ -296,7 +296,7 @@ backend/src/main/resources/
 │   ├── V56__drop_legacy_mediation_tables.sql  # 레거시 테이블 제거
 │   ├── V106__drop_ai_jury.sql          # jurors 테이블·juror_count 제거
 │   └── (other migrations)
-├── safety/forbidden-words.yml          # KeywordGuard 단어 목록
+├── safety/crisis-keywords.yml          # CrisisKeywordGuard 단어 목록
 ├── permissions.yml                     # UserPermissionsConfig 로드
 └── logback-spring.xml
 ```

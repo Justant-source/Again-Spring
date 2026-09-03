@@ -24,6 +24,5 @@
 
 - [ ] `docs/design/system.md` 톤(L/P/Q) 일관성 확인
 - [ ] `npm run lint:emoji` 통과 (emoji 잔존 0)
-- [ ] `npm run lint:words` 통과 (금지어 0)
 - [ ] 토큰 SSOT 유지: `tailwind.config.ts` 외 색상 하드코딩 없음
 - [ ] 신규 아이콘 추가 시 `docs/design/icons.md` 카탈로그 등재

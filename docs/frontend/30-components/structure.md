@@ -114,7 +114,6 @@ frontend/
 │       └── user.ts             # /api/users
 │
 ├── scripts/
-│   ├── lint:words              # 금지어 검사
 │   ├── lint:emoji              # 이모지 검사
 │   └── test:e2e:realbe         # 실서버 e2e
 │
@@ -165,7 +164,6 @@ frontend/
     │       └── sprout-character-system/         # 시봄이 캐릭터 60종(진행중 30/60) + catalog.json + gen.py
     └── policies/
         ├── README.md
-        ├── forbidden-words-lint.md
         └── (기타 정책 문서)
 ```
 
@@ -198,7 +196,6 @@ frontend/
 - `app/(admin)/admin/marketing/**` — 마케팅 대시보드
 - `components/community/c3/` — FeedCard, VoteBar, CommentBar, SearchPanel, BrandBar 등
 - `lib/api/community.ts` + `lib/api/user.ts` — API 클라이언트
-- `lib/constants/forbiddenWords.ts` — 3-tier 금지어
 - `lib/constants/userPermissions.ts` — 3-tier 권한
 - `lib/store/uiStore.ts` — 상태 관리
 - `mocks/handlers/community.ts`, `notifications.ts`, `user.ts`

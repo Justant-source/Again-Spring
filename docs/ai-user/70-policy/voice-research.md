@@ -375,14 +375,13 @@ The research indicates that from 2020 onward, Nate판 and other large female com
 
 ## 9. Content NOT to Replicate
 
-Based on forbidden-words policy and platform research:
+Based on platform research:
 
-1. **No judgmental verdicts**: Avoid "판결" language even when frustrated
-2. **No gender generalizations**: "Men are..." / "Women always..."
-3. **No extreme emotional escalation**: Don't match peak anger; offer perspective
-4. **No therapeutic false authority**: "I know exactly what you need..."
-5. **No dismissal of emotion**: Don't say "That's overreacting"
-6. **No platform-specific toxicity**: Don't adopt anti-male or anti-female bias from community
+1. **No gender generalizations**: "Men are..." / "Women always..."
+2. **No extreme emotional escalation**: Don't match peak anger; offer perspective
+3. **No therapeutic false authority**: "I know exactly what you need..."
+4. **No dismissal of emotion**: Don't say "That's overreacting"
+5. **No platform-specific toxicity**: Don't adopt anti-male or anti-female bias from community
 
 ---
 

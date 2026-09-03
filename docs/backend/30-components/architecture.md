@@ -33,7 +33,7 @@ flowchart TB
         Domain["JPA Entity\ndomain/community/* + notification + marketing"]
         Repo[JpaRepository\nrepository/]
         LLM["RemoteLlmProvider\nllm/remote/"]
-        Safety["PromptSanitizer\nKeywordGuard\nCrisisDetector\nsafety/"]
+        Safety["PromptSanitizer\nCrisisKeywordGuard\nsafety/"]
         Sched["RetentionScheduler\nservice/retention/"]
         Notify["service/notify/\nservice/notification/"]
     end
@@ -60,7 +60,7 @@ HTTP Request
 @Service (service/community/*, service/marketing/*)
    │
    │  비즈니스 로직 + @Transactional 경계
-   │  ├── safety/* (KeywordGuard, PromptSanitizer, CrisisDetector)
+   │  ├── safety/* (CrisisKeywordGuard, PromptSanitizer)
    │  └── llm/remote/* (RemoteLlmProvider → llm-worker HTTP)
    │
    │  자세한 설명: llm-bridge.md 참조
@@ -124,8 +124,7 @@ flowchart LR
 
 | 이벤트 | 발행 | 리스너 | 효과 |
 |---|---|---|---|
-| `SafetyTriggerEvent` | KeywordGuard 위반 시 | `SafetyAuditLogger` | safety 감사 로그 (마스킹) |
-| `CrisisDetectedEvent` | CrisisDetector 발동 시 (게시글/댓글) | 관리자 알림 | crisis_alerts 로깅 |
+| `CrisisDetectedEvent` | CrisisKeywordGuard 감지 시 (게시글/댓글) | SafetyAuditLogger | crisis_alerts 로깅 |
 
 `AsyncConfig`로 일부 리스너는 비동기 처리 — main thread 막지 않음.
 
@@ -167,10 +166,8 @@ flowchart LR
 |---|---|---|
 | `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [`shared/policies/auth.md`](../../shared/70-policy/auth.md) |
 | `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/policies/auth.md`](../../shared/70-policy/auth.md) |
-| `KeywordGuard` | 금지어 검사 (입력+응답 양방향) | [`shared/policies/forbidden-words.md`](../../shared/70-policy/forbidden-words.md) |
-| `CrisisDetector` | 위기 키워드 감지 → 관리자 알림 | `docs/shared/70-policy/forbidden-words.md` |
+| `CrisisKeywordGuard` | 실사용자 위기 키워드 감사 로그(게시 차단 없음) | `docs/frontend/60-runtime/flows/08-crisis.md` |
 | `PromptSanitizer` | LLM 입력 inject 방지 | `docs/backend/llm-bridge.md` |
-| `RatioEnforcer` | 공감 비율 범위 강제 (0~100%) | `docs/shared/70-policy/forbidden-words.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
 
 ## 예외 처리

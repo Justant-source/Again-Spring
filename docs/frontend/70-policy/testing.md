@@ -8,19 +8,6 @@
 
 ### 1. 린트 검사 (정적 분석)
 
-#### 금지어 검사 (`npm run lint:words`)
-
-```bash
-npm run lint:words
-```
-
-- **목표**: Level 1/2/3 금지어, 위기 키워드 사전 검출
-- **도구**: `scripts/check-forbidden-words.js` (Node.js)
-- **대상**: `app/`, `components/`, `lib/`, `mocks/`
-- **CI/CD**: PR 마다 실행 필수
-- **실패 조건**: Level 1 금지어 1개 이상 감지
-- **상세**: [`forbidden-words-lint.md`](forbidden-words-lint.md)
-
 #### 이모지 검사 (`npm run lint:emoji`)
 
 ```bash
@@ -73,7 +60,6 @@ MSW는 dev 모드에서 자동 활성화됩니다. 실제 페이지 플로우를
 [ ] 로그인 → 피드 열람 → 게시글 작성 → 투표 → 댓글
 [ ] 투표 (작성자/상대방)
 [ ] 댓글 작성 및 무한스크롤
-[ ] 금지어 입력 시 검증
 [ ] 위기 키워드 입력 시 모달 표시
 [ ] 위기 모달 닫기 (ESC/바깥클릭 차단 확인)
 ```
@@ -176,10 +162,9 @@ import { test, expect } from '../support/no-llm-fixture'
 
 ### 5. 보안 테스트
 
-#### 금지어 및 위기 키워드
+#### 위기 키워드
 
 ```
-[ ] Level 1 금지어 입력 시 검증 (배포 전 필수)
 [ ] 위기 키워드 ("자살", "폭력" 등) 입력 시 모달 표시
 [ ] 모달은 ESC/바깥클릭으로 닫히지 않음 (명시적 버튼만)
 ```
@@ -222,9 +207,6 @@ npm run test:e2e        # 자동화된 a11y 검사 (axe-core)
 ### 개발 단계
 
 ```bash
-# 금지어 검사 (매번)
-npm run lint:words
-
 # 이모지 검사
 npm run lint:emoji
 
@@ -239,7 +221,6 @@ npm run test
 
 ```bash
 # .husky/pre-commit
-npm run lint:words
 npm run lint:emoji
 npm run test        # 또는 SKIP_TESTS=1로 우회 가능
 ```
@@ -260,7 +241,6 @@ jobs:
         with:
           node-version: '20'
       - run: npm ci
-      - run: npm run lint:words
       - run: npm run lint:emoji
       - run: npm run test
       - run: npm run build
@@ -269,7 +249,6 @@ jobs:
 ### 배포 전 체크리스트
 
 ```
-[ ] npm run lint:words 통과
 [ ] npm run lint:emoji 통과
 [ ] npm run test 통과 (또는 생략 사유 명시)
 [ ] npm run build 성공 (no errors/warnings)
@@ -352,6 +331,6 @@ export const communityHandlers = [
   - `E2E_BASE_URL`에 `127.0.0.1`을 넣어도 Playwright config가 `localhost`로 정규화한다.
   - cleanup: 포스트/댓글/투표 + marketing_job·notifications·community_reports·게스트 users 행까지 teardown에서 삭제.
 - 성능 모니터링 자동화 미구현
-- FE KeywordGuard는 스텁(서버 KeywordGuard만) — 위기 키워드 e2e 없음
+- FE 위기 키워드 모달은 스텁(서버 `CrisisKeywordGuard`만) — 위기 키워드 e2e 없음
 
 ---

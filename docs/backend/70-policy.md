@@ -6,7 +6,7 @@
 cd backend
 ./gradlew test                        # 전체
 ./gradlew test --tests "*Sanitizer*"  # 패턴
-./gradlew test --tests com.againspring.safety.KeywordGuardTest
+./gradlew test --tests com.againspring.safety.CrisisKeywordGuardTest
 ./gradlew test --rerun-tasks          # 캐시 무시
 ```
 
@@ -39,7 +39,7 @@ cd backend
 | Service (비즈니스 로직) | 80% |
 | Controller (라우팅 + 입력 검증) | 70% |
 | LLM Bridge | 90% (에러 처리 중점) |
-| Safety (KeywordGuard, CrisisDetector, RatioEnforcer, PromptSanitizer) | **100%** |
+| Safety (CrisisKeywordGuard, PromptSanitizer) | **100%** |
 | API 통합 (Controller→Service→Repo) | 80% |
 
 JaCoCo로 측정 (현재 build.gradle.kts에 미포함 — 필요 시 추가).
@@ -122,8 +122,7 @@ CI에서는 환경변수 없으면 자동 skip.
 
 다음 클래스는 변경 시 반드시 테스트:
 
-- `safety/KeywordGuard` — 모든 단어 카테고리 + 응답 후처리
-- `safety/CrisisDetector` — Level 1 4 카테고리 + Level 2
+- `safety/CrisisKeywordGuard` — 위기 키워드 카테고리 전부
 - `safety/RatioEnforcer` — factual/difference/mixed 클리핑 + 엣지 케이스
 - `llm/PromptSanitizer` — INJECTION_PATTERNS 전부 + 길이 제한
 - `security/JwtService` — 토큰 발급/검증/폐기 확인

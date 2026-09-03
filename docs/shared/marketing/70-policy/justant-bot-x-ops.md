@@ -107,7 +107,7 @@ flowchart TD
 - 작문: `composeOutbound` — 프롬프트 + persona JSON + TIMELINE few-shot + DELETED_AUTO avoid + 선택 JPEG(`LlmImage`) + `peerReplies` 최대 10.
 - 자신 없으면 게시하지 않음 (`UNSURE`). ㅋㅋ로 채우지 않음.
 - 가드 `OutboundDraftGuard` + `marketing.x.outbound_guards`: `TOO_LONG`(기본 비공백 40자, 최대 2줄) / `LAUGH_SPAM` / `ECHO` / `LANG_MISMATCH`.
-- 안전: `KeywordGuard`, 판결 벨트, LLM 오류 시그니처. 오류 문자열은 본문으로 게시 금지. AI 출력은 **공감·관점·작성자·상대방**만 — 승패·유무죄 표현 금지.
+- 안전: LLM 오류 시그니처(`docs/shared/policies/llm-error-signatures.json`). 오류 문자열은 본문으로 게시 금지. 표현 denylist는 없다.
 - 게시: ASM `POST /api/v1/x/publish`. 성공 시 Telegram (`XOpsTelegramAlerts.posted`).
 
 ### 3.2 Inbound — 우리 글에 달린 남 댓글에 답
@@ -197,7 +197,7 @@ flowchart TD
 
 - 대상: 이번 run 신규 `TIMELINE` gold 중 `postText != null ∧ !hasPhoto`(사진 상황은 재현이 불공정). run당 캡 **10**.
 - 재현: `composeOutbound(postText, 빈 peers, 사진 없음, excludeTweetId)` — 해당 예시를 few-shot에서 뺀 **held-out**.
-- 심판: Sonnet + 4축(말투/길이/결/내용) + overall 0–100 JSON. 금지어·판결 벨트 준수.
+- 심판: Sonnet + 4축(말투/길이/결/내용) + overall 0–100 JSON.
 - `metrics()`: 28일 overall 평균(`n<30`이면 표본 부족) + 삭제율(28일 신규 `DELETED_AUTO` / 28일 `POSTED`, 분모 0 가드).
 - **게이트 = 평균 ≥95 ∧ 삭제율 ≤2% ∧ n≥30.**
 - 어드민 뱃지: `28일 닮음 {avg} / 삭제율 {pct}% / 게이트 통과|미달` (`data-testid=marketing-x-ops-mimicry-badge`).

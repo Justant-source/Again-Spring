@@ -8,12 +8,11 @@
 
 ## 광장형 위기 정책 개요
 
-다시봄 광장형 모델에서 **사용자 입력(게시글·댓글)에는 금지어·위기 키워드 필터를 적용하지 않습니다.**  
+다시봄 광장형 모델에서 **사용자 입력(게시글·댓글)에는 어떤 표현 필터도 적용하지 않습니다.**
 사용자가 쓴 텍스트의 표현 책임은 사용자에게 있으며, 플랫폼은 입력을 차단하지 않습니다.
 
-`PostComposeService`도 동일하다. `KeywordGuard.scanUserInput`으로 CRISIS 키워드를 감지하면
-`CrisisDetectedEvent`만 남기고 **게시는 계속**한다. LEVEL1(피해자·소송 등)은 AI 출력 금지어이며
-사연 본문 차단 사유가 아니다(2026-08-10: 차단 throw가 예약 발행을 멈추던 회귀를 제거).
+`PostComposeService`·`CommentService`는 `CrisisKeywordGuard.scan`으로 위기 키워드(자살·자해·폭력)를
+감지하면 `CrisisDetectedEvent`만 남기고 **게시는 계속**합니다. AI-user 본문에는 이 관제도 적용하지 않습니다.
 
 대신 다음 두 가지 수단으로 위기 상황에 대응합니다:
 
@@ -31,19 +30,19 @@
 
 ## (A) 자동 위기 감지 흐름
 
-근거: `service/crisis/CrisisDetector.java`, `app/(admin)/admin/crisis/`
+근거: `safety/CrisisKeywordGuard.java`, `app/(admin)/admin/crisis/`
 
 <!-- last-verified: 2026-08-31 -->
 <!-- code-ref: frontend/app/community/[id]/page.tsx -->
 ```mermaid
 flowchart TD
-    Post(["게시글/댓글 작성"]) --> Detect["CrisisDetector.detect()\n키워드 매칭"]
+    Post(["게시글/댓글 작성"]) --> Detect["CrisisKeywordGuard.scan()\n키워드 매칭"]
     Detect -->|"감지"| Log["감지 이벤트 기록"]
-    Log --> AdminCrisis["/admin/crisis 대시보드\n(30초 폴링, 본문 내용 비노출)"]
+    Log --> AdminCrisis["감사 로그\n(com.againspring.safety.audit, 본문 내용 비노출)"]
 ```
 
 - 위기 모니터 본문 비노출: 프라이버시 정책 준수
-- 수동 "위기 마크" 설정 UI는 존재하지 않는다 — 감지는 전적으로 자동(키워드 매칭)이며 관리자는 `/admin/crisis`에서 조회만 한다(과거 이 문서가 서술하던 `AdminCommunityController` 기반 수동 마크 PATCH 엔드포인트는 존재한 적이 없거나 이미 삭제된 죽은 참조였음 — 2026-07-30 확인)
+- 수동 "위기 마크" 설정 UI는 존재하지 않는다 — 감지는 전적으로 자동(키워드 매칭)이며 감사 로그 `com.againspring.safety.audit`로만 기록된다(2026-09-03 grep 확인: `/admin/crisis` 백엔드 엔드포인트는 존재하지 않는다. 과거 이 문서가 서술하던 `AdminCommunityController` 기반 수동 마크 PATCH 엔드포인트는 존재한 적이 없거나 이미 삭제된 죽은 참조였음 — 2026-07-30 확인)
 
 ---
 

@@ -160,7 +160,6 @@ cd backend && ./gradlew test
 cd frontend && npm run test
 # 실서버 e2e = dev:8090 (prod에서 e2e 금지)
 cd frontend && E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
-cd frontend && npm run lint:words
 cd frontend && npm run lint:emoji
 ```
 
