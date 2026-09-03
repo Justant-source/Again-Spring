@@ -136,8 +136,8 @@ flowchart TD
 - **기본 `original_post_enabled=false`.** 신규 자동 게시 철칙. **95% 게이트(평균 ≥95 ∧ 삭제율 ≤2% ∧ n≥30) 통과 전 prod에서 켜지 말 것.**
 - 슬롯 **12:30 · 19:30 KST** (리추얼 07:30/22:00과 격리).
 - 한도: `countPostedToday(ORIGINAL) < min(original_post_daily_cap, storyScoopsPerDay)`. `story_scoops_per_day`를 여기서 소비한다.
-- 소재 = **광장 공개 인기 사연만**. 개인 경험 날조 금지(일상 원글은 리추얼이 커버). `x_thread` 기발행(`marketing_job`) 제외 ∧ 기스쿱(`ref_post_id`) 제외 ∧ KeywordGuard 통과.
-- 작문: `composeOriginal(storySummary, link)` — persona `post_style` + `fewShotPostBlock()`(`TIMELINE_POST`) + donts + 원글 전용 길이 가드(140자/3줄). 프롬프트 `x-original-post.md`: 공감 한 줄 + UTM 링크. 판결·유무죄·재단 금지.
+- 소재 = **광장 공개 인기 사연만**. 개인 경험 날조 금지(일상 원글은 리추얼이 커버). `x_thread` 기발행(`marketing_job`) 제외 ∧ 기스쿱(`ref_post_id`) 제외. 표현 denylist는 없다(§3.1 원칙과 동일).
+- 작문: `composeOriginal(storySummary, link)` — persona `post_style` + `fewShotPostBlock()`(`TIMELINE_POST`) + donts + 원글 전용 길이 가드(140자/3줄). 프롬프트 `x-original-post.md`: 공감 한 줄 + UTM 링크(어조는 공감이지 판결이 아니다 — 필터로 차단하지 않는다).
 - 게시: `AsmClient.publishX` → `ledger.recordPosted(Kind.ORIGINAL, …, refPostId)` → Telegram 알림(알림 전용).
 - `ALL_KINDS`에 ORIGINAL 포함 → gold 오염 차단, 지운 원글은 avoid 학습.
 

@@ -39,7 +39,7 @@ flowchart TB
 
 | 담는 것 | 담지 않는 것 |
 |---|---|
-| REST 계약, 권한·금지어 정책, ADR, 마케팅 thin-client 문서 | BE 패키지 내부, FE 컴포넌트, compose 포트 표 |
+| REST 계약, 권한 정책, ADR, 마케팅 thin-client 문서 | BE 패키지 내부, FE 컴포넌트, compose 포트 표 |
 | 런타임 마운트 자산 (`prompts/`, `categories.yml`, `policies/user-permissions.json`, `templates/`) | 자산 경로 변경 (docker-compose와 함께만) |
 
 ## §3. 런타임 자산 (이동 금지)

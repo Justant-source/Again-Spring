@@ -16,7 +16,7 @@
 
 대신 다음 두 가지 수단으로 위기 상황에 대응합니다:
 
-1. **자동 위기 감지 + 관제** — `CrisisDetector`(키워드 매칭)가 위기 신호를 감지하면 `/admin/crisis`(30초 폴링)에 노출
+1. **자동 위기 감지 + 감사 로그** — `CrisisKeywordGuard.scan`(키워드 매칭)이 위기 신호를 감지하면 게시는 그대로 진행하고 감사 로그(`com.againspring.safety.audit`, 본문 내용 비노출)만 남긴다. `/admin/crisis` 백엔드 엔드포인트는 존재하지 않는다.
 2. **상시 핫라인 리소스** — `CrisisResourceModal` 언제든 접근 가능
 
 ---
