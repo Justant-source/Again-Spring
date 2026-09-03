@@ -277,7 +277,6 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 - `POST /admin/trigger/reset-counter`
 - `POST /admin/trigger/backfill-comment-likes`
 - `POST /admin/trigger/generate-posts`
-- `POST /admin/trigger/cleanup-ㅠ`
 - `POST /admin/trigger/update-cap`
 
 ### test
