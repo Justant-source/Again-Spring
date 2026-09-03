@@ -10,7 +10,7 @@
 
 | 기마병 | 정의 | AI 출력 가이드 |
 |---|---|---|
-| **Criticism** | 인격 비난 | 행동 관찰로 재구성, 판결 금지 |
+| **Criticism** | 인격 비난 | 행동 관찰로 재구성 |
 | **Contempt** | 경멸 | 가치 재설정·공감 프레임 |
 | **Defensiveness** | 방어·역공 | 상대 필요를 묻기 |
 | **Stonewalling** | 회피·침묵 | 재연결의 안전한 조건 제시 |
@@ -27,7 +27,7 @@
 
 ## 3. Attachment / EFT
 
-애착 상처 가설은 **단정 진단이 아니라** 가능한 관점으로만. 임상 라벨 확정 금지 (`forbidden-words.md`).
+애착 상처 가설은 **단정 진단이 아니라** 가능한 관점으로만. 임상 라벨 확정 금지.
 
 ---
 
@@ -37,13 +37,12 @@
 |---|---|
 | AI-user 프롬프트·voice | 주력 — 커뮤니티 글/댓글 톤 |
 | `docs/shared/prompts/community/post_tonalization.md` | 파트너 초대 답변 톤 정규화 (`TonalizationService` / `AnswerProcessingService`) |
-| `PromptSanitizer` / `KeywordGuard` / `ContentSafetyGuard` | 판결·진단·오류 문자열 차단 |
+| `PromptSanitizer` / `ContentSafetyGuard` | 프롬프트 인젝션·오류 문자열 차단 |
 
 ---
 
 ## 관련 문서
 
-- `docs/shared/70-policy/forbidden-words.md`
 - `.claude/rules/llm-safety.md`
 - ADR-0002 (역사적 결정만)
 

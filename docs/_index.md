@@ -50,7 +50,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | AI 유저 생성·오케스트레이션 | `docs/ai-user/10-context.md` | `docs/ai-user/30-components/orchestrator.md` | `ai-user/orchestrator/` |
 | AI 유저 학습 | `docs/ai-user/30-components/learning.md` | `docs/ai-user/70-policy/llm-call-budget.md` | `ai-user/learning/` |
 | API 명세 | `docs/shared/50-api/rest-spec.md` | — | `backend/src/main/java/com/againspring/api/` |
-| 정책 (금지어·인증·권한) | `docs/shared/70-policy/forbidden-words.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
+| 정책 (인증·권한) | `docs/shared/70-policy/auth.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
 | 환경/배포 | `docs/env/60-runtime/deployment.md` | `docs/env/20-containers/architecture.md` | `env/docker-compose*.yml` |
 | 마케팅 | `docs/shared/marketing/10-context.md` | `docs/shared/marketing/70-policy/` | ASM: (별도 저장소) |
 | Justant-Bot (X 선댓글·대댓글) | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | `docs/shared/prompts/marketing/x-outbound-reply.md` · `x-outbound-donts.md` | `backend/src/main/java/com/againspring/marketing/XCommentComposer.java` |
@@ -98,7 +98,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | 12 | `ai-user/orchestrator/**` | `docs/ai-user/30-components/orchestrator.md` | M |
 | 13 | `ai-user/learning/**` | `docs/ai-user/30-components/learning.md` | M |
 | 14 | `env/docker-compose*.yml` | `docs/env/20-containers/architecture.md` | M |
-| 15 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | `docs/shared/70-policy/forbidden-words.md` | M |
+| 15 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | `docs/frontend/60-runtime/flows/08-crisis.md` | M |
 | 16 | `backend/src/main/java/com/againspring/llm/prompt/PromptLoader.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 17 | `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 18 | `backend/src/main/java/com/againspring/marketing/**` | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | M |
@@ -117,5 +117,4 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | `ai-user/learning/` | ai-user | `docs/ai-user/30-components/learning.md` | |
 | `env/docker-compose*.yml` | env | `docs/env/20-containers/architecture.md` | 🏛 |
 | `docs/shared/policies/` | shared | `docs/shared/70-policy/` | 🏛 |
-| `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | shared | `docs/shared/70-policy/forbidden-words.md` | 🏛 |
 | `backend/src/main/java/com/againspring/marketing/` | marketing | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | 🏛 |

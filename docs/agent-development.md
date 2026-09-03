@@ -27,7 +27,7 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | FE 디자인·UX | [`docs/frontend/70-policy/design-system.md`](./frontend/70-policy/design-system.md), [`docs/frontend/70-policy/principles.md`](./frontend/70-policy/principles.md) | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
 | BE 기능·API | [`docs/backend/10-context.md`](./backend/10-context.md) | `backend/src/main/java/com/againspring/` |
 | API·DB 계약 | [`docs/shared/50-api/README.md`](./shared/50-api/README.md) | `backend/.../*Controller.java`, `backend/src/main/resources/db/migration/` |
-| LLM 브릿지·프롬프트 | [`docs/backend/30-components/llm-bridge.md`](./backend/30-components/llm-bridge.md), [`docs/shared/70-policy/forbidden-words.md`](./shared/70-policy/forbidden-words.md) | `backend/.../llm/`, `docs/shared/prompts/` |
+| LLM 브릿지·프롬프트 | [`docs/backend/30-components/llm-bridge.md`](./backend/30-components/llm-bridge.md) | `backend/.../llm/`, `docs/shared/prompts/` |
 | AI-user | [`docs/ai-user/10-context.md`](./ai-user/10-context.md) | `ai-user/orchestrator/`, `ai-user/llm/`, `ai-user/learning/`, `ai-user/sync/` |
 | 환경·배포 | [`docs/env/10-context.md`](./env/10-context.md) | `env/`, `.env.*.example`, `application*.yml` |
 
@@ -51,7 +51,7 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 | DB migration·JPA domain | `docs/backend/40-data.md` |
 | 포트·compose·nginx | `docs/shared/20-containers.md`, `docs/env/20-containers/architecture.md`, README 포트표 |
 | 환경변수 | `docs/env/40-data.md`, README |
-| LLM 안전·프롬프트·오류 시그니처 | `docs/shared/70-policy/forbidden-words.md`, `.claude/rules/llm-safety.md` |
+| LLM 안전·프롬프트·오류 시그니처 | `.claude/rules/llm-safety.md` |
 | FE 디자인 토큰·global style | `docs/frontend/70-policy/design-system.md` |
 | FE test id·journey 변화 | `frontend/tests/e2e-realbe/support/selectors.ts`, `docs/frontend/70-policy/testing.md` |
 
@@ -64,7 +64,7 @@ AI agent가 다시봄 코드를 수정할 때의 최소 작업 루프다. 상세
 cd frontend && npm run lint:docs
 
 # FE
-cd frontend && npm run lint:words && npm run lint:emoji && npm run test
+cd frontend && npm run lint:emoji && npm run test
 cd frontend && npm run build
 
 # BE

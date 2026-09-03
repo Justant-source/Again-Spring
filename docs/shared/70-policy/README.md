@@ -9,7 +9,6 @@ last_updated: 2026-08-31
 
 | 문서 | 내용 | 권위 |
 |---|---|---|
-| [forbidden-words.md](forbidden-words.md) | AI 출력 금지어 | 🏛 |
 | [auth.md](auth.md) | 인증·인가 | |
 | [user-permissions.md](user-permissions.md) | 등급별 권한 | |
 | [categories.md](categories.md) | 갈등 분류 | |

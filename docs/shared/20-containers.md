@@ -93,7 +93,7 @@ flowchart TB
         PostService[PostComposeService<br/>원문 게시]
         VoteService[VoteService<br/>작성자 vs 상대방]
         LLMProvider["RemoteLlmProvider<br/>(CLI 경로, 제품 사람글 미사용)"]
-        Safety[PromptSanitizer<br/>KeywordGuard<br/>CrisisDetector]
+        Safety[PromptSanitizer<br/>CrisisKeywordGuard]
         Retention[RetentionScheduler]
     end
     subgraph AIUser["shared ai-user"]
