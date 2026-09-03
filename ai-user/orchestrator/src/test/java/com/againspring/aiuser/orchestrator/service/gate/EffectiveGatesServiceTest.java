@@ -5,12 +5,15 @@ import com.againspring.aiuser.orchestrator.domain.AiUserGenerationConfig;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -38,8 +41,10 @@ class EffectiveGatesServiceTest {
         when(repo.findById(1)).thenReturn(Optional.of(cfg));
         LlmGenerationGateService gate = mock(LlmGenerationGateService.class);
         when(gate.isHeld()).thenReturn(false);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
 
-        Map<String, Object> out = new EffectiveGatesService(props, repo, gate).resolve();
+        Map<String, Object> out = new EffectiveGatesService(props, repo, gate, jdbc).resolve();
 
         assertThat(out.get("generationAllowed")).isEqualTo(false);
         assertThat(out.get("publishingAllowed")).isEqualTo(false);
@@ -62,8 +67,10 @@ class EffectiveGatesServiceTest {
         when(repo.findById(1)).thenReturn(Optional.of(cfg));
         LlmGenerationGateService gate = mock(LlmGenerationGateService.class);
         when(gate.isHeld()).thenReturn(false);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
 
-        Map<String, Object> out = new EffectiveGatesService(props, repo, gate).resolve();
+        Map<String, Object> out = new EffectiveGatesService(props, repo, gate, jdbc).resolve();
 
         assertThat(out.get("generationAllowed")).isEqualTo(true);
         assertThat(out.get("publishingAllowed")).isEqualTo(true);
@@ -79,8 +86,10 @@ class EffectiveGatesServiceTest {
         when(repo.findById(1)).thenReturn(Optional.of(cfg));
         LlmGenerationGateService gate = mock(LlmGenerationGateService.class);
         when(gate.isHeld()).thenReturn(true);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
 
-        Map<String, Object> out = new EffectiveGatesService(props, repo, gate).resolve();
+        Map<String, Object> out = new EffectiveGatesService(props, repo, gate, jdbc).resolve();
 
         assertThat(out.get("generationAllowed")).isEqualTo(false);
         assertThat(out.get("publishingAllowed")).isEqualTo(true);
@@ -94,12 +103,38 @@ class EffectiveGatesServiceTest {
         when(repo.findById(1)).thenReturn(Optional.empty());
         LlmGenerationGateService gate = mock(LlmGenerationGateService.class);
         when(gate.isHeld()).thenReturn(false);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(0);
 
-        Map<String, Object> out = new EffectiveGatesService(props, repo, gate).resolve();
+        Map<String, Object> out = new EffectiveGatesService(props, repo, gate, jdbc).resolve();
 
         assertThat(out.get("generationAllowed")).isEqualTo(false);
         assertThat(out.get("publishingAllowed")).isEqualTo(false);
         assertThat(reasons(out)).contains("ai_user_generation_config row missing");
+    }
+
+    @Test
+    void nightlySnapshotUnrestoredIsGateAndReason() {
+        OrchestratorProperties props = enabledProps();
+        AiUserGenerationConfigRepository repo = mock(AiUserGenerationConfigRepository.class);
+        AiUserGenerationConfig cfg = mock(AiUserGenerationConfig.class);
+        when(cfg.isAiUserKillSwitch()).thenReturn(false);
+        when(cfg.isScheduleExecutionPaused()).thenReturn(false);
+        when(cfg.getProviderAiPostBundle()).thenReturn("CLAUDE");
+        when(cfg.getUpdatedBy()).thenReturn("nightly-batch");
+        when(repo.findById(1)).thenReturn(Optional.of(cfg));
+        LlmGenerationGateService gate = mock(LlmGenerationGateService.class);
+        when(gate.isHeld()).thenReturn(false);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class))).thenReturn(1);
+
+        Map<String, Object> out = new EffectiveGatesService(props, repo, gate, jdbc).resolve();
+
+        assertThat(reasons(out)).contains("nightly snapshot not restored (providers may be stuck at CLAUDE)");
+        assertThat(gates(out))
+            .filteredOn(g -> "nightly_snapshot_unrestored".equals(g.get("name")))
+            .extracting(g -> g.get("value"))
+            .containsExactly(true);
     }
 
     @SuppressWarnings("unchecked")
