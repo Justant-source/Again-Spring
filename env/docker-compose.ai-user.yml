@@ -40,6 +40,7 @@ services:
       LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
       LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
       LLM_STUB_FIXTURE_DIR: ${LLM_STUB_FIXTURE_DIR:-}
+      LLM_AUTH_DOWN_TTL_MINUTES: ${LLM_AUTH_DOWN_TTL_MINUTES:-10}
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
       DB_USER: ${MARIADB_USER:-againspring}
       DB_PASSWORD: ${MARIADB_PASSWORD}

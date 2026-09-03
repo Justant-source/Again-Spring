@@ -128,6 +128,7 @@ last_updated: 2026-09-01
 | `AI_USER_ENV` | **필수.** `prod`\|`dev`. compose가 서비스별 고정 주입. DB·backend 호스트명이 이 값과 다르면 기동 실패(`EnvironmentGuard`) | compose 고정 |
 | `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
+| `AI_USER_LLM_AVAILABILITY_CRON` | `LlmAvailabilityGate` — 워커 `GET /v1/providers/status`를 폴링해 `AUTH_DOWN`이면 `llm_generation_gate`를 `auto:llm-auth-down` 접두로 hold, 복구되면 auto hold만 resume(사람 hold는 안 건드림) | `0 */5 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
 | `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | **vault** `ai_user.bot_password` (env 비권장) |
 | `AI_USER_INTERNAL_TOKEN` | `/api/internal/ai-user/**`(backend) 인증 Bearer 토큰. JWT 아님, fail-closed. BE·orchestrator 동일 값 필수 | **vault** `ai_user.internal_token` (env 비권장) |
@@ -186,6 +187,7 @@ last_updated: 2026-09-01
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
 | `LLM_STUB_FIXTURE_DIR` | provider=STUB일 때 픽스처 디렉토리(비면 classpath `stub/`) — dev canary 전용 | 공란 |
+| `LLM_AUTH_DOWN_TTL_MINUTES` | `ProviderHealthRegistry` — CLI stderr에서 인증 실패(`AUTH_ERROR`)가 잡힌 provider를 `AUTH_DOWN`으로 표시해두는 TTL(분). 경과 후 다음 조회 때 자동 `UP` | `10` |
 | `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
 | `LLM_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | 구조화 생성 번들 실패 시 Telegram 알림(워커) | `true` |
 | `LLM_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | PARSE_FAIL 이벤트 임계값(워커) — N회 이상 초과 시 1회 알림 | `3` |

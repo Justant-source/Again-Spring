@@ -84,6 +84,8 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 | base model | `claude-haiku-4-5-20251001` |
 | post model override | 빈 값, compose에서는 `claude-sonnet-5` |
 
+**타임아웃 시 프로세스 트리 종료** (2026-09-03): 실행 타임아웃이 지나면 `LlmWorkerPool`이 더 이상 `LlmTimeoutException`만 던지고 CLI 프로세스를 방치하지 않는다. 각 실행은 `ExecutionSlot.open(correlationId)`으로 슬롯을 열고, `ClaudeCliInvoker`/`CodexCliInvoker`가 `ExecutionSlot.attachCurrent(process)`로 실제 프로세스를 슬롯에 연결한다. 타임아웃 스케줄 태스크는 `slot.terminate(processTerminator, "execution-timeout")`을 호출해 `ProcessTerminator`가 프로세스 트리를 죽인 뒤에 예외를 완료시킨다 — 이전에는 타임아웃이 나도 프로세스가 살아남아 워커 슬롯을 영구히 붙잡는 문제가 있었다. `WorkerMetrics.timedOut`(`GET /v1/metrics`)이 누적 타임아웃 건수를 노출한다.
+
 ### provider 선택
 
 레거시 API 경로(`backend=CLI|API`)와 신규 `provider` 필드가 공존한다. **PLAN `/v2/generate/*`는 legacy `backend` selector를 받지 않으며 request의 workload/provider snapshot(`CLAUDE`|`CODEX`)만 허용한다.**
@@ -100,6 +102,20 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 - `InvokerRouter.routeProvider(LlmProvider)`가 위 4종을 라우팅한다.
 - prompt caching flag는 `llm.api.prompt-caching`에 있고, compose/env로 제어할 수 있다.
 - `/internal/rewrite/post`는 legacy 사연 큐레이션 배치용이며, backend 기본값을 `API`로 잡아 clcocloud 직접 경로를 우선 사용한다.
+
+## provider 인증 상태 (2026-09-03)
+
+CLI exit code≠0일 때 `ClaudeCliInvoker`/`CodexCliInvoker`는 stderr 마지막 2KB를 `CliAuthFailureDetector.isAuthFailure()`로 분류한다 — 세션 만료(`not logged in`, `token has expired`, `invalid_grant` 등)·조직 차단(`organization has disabled`, `subscription access`)·키 무효(`invalid api key`, `401`) 패턴에 걸리면 `errorType=AUTH_ERROR`, 아니면 기존 `CLAUDE_ERROR`/`CODEX_ERROR`로 남는다. 토큰을 태우는 canary 호출 없이 실제 요청 결과로만 판단한다.
+
+`ProviderHealthRegistry`가 provider별(현재 `claude`/`codex`) 상태를 메모리에 들고, `AUTH_ERROR`가 나면 `markAuthDown(provider, reason)`으로 `AUTH_DOWN`을 기록한다. `GET /v1/providers/status`가 이 스냅샷을 반환한다:
+
+```json
+{ "claude": { "state": "AUTH_DOWN", "reason": "...", "since": "...", "ttlMinutes": 10 }, "codex": { "state": "UP" } }
+```
+
+`AUTH_DOWN`은 `llm.auth-down-ttl-minutes`(env `LLM_AUTH_DOWN_TTL_MINUTES`, 기본 `10`)가 지나면 다음 조회 때 자동으로 `UP`으로 되돌아간다 — 별도 복구 호출이 없어도 TTL 경과 후 재확인 시 정상 취급된다.
+
+orchestrator의 `LlmAvailabilityGate`(5분 cron)가 이 엔드포인트를 폴링해 `llm_generation_gate`를 자동 hold/resume한다 — 상세는 [10-context.md](../10-context.md)의 "글이 하나도 안 올라올 때" 흐름과 [operations.md](../60-runtime/operations.md) §9 참조.
 
 ## prompt 조립 모드
 

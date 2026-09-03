@@ -379,6 +379,7 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
   (BACKEND_WRITE_FAILED 재시도는 3회로 캡; 그 이상이면 `FAILED`로 내려 큐를 막지 않는다)
 - `ai_user_generation_config.ai_user_kill_switch = 0`인지 확인
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
+- `GET /admin/trigger/llm-generation-status`의 `reason`이 `auto:llm-auth-down: ...`으로 시작하면 `LlmAvailabilityGate`가 워커 provider `AUTH_DOWN`을 감지해 자동 hold한 것이다 — 워커 CLI 세션(`claude auth login`) 복구 후 최대 5분(cron 주기) 이내 자동 resume되며, `reason`이 `auto:`로 시작하지 않으면 사람이 건 수동 hold이므로 `llm-generation-resume`을 직접 호출해야 한다.
 
 ### learning이 예상치 않게 crawl할 때
 
