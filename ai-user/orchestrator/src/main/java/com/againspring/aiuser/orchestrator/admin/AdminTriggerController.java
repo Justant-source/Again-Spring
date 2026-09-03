@@ -11,6 +11,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
 import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
+import com.againspring.aiuser.orchestrator.service.gate.EffectiveGatesService;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
@@ -71,6 +72,7 @@ public class AdminTriggerController {
     private final StoryProfileAnalyzer storyProfileAnalyzer;
     private final ThreadPlanGenerationService threadPlanGenerationService;
     private final LlmGenerationGateService llmGenerationGateService;
+    private final EffectiveGatesService effectiveGatesService;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -612,5 +614,11 @@ public class AdminTriggerController {
         body.put("reason", gate.getReason());
         body.put("updatedAt", gate.getUpdatedAt());
         return ResponseEntity.ok(body);
+    }
+
+    /** 모든 생성/발행 게이트의 해석 결과 (backend /api/admin/ai-user/effective-gates 가 프록시). */
+    @GetMapping("/effective-gates")
+    public ResponseEntity<Map<String, Object>> effectiveGates() {
+        return ResponseEntity.ok(effectiveGatesService.resolve());
     }
 }

@@ -8,6 +8,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
 import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
+import com.againspring.aiuser.orchestrator.service.gate.EffectiveGatesService;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
@@ -56,6 +57,7 @@ class AdminTriggerControllerFillTest {
     @Mock private StoryProfileAnalyzer storyProfileAnalyzer;
     @Mock private ThreadPlanGenerationService threadPlanGenerationService;
     @Mock private LlmGenerationGateService llmGenerationGateService;
+    @Mock private EffectiveGatesService effectiveGatesService;
 
     private AdminTriggerController controller;
 
@@ -66,7 +68,7 @@ class AdminTriggerControllerFillTest {
                 properties, nightlyScheduledFillService, scheduledPostRepository, engagementDispatcher,
                 viewDispatcher, humanReplyTtlCleanupService, personaCapsuleService, personaMatcherService,
                 personaAutoProvisionService, storyProfileAnalyzer, threadPlanGenerationService,
-                llmGenerationGateService);
+                llmGenerationGateService, effectiveGatesService);
     }
 
     @Test
