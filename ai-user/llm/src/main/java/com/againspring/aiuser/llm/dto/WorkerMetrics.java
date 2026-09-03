@@ -13,4 +13,5 @@ public class WorkerMetrics {
     private final long completed;
     private final long rejected;
     private final long throttled;
+    private final long timedOut;
 }

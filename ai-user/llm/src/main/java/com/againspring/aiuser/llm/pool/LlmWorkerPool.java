@@ -47,6 +47,7 @@ public class LlmWorkerPool {
 
     private final ClaudeCliInvoker invoker;
     private final InvokerRouter invokerRouter;
+    private final ProcessTerminator processTerminator;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4,
             r -> { Thread t = new Thread(r, "llm-pool-scheduler"); t.setDaemon(true); return t; });
 
@@ -57,10 +58,12 @@ public class LlmWorkerPool {
     private final AtomicLong completedCount = new AtomicLong(0);
     private final AtomicLong rejectedCount = new AtomicLong(0);
     private final AtomicLong throttledCount = new AtomicLong(0);
+    private final AtomicLong timedOutCount = new AtomicLong(0);
 
-    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter) {
+    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter, ProcessTerminator processTerminator) {
         this.invoker = invoker;
         this.invokerRouter = invokerRouter;
+        this.processTerminator = processTerminator;
     }
 
     @PostConstruct
@@ -102,6 +105,7 @@ public class LlmWorkerPool {
         long enqueueTime = System.currentTimeMillis();
 
         CompletableFuture<String> resultFuture = new CompletableFuture<>();
+        final ExecutionSlot[] slotRef = new ExecutionSlot[1];
 
         try {
             executor.submit(() -> {
@@ -114,16 +118,21 @@ public class LlmWorkerPool {
                     return;
                 }
                 activeCount.incrementAndGet();
+                ExecutionSlot slot = ExecutionSlot.open(correlationId);
+                slotRef[0] = slot;
                 try {
                     String result = selectedInvoker.invoke(prompt, resolvedModel);
-                    resultFuture.complete(result);
-                    completedCount.incrementAndGet();
+                    if (!slot.isTerminated()) {
+                        resultFuture.complete(result);
+                        completedCount.incrementAndGet();
+                    }
                 } catch (ClaudeCodeException e) {
                     if (e.isThrottled()) throttledCount.incrementAndGet();
-                    resultFuture.completeExceptionally(e);
+                    if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
                 } catch (Exception e) {
-                    resultFuture.completeExceptionally(e);
+                    if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
                 } finally {
+                    slot.close();
                     activeCount.decrementAndGet();
                 }
             });
@@ -135,6 +144,10 @@ public class LlmWorkerPool {
         // 실행 타임아웃 강제 + 프로세스 킬
         ScheduledFuture<?> timeoutTask = scheduler.schedule(() -> {
             if (!resultFuture.isDone()) {
+                ExecutionSlot slot = slotRef[0];
+                boolean killed = slot != null && slot.terminate(processTerminator, "execution-timeout");
+                timedOutCount.incrementAndGet();
+                log.warn("Sync task timeout after {}ms corr={} processKilled={}", effectiveTimeout, correlationId, killed);
                 resultFuture.completeExceptionally(new LlmTimeoutException(
                         "Sync task timed out after " + effectiveTimeout + "ms"));
             }
@@ -170,6 +183,7 @@ public class LlmWorkerPool {
         var selectedInvoker = invokerRouter.routeProvider(provider);
         long enqueueTime = System.currentTimeMillis();
         CompletableFuture<String> resultFuture = new CompletableFuture<>();
+        final ExecutionSlot[] slotRef = new ExecutionSlot[1];
         try {
             executor.submit(() -> {
                 if (System.currentTimeMillis() - enqueueTime > queueWaitTimeoutMs) {
@@ -177,25 +191,40 @@ public class LlmWorkerPool {
                     return;
                 }
                 activeCount.incrementAndGet();
+                ExecutionSlot slot = ExecutionSlot.open(correlationId);
+                slotRef[0] = slot;
                 try {
                     // Structured endpoints retry exactly once at service level. Do not
                     // accidentally use the legacy Claude API/CLI fallback policy here.
-                    resultFuture.complete(schema == null
+                    String result = schema == null
                             ? selectedInvoker.invokeSingleAttempt(prompt, resolvedModel)
-                            : selectedInvoker.invokeSingleAttempt(prompt, resolvedModel, schema));
-                    completedCount.incrementAndGet();
+                            : selectedInvoker.invokeSingleAttempt(prompt, resolvedModel, schema);
+                    if (!slot.isTerminated()) {
+                        resultFuture.complete(result);
+                        completedCount.incrementAndGet();
+                    }
                 } catch (Exception e) {
                     if (e instanceof ClaudeCodeException c && c.isThrottled()) throttledCount.incrementAndGet();
-                    resultFuture.completeExceptionally(e);
-                } finally { activeCount.decrementAndGet(); }
+                    if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
+                } finally {
+                    slot.close();
+                    activeCount.decrementAndGet();
+                }
             });
         } catch (RejectedExecutionException e) {
             rejectedCount.incrementAndGet();
             throw new LlmCapacityException("Worker queue full (capacity=" + queueCapacity + ")");
         }
-        ScheduledFuture<?> timeout = scheduler.schedule(() -> resultFuture.completeExceptionally(
-                new LlmTimeoutException("Provider task timed out after " + effectiveTimeout + "ms")),
-                effectiveTimeout, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> timeout = scheduler.schedule(() -> {
+            if (!resultFuture.isDone()) {
+                ExecutionSlot slot = slotRef[0];
+                boolean killed = slot != null && slot.terminate(processTerminator, "execution-timeout");
+                timedOutCount.incrementAndGet();
+                log.warn("Provider task timeout after {}ms corr={} processKilled={}", effectiveTimeout, correlationId, killed);
+                resultFuture.completeExceptionally(
+                        new LlmTimeoutException("Provider task timed out after " + effectiveTimeout + "ms"));
+            }
+        }, effectiveTimeout, TimeUnit.MILLISECONDS);
         try {
             return resultFuture.get();
         } catch (ExecutionException e) {
@@ -307,6 +336,7 @@ public class LlmWorkerPool {
                 .completed(completedCount.get())
                 .rejected(rejectedCount.get())
                 .throttled(throttledCount.get())
+                .timedOut(timedOutCount.get())
                 .build();
     }
 

@@ -3,6 +3,7 @@ package com.againspring.aiuser.llm.service;
 import com.againspring.aiuser.llm.exception.ClaudeCodeException;
 import com.againspring.aiuser.llm.exception.InvocationCanceledException;
 import com.againspring.aiuser.llm.pool.CancelableInvocation;
+import com.againspring.aiuser.llm.pool.ExecutionSlot;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,7 @@ public class CodexCliInvoker implements Invoker {
             pb.environment().remove("OPENAI_API_KEY");
             pb.environment().remove("CODEX_API_KEY");
             Process process = pb.start();
+            ExecutionSlot.attachCurrent(process);
             drainStderr(process);
             try (var stdin = process.getOutputStream()) {
                 stdin.write(prompt.getBytes(StandardCharsets.UTF_8));

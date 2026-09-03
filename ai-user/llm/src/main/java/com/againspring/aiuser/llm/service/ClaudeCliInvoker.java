@@ -3,6 +3,7 @@ package com.againspring.aiuser.llm.service;
 import com.againspring.aiuser.llm.exception.ClaudeCodeException;
 import com.againspring.aiuser.llm.exception.InvocationCanceledException;
 import com.againspring.aiuser.llm.pool.CancelableInvocation;
+import com.againspring.aiuser.llm.pool.ExecutionSlot;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -136,6 +137,7 @@ public class ClaudeCliInvoker implements Invoker {
         ProcessBuilder pb = buildProcessBuilder(split.systemPart(), model, schema == null ? null : schemaCatalog.json(schema));
         try {
             Process process = pb.start();
+            ExecutionSlot.attachCurrent(process);
             drainStderr(process, "sync");
             writeUserPromptToStdin(process, split.userPart());
             StreamResult result = readStreamingOutput(process, null, corrId, model, 1, startMs);
