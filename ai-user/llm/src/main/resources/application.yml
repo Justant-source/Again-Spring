@@ -1,17 +1,6 @@
 spring:
   application:
     name: llm-ai-user
-  datasource:
-    url: ${DB_URL:jdbc:mariadb://localhost:3306/againspring_dev?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
-    username: ${DB_USER:againspring}
-    password: ${DB_PASSWORD:changeme}
-    driver-class-name: org.mariadb.jdbc.Driver
-    hikari:
-      maximum-pool-size: 3
-      minimum-idle: 1
-      connection-timeout: 10000
-      idle-timeout: 600000
-      max-lifetime: 1800000
 
 server:
   port: 8092
@@ -78,4 +67,5 @@ self-critique:
     penalty: ${SELF_CRITIQUE_RARE_VOCAB_PENALTY:1}
 
 anthropic:
-  api-key: ${ANTHROPIC_API_KEY:-}
+  api-key: ${ANTHROPIC_API_KEY:}
+  base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}

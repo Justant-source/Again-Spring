@@ -41,9 +41,7 @@ services:
       LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
       LLM_STUB_FIXTURE_DIR: ${LLM_STUB_FIXTURE_DIR:-}
       LLM_AUTH_DOWN_TTL_MINUTES: ${LLM_AUTH_DOWN_TTL_MINUTES:-10}
-      DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${MARIADB_PASSWORD}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
       HOME: /home/justant
     volumes:
       - ${CLAUDE_HOST_CONFIG_DIR:-/home/justant/.claude}:/home/justant/.claude
@@ -52,7 +50,6 @@ services:
     restart: unless-stopped
     networks:
       - againspring
-      - againspring-prod
     healthcheck:
       test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8092/actuator/health | grep -q UP"]
       interval: 15s
