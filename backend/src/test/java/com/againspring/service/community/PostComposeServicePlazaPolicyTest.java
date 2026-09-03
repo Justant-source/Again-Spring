@@ -5,6 +5,7 @@ import com.againspring.domain.enums.PostCategory;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.common.exception.BusinessException;
+import com.againspring.safety.CrisisDetectedEvent;
 import com.againspring.safety.CrisisKeywordGuard;
 import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
@@ -70,6 +71,51 @@ class PostComposeServicePlazaPolicyTest {
         verify(postRepository).save(captor.capture());
         assertThat(captor.getValue().getBodyRaw()).contains("소송");
         assertThat(captor.getValue().getBodyRaw()).contains("피해자");
+    }
+
+    @Test
+    @DisplayName("위기 키워드 감지 시에도 게시는 계속되고 CrisisDetectedEvent가 감사 로그용으로 발행된다")
+    void compose_crisisDetected_stillPublishesAndEmitsAuditEvent() {
+        String body = "이제 정말 죽고싶다는 생각뿐입니다.";
+        when(syntheticOutputGuard.isSynthetic("user_real")).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(new CrisisScanResult(true, List.of("죽고싶")));
+        when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatCode(() -> composeService.composeAndPublish(
+                "user_real", "제목", body,
+                PostCategory.FAMILY, "PUBLIC", "session-99", null, null, null, null, null))
+                .doesNotThrowAnyException();
+
+        // (a) 위기 감지와 무관하게 게시는 계속된다
+        verify(postRepository).save(any(Post.class));
+
+        // (b) CrisisDetectedEvent가 정확히 1회, 매칭된 패턴과 함께 발행된다
+        ArgumentCaptor<CrisisDetectedEvent> eventCaptor = ArgumentCaptor.forClass(CrisisDetectedEvent.class);
+        verify(eventPublisher, org.mockito.Mockito.times(1)).publishEvent(eventCaptor.capture());
+        CrisisDetectedEvent published = eventCaptor.getValue();
+        assertThat(published.getUserId()).isEqualTo("user_real");
+        assertThat(published.getSessionId()).isEqualTo("session-99");
+        assertThat(published.getMatchedPatterns()).containsExactly("죽고싶");
+    }
+
+    @Test
+    @DisplayName("위기 키워드 미감지 시 CrisisDetectedEvent는 발행되지 않는다")
+    void compose_noCrisis_neverPublishesCrisisDetectedEvent() {
+        String body = "평범한 일상 이야기입니다.";
+        when(syntheticOutputGuard.isSynthetic("user_real")).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
+        when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        composeService.composeAndPublish(
+                "user_real", "제목", body,
+                PostCategory.FAMILY, "PUBLIC", null, null, null, null, null, null);
+
+        verify(postRepository).save(any(Post.class));
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any(CrisisDetectedEvent.class));
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.againspring.domain.enums.CommentStatus;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
+import com.againspring.safety.CrisisDetectedEvent;
 import com.againspring.safety.CrisisKeywordGuard;
 import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -168,5 +170,45 @@ class CommentServiceTest {
         verify(commentRepository).delete(top);
         verify(postLikeRepository).deleteByCommentId(101L);
         verify(postLikeRepository).deleteByCommentId(commentId);
+    }
+
+    @Test
+    @DisplayName("addComment — 위기 키워드 감지 시에도 댓글은 저장되고 CrisisDetectedEvent가 감사 로그용으로 발행된다")
+    void addComment_crisisDetected_stillSavesAndPublishesAuditEvent() {
+        String body = "이제 정말 죽고싶다는 생각뿐입니다.";
+        String authorId = "user-1";
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId(authorId).build()));
+        when(syntheticOutputGuard.isSynthetic(authorId)).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(new CrisisScanResult(true, List.of("죽고싶")));
+        when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PostComment saved = commentService.addComment(POST_ID, null, authorId, body);
+
+        // (a) 위기 감지와 무관하게 댓글은 저장된다
+        assertThat(saved.getBody()).isEqualTo(body);
+        verify(commentRepository).save(any());
+
+        // (b) CrisisDetectedEvent가 정확히 1회, 매칭된 패턴과 함께 발행된다
+        ArgumentCaptor<CrisisDetectedEvent> eventCaptor = ArgumentCaptor.forClass(CrisisDetectedEvent.class);
+        verify(eventPublisher, org.mockito.Mockito.times(1)).publishEvent(eventCaptor.capture());
+        CrisisDetectedEvent published = eventCaptor.getValue();
+        assertThat(published.getUserId()).isEqualTo(authorId);
+        assertThat(published.getMatchedPatterns()).containsExactly("죽고싶");
+    }
+
+    @Test
+    @DisplayName("addComment — 위기 키워드 미감지 시 CrisisDetectedEvent는 발행되지 않는다")
+    void addComment_noCrisis_neverPublishesCrisisDetectedEvent() {
+        String body = "오늘 점심 뭐 먹지 고민입니다.";
+        String authorId = "user-1";
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId(authorId).build()));
+        when(syntheticOutputGuard.isSynthetic(authorId)).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
+        when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        commentService.addComment(POST_ID, null, authorId, body);
+
+        verify(commentRepository).save(any());
+        verify(eventPublisher, never()).publishEvent(any(CrisisDetectedEvent.class));
     }
 }
