@@ -309,9 +309,16 @@ public class PairedPostScheduler {
         return new HoldPairResult(true, held.getId(), HoldResult.Outcome.SAVED, "saved");
     }
 
-    private Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
+    Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
                                        String preferredSource) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
+        // Missing row = no admin switch present -> treat kill as false (fail-open only for this
+        // flag; provider resolution below still falls back to yml when the row is absent).
+        boolean killSwitchOn = config != null && config.isAiUserKillSwitch();
+        if (killSwitchOn) {
+            log.info("[PairedPost] Call1 skipped: kill switch on corrId={}", corrId);
+            return Call1Attempt.skipped("kill switch");
+        }
         String provider = config == null ? props.getThreadPlan().getAiPostProvider() : config.getProviderAiPostBundle();
         if (provider == null || provider.isBlank() || "OFF".equalsIgnoreCase(provider)) {
             log.info("[PairedPost] Call1 skipped: provider OFF corrId={}", corrId);
@@ -387,10 +394,10 @@ public class PairedPostScheduler {
         return s.isEmpty() || "null".equalsIgnoreCase(s) ? null : s;
     }
 
-    private record Call1Hold(String title, String body, Map<String, Object> response,
+    record Call1Hold(String title, String body, Map<String, Object> response,
                              String provider, String model, int itemCount) { }
 
-    private record Call1Attempt(Optional<Call1Hold> hold, boolean llmInvoked, String detail) {
+    record Call1Attempt(Optional<Call1Hold> hold, boolean llmInvoked, String detail) {
         static Call1Attempt ok(Call1Hold hold) {
             return new Call1Attempt(Optional.of(hold), true, "ok");
         }

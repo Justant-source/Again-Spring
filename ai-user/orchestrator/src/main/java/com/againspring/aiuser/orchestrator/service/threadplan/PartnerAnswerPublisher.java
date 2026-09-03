@@ -57,6 +57,13 @@ public class PartnerAnswerPublisher {
         OrchestratorProperties.PairedPost config = properties.getPairedPost();
         if (config == null || !config.isEnabled() || !config.isPartnerPublisherEnabled()) return;
 
+        boolean dbBlocked = generationConfigRepository.findById(1)
+                .map(c -> c.isAiUserKillSwitch() || c.isScheduleExecutionPaused()).orElse(true);
+        if (dbBlocked) {
+            log.info("[PartnerAnswer] publishDue skip: ai_user_kill_switch or schedule_execution_paused");
+            return;
+        }
+
         int batchSize = Math.max(1, config.getPartnerPublishBatchSize());
         for (AiScheduledPartnerAnswer row : leases.claimDue(WORKER, batchSize, Duration.ofMinutes(5), Instant.now())) {
             publish(row);
