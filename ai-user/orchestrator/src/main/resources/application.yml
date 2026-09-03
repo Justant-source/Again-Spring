@@ -59,6 +59,10 @@ ai-user:
   secondary-backend-base-url: ${AI_USER_SECONDARY_BACKEND_URL:}
   # AI-user generation 시 FAMILY 광장 활성화 (false = OTHER로 흡수)
   family-plaza-generation-enabled: ${AI_USER_FAMILY_PLAZA_ENABLED:false}
+  # ContentSafetyGuard 길이 상한 — SSOT = backend DTO(PostCreateRequest.bodyRaw / CommentRequest.body 둘 다 @Size(max=1000))
+  limits:
+    max-post: ${AI_USER_MAX_POST_CHARS:1000}
+    max-comment: ${AI_USER_MAX_COMMENT_CHARS:1000}
   paired-post:
     enabled: ${PAIRED_POST_ENABLED:false}
     cron: "${PAIRED_POST_CRON:0 0 5 * * *}"

@@ -138,7 +138,7 @@ public class StructuredGenerationService {
             JsonNode p = root.path("post");
             String title = text(p, "title"); String body = text(p, "body");
             // 제목 ≤40자(공백 포함)·제목≠본문 — 2026-08 prod 동일 제목/본문 회귀 방어
-            validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 6000);
+            validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 1000);
             rejectIdenticalTitleBody(title, body);
             List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
@@ -245,7 +245,7 @@ public class StructuredGenerationService {
     private static ThreadPlanResponse.Post replacePostBodyIfValid(ThreadPlanResponse.Post post, String refined) {
         if (refined == null || refined.equals(post.getBody())) return post;
         try {
-            validText(refined, "post.body", 20, 6000);
+            validText(refined, "post.body", 20, 1000);
             List<Integer> splits = sanitizeCaptureSplits(refined, post.getCaptureSplitAfterLines());
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             return ThreadPlanResponse.Post.builder()
@@ -359,7 +359,7 @@ public class StructuredGenerationService {
         String title = text(p, "title");
         String body = text(p, "body");
         validText(title, "post.title", 4, 40);
-        validText(body, "post.body", 20, 6000);
+        validText(body, "post.body", 20, 1000);
         rejectIdenticalTitleBody(title, body);
         List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
         Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
@@ -407,7 +407,7 @@ public class StructuredGenerationService {
                 throw new StructuredGenerationException("partner_post is required");
             }
             String body = text(pp, "body");
-            validText(body, "partner_post.body", 20, 6000);
+            validText(body, "partner_post.body", 20, 1000);
             List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(pp));
             partnerPost = PairedPhase2Response.PartnerPost.builder()
                     .body(body)
@@ -544,7 +544,7 @@ public class StructuredGenerationService {
                     resolveFormality(partnerPersona), model, resolveVoiceType(partnerPersona));
             if (refined != null && !refined.equals(partnerPost.getBody())) {
                 try {
-                    validText(refined, "partner_post.body", 20, 6000);
+                    validText(refined, "partner_post.body", 20, 1000);
                     List<Integer> splits = sanitizeCaptureSplits(refined, partnerPost.getCaptureSplitAfterLines());
                     partnerPost = PairedPhase2Response.PartnerPost.builder()
                             .body(refined)

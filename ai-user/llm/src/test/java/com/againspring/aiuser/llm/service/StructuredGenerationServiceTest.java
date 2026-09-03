@@ -51,6 +51,37 @@ class StructuredGenerationServiceTest {
         assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(planRequest(), "corr-title-eq"));
     }
 
+    /**
+     * Task 2.3: post.body 상한 SSOT = backend PostCreateRequest.bodyRaw @Size(max=1000).
+     * sanitizer 미경유 경로(AiPostBundleService)에서도 backend 400을 만들지 않도록
+     * 구조화 생성 단계에서 1000자로 걸러야 한다.
+     */
+    @Test
+    void rejectsPostBodyOver1000Chars() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String over = "가".repeat(1001);
+        String json = planJsonWithTitleBody("한국어 제목입니다", over);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        assertThrows(StructuredGenerationException.class, () -> service.createThreadPlan(planRequest(), "corr-post-len"));
+    }
+
+    @Test
+    void acceptsPostBodyAt1000Chars() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool, disabledCritique());
+        String at = "가".repeat(1000);
+        String json = planJsonWithTitleBody("한국어 제목입니다", at);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(json);
+
+        ThreadPlanResponse response = service.createThreadPlan(planRequest(), "corr-post-len-ok");
+        assertNotNull(response);
+        assertEquals(at, response.getPost().getBody());
+    }
+
     @Test
     void planPromptIncludesCaptureSplitRules() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);

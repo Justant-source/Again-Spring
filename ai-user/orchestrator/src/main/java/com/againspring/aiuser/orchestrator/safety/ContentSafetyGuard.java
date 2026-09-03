@@ -71,11 +71,11 @@ public class ContentSafetyGuard {
     }
 
     private static final int MIN_LENGTH = 5;
-    // POST 상한: OutputSanitizer(llm) MAX_POST=2000보다 여유 있게 설정해 sanitizer가 실질적 상한이 됨.
-    // Phase 5에서 ai-user.limits.max-post/max-comment 환경변수로 통일 예정.
-    // TODO Phase 5: @Value("${ai-user.limits.max-post:2200}") 로 교체
-    private static final int MAX_LEN_POST    = 2200;
-    private static final int MAX_LEN_COMMENT = 350;
+    /** backend PostCreateRequest.bodyRaw @Size(max=1000) · CommentRequest.body @Size(max=1000)와 동일 — SSOT는 backend DTO. */
+    @org.springframework.beans.factory.annotation.Value("${ai-user.limits.max-post:1000}")
+    private int maxLenPost = 1000;
+    @org.springframework.beans.factory.annotation.Value("${ai-user.limits.max-comment:1000}")
+    private int maxLenComment = 1000;
 
     /** 콘텐츠 타입: executePost→POST, executeComment/executeReply→COMMENT */
     public enum ContentType { POST, COMMENT }
@@ -116,7 +116,7 @@ public class ContentSafetyGuard {
         if (text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");
         }
-        int maxLen = (type == ContentType.POST) ? MAX_LEN_POST : MAX_LEN_COMMENT;
+        int maxLen = (type == ContentType.POST) ? maxLenPost : maxLenComment;
         if (text.length() > maxLen) {
             return GuardResult.blocked("TOO_LONG: " + text.length());
         }

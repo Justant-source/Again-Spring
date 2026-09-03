@@ -127,4 +127,16 @@ class ContentSafetyGuardTest {
         assertThat(g.check("permission_error: this account cannot access", ContentType.COMMENT).reason()).isEqualTo("LLM_ERROR_SIGNATURE");
     }
 
+    /**
+     * Task 2.3: 길이 상한 SSOT = backend DTO(글 1000자·댓글 1000자). orchestrator가
+     * 같은 값으로 차단해야 backend 400 대신 여기서 BLOCKED 로그로 걸러진다.
+     */
+    @Test
+    void commentLimitMatchesBackendDto() {
+        ContentSafetyGuard g = new ContentSafetyGuard();
+        assertThat(g.check("가".repeat(1000), ContentSafetyGuard.ContentType.COMMENT).passed()).isTrue();
+        assertThat(g.check("가".repeat(1001), ContentSafetyGuard.ContentType.COMMENT).passed()).isFalse();
+        assertThat(g.check("가".repeat(1001), ContentSafetyGuard.ContentType.POST).passed()).isFalse();
+    }
+
 }
