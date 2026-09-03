@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable
@@ -177,7 +178,16 @@ USERS_SPEC = TableSpec(
 )
 PERSONAS_SPEC = TableSpec("personas", ("id",), mode="full")
 
-# 24h full 대상
+POSTS_WHERE = "`visibility` <> 'PRIVATE' AND `status` <> 'DRAFT' AND `deleted_at` IS NULL"
+COMMENTS_WHERE = "`deleted_at` IS NULL"
+
+POSTS_SPEC = TableSpec("posts", ("id",), time_columns=("updated_at", "created_at"),
+                       transform=_mask_real_post, where=POSTS_WHERE)
+COMMENTS_SPEC = TableSpec("post_comments", ("id",), time_columns=("updated_at", "created_at"),
+                          transform=_mask_real_comment, where=COMMENTS_WHERE)
+
+# 24h full 대상 — 설정 테이블(ai_user_runtime·ai_user_generation_config·system_setting·ai_prompt_template)은
+# dev 튜닝을 덮으므로 제외(2026-09). ai_content_corrections·ai_global_rules는 콘텐츠 규칙이라 유지.
 SYNC_TABLES: tuple[TableSpec, ...] = (
     USERS_SPEC,
     PERSONAS_SPEC,
@@ -187,24 +197,20 @@ SYNC_TABLES: tuple[TableSpec, ...] = (
     TableSpec("persona_history_entries", ("id",), time_columns=("created_at",)),
     TableSpec("persona_life_state", ("persona_id",), time_columns=("updated_at",)),
     TableSpec("persona_daily_quota", ("persona_id", "day_bucket"), mode="full"),
-    TableSpec("ai_user_runtime", ("id",), mode="full"),
-    TableSpec("ai_user_generation_config", ("id",), mode="full"),
     TableSpec("ai_content_corrections", ("id",), time_columns=("created_at",)),
     TableSpec("ai_global_rules", ("id",), time_columns=("created_at",)),
-    TableSpec("ai_prompt_template", ("key",), time_columns=("updated_at",)),
-    TableSpec("system_setting", ("setting_key",), time_columns=("updated_at",)),
-    TableSpec("posts", ("id",), time_columns=("updated_at", "created_at")),
+    POSTS_SPEC,
     TableSpec("vote_options", ("id",), mode="full"),
-    TableSpec("post_comments", ("id",), time_columns=("updated_at", "created_at")),
+    COMMENTS_SPEC,
     TableSpec("votes", ("id",), time_columns=("created_at",)),
     TableSpec("post_likes", ("id",), time_columns=("created_at",)),
 )
 
 # 5분 콘텐츠 (T1) — users/personas는 U1 동반으로만
 CONTENT_TABLES: tuple[TableSpec, ...] = (
-    TableSpec("posts", ("id",), time_columns=("updated_at", "created_at")),
+    POSTS_SPEC,
     TableSpec("vote_options", ("id",), mode="full"),
-    TableSpec("post_comments", ("id",), time_columns=("updated_at", "created_at")),
+    COMMENTS_SPEC,
     TableSpec("votes", ("id",), time_columns=("created_at",)),
     TableSpec("post_likes", ("id",), time_columns=("created_at",)),
 )
@@ -261,21 +267,29 @@ def ensure_dev_table(prod_cur, dev_cur, table: str) -> bool:
     return True
 
 
+def _where_if_columns_exist(where: str | None, columns: list[str]) -> str | None:
+    if not where:
+        return None
+    referenced = set(re.findall(r"`([a-z_]+)`", where))
+    return where if referenced <= set(columns) else None
+
+
 def build_select_sql(table: str, columns: list[str], spec: TableSpec, since: datetime) -> tuple[str, list]:
     quoted_cols = ", ".join(f"`{col}`" for col in columns)
-    if spec.mode == "full":
-        return f"SELECT {quoted_cols} FROM `{table}`", []
-
-    filters = [col for col in spec.time_columns if col in columns]
-    if not filters:
-        return f"SELECT {quoted_cols} FROM `{table}`", []
-
-    clauses = [f"`{col}` >= %s" for col in filters]
-    params = [since] * len(filters)
-    return (
-        f"SELECT {quoted_cols} FROM `{table}` WHERE " + " OR ".join(clauses),
-        params,
-    )
+    extra = _where_if_columns_exist(spec.where, columns)
+    clauses: list[str] = []
+    params: list = []
+    if spec.mode != "full":
+        filters = [col for col in spec.time_columns if col in columns]
+        if filters:
+            clauses.append("(" + " OR ".join(f"`{col}` >= %s" for col in filters) + ")")
+            params.extend([since] * len(filters))
+    if extra:
+        clauses.append(f"({extra})")
+    sql = f"SELECT {quoted_cols} FROM `{table}`"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    return sql, params
 
 
 def build_upsert_sql(table: str, columns: list[str], primary_keys: tuple[str, ...]) -> str:
@@ -420,10 +434,12 @@ def _run_tables(
     collected_rows: list[dict] = []
     try:
         with prod.cursor() as prod_cur, dev.cursor() as dev_cur:
+            prod_cur.execute("SELECT id FROM users WHERE synthetic = 1")
+            ctx = SyncContext(synthetic_ids=frozenset(str(r["id"]) for r in prod_cur.fetchall()))
             dev_cur.execute("SET FOREIGN_KEY_CHECKS = 0")
             for spec in specs:
                 try:
-                    count, rows = sync_table(prod_cur, dev_cur, spec, since, now)
+                    count, rows = sync_table(prod_cur, dev_cur, spec, since, now, ctx)
                     counts[spec.name] = count
                     if companion_authors:
                         collected_rows.extend(rows)
@@ -436,10 +452,10 @@ def _run_tables(
                 # personas.id == users.id for AI personas
                 persona_ids = set(user_ids)
                 counts["users(companion)"] = sync_rows_by_ids(
-                    prod_cur, dev_cur, USERS_SPEC, user_ids, now
+                    prod_cur, dev_cur, USERS_SPEC, user_ids, now, ctx
                 )
                 counts["personas(companion)"] = sync_rows_by_ids(
-                    prod_cur, dev_cur, PERSONAS_SPEC, persona_ids, now
+                    prod_cur, dev_cur, PERSONAS_SPEC, persona_ids, now, ctx
                 )
 
             dev_cur.execute("SET FOREIGN_KEY_CHECKS = 1")
