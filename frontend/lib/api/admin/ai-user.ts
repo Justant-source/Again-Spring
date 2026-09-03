@@ -216,7 +216,7 @@ export async function getHourlyDistribution(hours?: number): Promise<HourlyDistr
 export interface EffectiveGate {
   name: string;
   source: 'env' | 'yml' | 'db';
-  value: boolean | string;
+  value: boolean | string | null;
   blocks: string;
 }
 

@@ -124,7 +124,9 @@ export function EffectiveGatesPanel({ className }: { className?: string }) {
                       <tr key={gate.name} className="border-b border-gray-100">
                         <td className="px-3 py-2 font-medium text-gray-800">{gate.name}</td>
                         <td className="px-3 py-2 text-gray-500">{gate.source}</td>
-                        <td className="px-3 py-2 text-gray-700">{String(gate.value)}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {gate.value === null ? '-' : String(gate.value)}
+                        </td>
                         <td className="px-3 py-2 text-gray-500">{gate.blocks || '-'}</td>
                       </tr>
                     ))

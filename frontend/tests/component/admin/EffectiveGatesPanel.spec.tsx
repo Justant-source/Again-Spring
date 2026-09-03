@@ -94,6 +94,21 @@ describe('EffectiveGatesPanel', () => {
     );
   });
 
+  it('renders a null gate value as - instead of the literal string "null"', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: buildGates({
+        gates: [{ name: 'config_updated_by', source: 'db', value: null, blocks: '' }],
+      }),
+    });
+
+    render(<EffectiveGatesPanel />);
+
+    const table = await screen.findByTestId('ai-user-gate-table');
+    expect(table).toHaveTextContent('config_updated_by');
+    expect(table).toHaveTextContent('-');
+    expect(table).not.toHaveTextContent('null');
+  });
+
   it('shows an open verdict without an error state when both gates allow', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: buildGates({ gates: [{ name: 'ai.user.enabled', source: 'yml', value: true, blocks: '' }] }),
