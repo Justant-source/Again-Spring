@@ -163,6 +163,18 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `x_persona_example` | Justant-Bot 말투 코퍼스 (TIMELINE · TIMELINE_POST gold / DELETED_AUTO avoid) | BIGINT auto **V123** · 드릴 행 삭제 **V124** · source 코멘트 **V125** |
 | `x_persona_eval` | 페르소나 held-out 재현 채점 (28일 닮음 지표) | BIGINT auto **V125** |
 
+### 스키마 소유 (Flyway 2본)
+
+같은 DB에 Flyway가 둘이다. 소유자만 DDL·DML 쓰기를 한다. 예외는 명시한 것뿐.
+
+| 소유 | history 테이블 | 테이블 |
+|---|---|---|
+| backend | `flyway_schema_history` | `users`·`posts`·`post_comments`·`votes`·`vote_options`·`post_likes`·`post_views`·`community_reports`·`notifications`·`ai_user_outbox`·`ai_llm_jobs`·`ai_prompt_template`·`ai_user_generation_config`·`ai_global_rules`·`ai_content_corrections`·`bot_request_dedup`·`system_setting`·그 외 전부 |
+| ai-user orchestrator | `flyway_schema_history_aiuser` | `personas`·`persona_relationships`·`persona_seen_posts`·`persona_action_log`·`persona_daily_quota`·`persona_history_entries`·`persona_life_state`·`persona_fact_assertions`·`persona_semantic_capsules`·`persona_match_audits`·`post_analysis`·`ai_user_runtime`·`ai_thread_plans`·`ai_thread_plan_items`·`ai_human_interaction_inbox`·`ai_scheduled_posts`·`ai_scheduled_partner_answers`·`ai_post_interested_personas`·`llm_generation_gate`·`daily_planner_retry_log` |
+| llm-ai-user | — | **없음** (DB 미접속, 2026-09) |
+
+명시 예외: orchestrator는 `ai_user_outbox.status`를 UPDATE한다(`BackendOutboxConsumer`). 그 외 backend 소유 테이블은 orchestrator에서 SELECT만. `users`·`posts`·`post_comments` 쓰기는 `/api/internal/ai-user/*`·`/api/community/*` REST로만.
+
 ### AI-user 운영 테이블
 
 | 테이블 | 역할 | PK |

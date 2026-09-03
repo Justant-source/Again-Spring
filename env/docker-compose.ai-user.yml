@@ -111,8 +111,10 @@ services:
     environment:
       AI_USER_ENV: prod
       DB_URL: jdbc:mariadb://againspring-mariadb-prod:3306/${MARIADB_DATABASE:-againspring}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${MARIADB_PASSWORD}
+      # AI_USER_DB_USER/PASSWORD: 스코프 계정(ai_user_orch, docs/backend/40-data.md 소유 표)이
+      # 생성되면 이 두 변수만 채워 전환한다. 미생성 시 fallback으로 기존 MARIADB_* 계정을 그대로 쓴다.
+      DB_USER: ${AI_USER_DB_USER:-${MARIADB_USER:-againspring}}
+      DB_PASSWORD: ${AI_USER_DB_PASSWORD:-${MARIADB_PASSWORD}}
       BACKEND_BASE_URL: http://againspring-backend-prod:8080
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ENABLED: ${AI_USER_ENABLED:-true}
@@ -225,8 +227,10 @@ services:
     environment:
       AI_USER_ENV: dev
       DB_URL: jdbc:mariadb://againspring-mariadb-dev:3306/${DEV_DB_NAME:-againspring_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
-      DB_USER: ${MARIADB_USER:-againspring}
-      DB_PASSWORD: ${DEV_MARIADB_PASSWORD}
+      # AI_USER_DB_USER/PASSWORD: 스코프 계정(ai_user_orch, docs/backend/40-data.md 소유 표)이
+      # 생성되면 이 두 변수만 채워 전환한다. 미생성 시 fallback으로 기존 MARIADB_*/DEV_MARIADB_* 계정을 그대로 쓴다.
+      DB_USER: ${AI_USER_DB_USER:-${MARIADB_USER:-againspring}}
+      DB_PASSWORD: ${AI_USER_DB_PASSWORD:-${DEV_MARIADB_PASSWORD}}
       BACKEND_BASE_URL: http://againspring-backend-dev:8080
       LLM_AI_USER_URL: ${LLM_AI_USER_URL:-http://againspring-llm-ai-user:8092}
       AI_USER_ENABLED: ${AI_USER_DEV_ENABLED:-false}

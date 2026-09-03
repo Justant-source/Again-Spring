@@ -95,6 +95,23 @@ docker logs -f againspring-prod-dev-sync
 - 네트워크: sync만 `againspring-prod` + `againspring-dev` (유일한 교차 쓰기 경로)
 - backend-dev는 `againspring`(LLM) 네트워크에 **연결하지 않음** (L3)
 
+### 계정 생성 1회 절차 — orchestrator 스코프 DB 계정
+
+orchestrator는 기본으로 backend와 같은 전체 권한 `MARIADB_USER` 계정을 쓴다. 스키마 소유
+표(`docs/backend/40-data.md` §"스키마 소유")에 맞춰 쓰기 범위를 좁힌 `ai_user_orch` 계정을
+만들려면 dev에서 root로 1회만 실행한다 (prod는 Task 4.7 검증 후):
+
+```bash
+sed -e 's/:DBNAME:/againspring_dev/g' -e 's/:PASSWORD:/<새 비밀번호>/g' \
+  env/scripts/sql/create-ai-user-db-account.sql \
+  | docker exec -i againspring-mariadb-dev sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD"'
+```
+
+실행 후 `.env.ai-user`에 `AI_USER_DB_USER=ai_user_orch` / `AI_USER_DB_PASSWORD=<위 비밀번호>`를
+채우고 `docker compose -f docker-compose.ai-user.yml --env-file .env.ai-user up -d --build`로
+orchestrator만 재기동한다. 두 변수를 비워두면 기존 전체 권한 계정으로 fallback한다
+(`env/docker-compose.ai-user.yml` orchestrator 두 서비스).
+
 ## prod 사전 체크리스트
 
 - [ ] local unit / lint / build 통과
