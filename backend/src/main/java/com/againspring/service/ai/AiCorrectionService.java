@@ -579,15 +579,7 @@ public class AiCorrectionService {
     /** 텍스트가 LLM 제공자 오류 시그니처를 포함하는지 확인 (CLAUDE.md 규칙 #7) */
     public static boolean isErrorSignature(String text) {
         if (text == null || text.isBlank()) return false;
-        String t = text.toLowerCase();
-        return t.contains("credit balance") || t.contains("too low to access")
-                || t.contains("usage limit") || t.contains("rate limit")
-                || t.contains("rate_limit") || t.contains("overloaded")
-                || t.contains("invalid_request_error") || t.contains("authentication_error")
-                || t.contains("api_error") || t.contains("anthropic api")
-                || t.contains("too many requests") || t.contains("service unavailable")
-                || t.contains("internal server error") || t.contains("purchase credits")
-                || t.contains("insufficient credit");
+        return LlmErrorSignatures.get().containsSignature(text.toLowerCase(java.util.Locale.ROOT));
     }
 
     // =====================================================================

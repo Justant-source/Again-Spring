@@ -118,6 +118,10 @@ String sanitized = promptSanitizer.sanitize(userInput);
 
 **문제**: 마케팅 영상 발행 잡의 44.5%가 `VARIANT_LLM_ERROR`로 실패. LLM이 낸 JSON 응답이 문장 중간에서 잘렸다.
 
+**오탐 (2026-09-02, AS#1009/#1010)**: `VideoVariantService.looksLikeLlmError`가 원문 전체에 `"overloaded"` 부분문자열을 걸면, 시봄이 카탈로그 id `overloaded`가 들어 있는 **정상 JSON**을 `LLM_ERROR`로 버리고 QUALITY_GATE가 죽는다. 제공자 과부하는 `Overloaded` / `overloaded_error` / `api overloaded`만 매칭하고, JSON 문자열 값 `"overloaded"`는 콘텐츠로 둔다.
+
+**2026-09-03**: backend의 오류 시그니처 판정(`AiCorrectionService`·`XPersonaLearnService`·`VideoVariantService`)은 `com.againspring.service.ai.LlmErrorSignatures` 로더를 거쳐 `docs/shared/policies/llm-error-signatures.json` SSOT를 읽는다(하드코딩 목록 폐기). `VideoVariantService`만 위 `overloaded`-as-JSON-값 예외를 로더 호출 앞단에서 별도로 유지한다.
+
 **근본 원인** (b2eb851a 커밋으로 확정):
 1. Claude CLI의 `--output-format stream-json` 출력이 최종 `result` 이벤트 없이 끝날 때(생성이 중간에 끊김)
 2. `ClaudeCliInvoker.readStreamingOutput()`이 누적된 부분 스트림을 정상 응답으로 반환

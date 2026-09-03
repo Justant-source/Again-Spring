@@ -812,19 +812,46 @@ public class VideoVariantService {
         return out.replaceAll(" {2,}", " ").trim();
     }
 
-    /** Lightweight LLM-error fingerprint (avoid posting credit/error blobs as copy). */
-    private static boolean looksLikeLlmError(String s) {
+    /**
+     * Lightweight LLM-error fingerprint (avoid posting credit/error blobs as copy).
+     * {@code overloaded} is matched only as a provider error — the Sibom catalog id
+     * {@code overloaded} in JSON ({@code "image_id": "overloaded"}) is valid content
+     * (jobs 1009/1010, 2026-09-02).
+     */
+    static boolean looksLikeLlmError(String s) {
         if (s == null) return true;
         String t = s.toLowerCase(Locale.ROOT);
-        return t.contains("credit balance")
-                || t.contains("rate limit")
-                || t.contains("session limit")
-                || t.contains("hit your session")
-                || t.contains("api error")
-                || t.contains("overloaded")
-                || t.contains("prompt is too long")
-                || t.contains("i'm sorry")
-                || t.contains("as an ai");
+        if (t.contains("overloaded") && !hasProviderOverload(t)) {
+            // 카탈로그 image_id "overloaded"는 정상 콘텐츠 — 'overloaded' 시그니처만 제외하고 나머지 검사
+            String masked = t.replace("\"image_id\": \"overloaded\"", "").replace("overloaded", "");
+            return com.againspring.service.ai.LlmErrorSignatures.get().containsSignature(masked)
+                    || t.contains("session limit") || t.contains("hit your session") || t.contains("prompt is too long");
+        }
+        return com.againspring.service.ai.LlmErrorSignatures.get().containsSignature(t)
+                || hasProviderOverload(t)
+                || t.contains("session limit") || t.contains("hit your session") || t.contains("prompt is too long");
+    }
+
+    /** Anthropic 529 / CLI "Overloaded" — not the catalog image_id string. */
+    private static boolean hasProviderOverload(String lower) {
+        if (lower.contains("overloaded_error") || lower.contains("api overloaded")) {
+            return true;
+        }
+        int from = 0;
+        while (from < lower.length()) {
+            int idx = lower.indexOf("overloaded", from);
+            if (idx < 0) {
+                return false;
+            }
+            boolean jsonStringValue = idx > 0 && lower.charAt(idx - 1) == '"'
+                    && idx + "overloaded".length() < lower.length()
+                    && lower.charAt(idx + "overloaded".length()) == '"';
+            if (!jsonStringValue) {
+                return true;
+            }
+            from = idx + "overloaded".length();
+        }
+        return false;
     }
 
     private static String blankToNull(String s) {

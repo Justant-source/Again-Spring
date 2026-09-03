@@ -236,6 +236,47 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void looksLikeLlmError_doesNotTreatSibomCatalogOverloadedIdAsProviderError() {
+        String reelsJson = """
+            ```json
+            {
+              "hook_reels": "책임질수록 밀려나고 책임 안 질수록 올라간다",
+              "script_reels": "15년 다니며 본 것. 책임 앞에 먼저 비틀어 아래 사람들을 지킨 선배들은 만신창이였다.",
+              "sibom_plan": [
+                {"role": "peak", "image_id": "overloaded", "caption": "짓눌림"}
+              ]
+            }
+            ```
+            """;
+        assertThat(VideoVariantService.looksLikeLlmError(reelsJson)).isFalse();
+        assertThat(VideoVariantService.looksLikeLlmError("Overloaded")).isTrue();
+        assertThat(VideoVariantService.looksLikeLlmError("Anthropic API overloaded (529)")).isTrue();
+        assertThat(VideoVariantService.looksLikeLlmError("{\"type\":\"overloaded_error\"}")).isTrue();
+        assertThat(VideoVariantService.looksLikeLlmError("Credit balance is too low")).isTrue();
+    }
+
+    @Test
+    void generate_acceptsSibomPlanWithCatalogIdOverloaded() throws Exception {
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("""
+            {"hook_reels":"책임질수록 밀려난다","script_reels":"15년 다니며 본 것. 책임 앞에 먼저 비틀어 지킨 선배들은 만신창이였다.","sibom_plan":[
+              {"role":"intro","image_id":"no-apology","caption":"책임회피","beat_index":0,"size":"large","dwell":"hold"},
+              {"role":"peak","image_id":"overloaded","caption":"짓눌림","beat_index":1,"size":"large","dwell":"hold"},
+              {"role":"punch","image_id":"caught-lying","caption":"거짓말","beat_index":2,"size":"small","dwell":"punch"},
+              {"role":"soft_fill","image_id":"swallow-words","caption":"말못함","beat_index":3,"size":"small","dwell":"punch"}
+            ]}
+            """);
+
+        VideoVariantService.Variants v = service.generate(
+                "마스터", "anger", "제목", "본문요약용텍스트입니다. 두 번째 문장입니다.", true, false,
+                List.of("no-apology", "overloaded", "caught-lying", "swallow-words"));
+
+        assertThat(v.channelGenerationStatus().get("instagram_reels")).isEqualTo("OK");
+        assertThat(v.sibomPlanReels().stream().map(SibomPlanItem::imageId))
+                .contains("overloaded");
+        assertThat(VideoVariantService.validateRequiredSibomPlans(v, true, false).isValid()).isTrue();
+    }
+
+    @Test
     void generate_llmFail_fallsBackToHeuristic() throws Exception {
         when(llmProvider.invoke(anyString(), anyString())).thenThrow(new RuntimeException("down"));
 

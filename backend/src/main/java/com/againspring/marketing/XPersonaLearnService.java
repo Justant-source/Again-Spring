@@ -646,16 +646,12 @@ public class XPersonaLearnService {
         return t;
     }
 
-    static boolean looksLikeLlmError(String s) {
+    public static boolean looksLikeLlmError(String s) {
         if (s == null) {
             return true;
         }
-        String n = s.toLowerCase();
-        return n.contains("credit balance")
-            || n.contains("rate_limit")
-            || n.contains("rate limit")
-            || n.contains("i'm claude")
-            || n.contains("as an ai");
+        return com.againspring.service.ai.LlmErrorSignatures.get()
+                .containsSignature(s.toLowerCase(java.util.Locale.ROOT));
     }
 
     public LearnResult requireEnabledThenRun(String updatedBy) {
