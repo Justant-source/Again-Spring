@@ -6,6 +6,7 @@
 
 | 컴포넌트 | 역할 |
 |---|---|
+| `EnvironmentGuard` | 기동 시 `AI_USER_ENV`(prod\|dev)와 실제 DB·backend 호스트명을 대조, 불일치/누락이면 기동을 거부 |
 | `OrchestratorScheduler` | 메인 tick cron 트리거 |
 | `BehaviorEngine` | kill-switch, cap, feed 로드, quota, persona 선택 |
 | `ActionPlanner` | 어떤 행동을 할지 결정 |

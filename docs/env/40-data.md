@@ -70,7 +70,7 @@ last_updated: 2026-09-01
 | `CLAUDE_BIN` | Claude CLI 바이너리 | `claude` |
 | `CLAUDE_MODEL` | 기본 모델 | `claude-haiku-4-5-20251001` |
 | `REPORT_LLM_MODEL` | 리포트 모델 | `claude-sonnet-5` |
-| `CLAUDE_HOST_CONFIG_DIR` | `/root/.claude`로 마운트할 호스트 경로 | 환경별 실제 값 |
+| `CLAUDE_HOST_CONFIG_DIR` | 컨테이너 내부 `~/.claude`(uid 1000, `HOME=/home/justant`)로 마운트할 호스트 경로 | 환경별 실제 값 |
 | `LLM_POOL_SIZE` | worker pool size | `100` |
 | `LLM_QUEUE_CAPACITY` | queue size | `500` |
 | `LLM_QUEUE_WAIT_TIMEOUT_MS` | queue wait timeout | `120000` (2026-08-15, 기존 `30000`) |
@@ -124,7 +124,7 @@ last_updated: 2026-09-01
 | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | PARSE_FAIL 이벤트 임계값 — N회 이상 초과 시 1회 알림 | `3` |
 | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_WINDOW_MINUTES` | PARSE_FAIL 계수 윈도우(분) | `30` |
 | `AI_USER_STRUCTURED_GENERATION_PARSE_FAIL_COOLDOWN_MINUTES` | PARSE_FAIL 알림 쿨다운(분) | `360` |
-| `AI_USER_BACKEND_URL` | orchestrator가 write할 backend. dev 전용 인스턴스는 `http://againspring-backend-dev:8080`, prod는 `http://againspring-backend-prod:8080` | `http://againspring-backend-prod:8080` |
+| `AI_USER_ENV` | **필수.** `prod`\|`dev`. compose가 서비스별 고정 주입. DB·backend 호스트명이 이 값과 다르면 기동 실패(`EnvironmentGuard`) | compose 고정 |
 | `AI_USER_ENABLED` | **하드 게이트**. false면 스케줄러와 tick이 바로 skip | `true` |
 | `AI_USER_TICK_CRON` | 메인 tick cron | `0 */10 * * * *` |
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
@@ -135,7 +135,6 @@ last_updated: 2026-09-01
 | `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |
 | `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
 | `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
-| `AI_USER_SECONDARY_BACKEND_URL` | 보조 backend direct write | 기본 공란 |
 | `AI_USER_FAMILY_PLAZA_ENABLED` | AI 생성에 FAMILY 광장 포함 여부 (false = OTHER로 흡수). 사용자 검색/글쓰기는 여전히 FAMILY 지원 | `false` |
 | `PAIRED_POST_ENABLED` | 양면 사연(작성자+상대방) 생성. prod 기본 true | `true`(prod) / `false`(dev 휴면) |
 | `PAIRED_POST_CRON` | paired posts cron (당일 부족분 보충) | `0 0 */2 * * *` |

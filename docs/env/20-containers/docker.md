@@ -80,7 +80,7 @@ prod 웹/DB 스택이다. ai-user 런타임은 포함하지 않는다.
 운영 원칙:
 
 - orchestrator 기본 대상은 `backend-prod`와 `mariadb-prod`
-- `AI_USER_SECONDARY_BACKEND_URL`은 기본 공란
+- orchestrator는 `AI_USER_ENV`로 자기 환경을 검증하고 불일치 시 기동하지 않는다
 - dev DB 직접 쓰기는 `prod-dev-sync`를 통한 동기화만 허용
 
 ## 시작 순서
