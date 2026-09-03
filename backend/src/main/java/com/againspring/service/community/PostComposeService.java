@@ -10,6 +10,7 @@ import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.safety.CrisisDetectedEvent;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.ai.SyntheticOutputGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,6 +37,7 @@ public class PostComposeService {
     private final VoteOptionRepository voteOptionRepository;
     private final KeywordGuard keywordGuard;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final SyntheticOutputGuard syntheticOutputGuard;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
     private final ApplicationEventPublisher eventPublisher;
     private final SibomCandidateService sibomCandidateService;
@@ -148,6 +150,7 @@ public class PostComposeService {
         // 광장형 정책(docs/frontend/60-runtime/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
         // KeywordGuard LEVEL1(피해자·소송 등)은 AI 출력 금지어이며 커뮤니티 본문 차단 사유가 아니다.
         // CRISIS 키워드만 관제 이벤트(감사 로그)로 남기고 게시는 계속한다.
+        syntheticOutputGuard.assertPublishable(authorId, bodyRaw);
         var scanResult = keywordGuard.scanUserInput(bodyRaw, authorId);
         if (scanResult.isCrisis()) {
             List<String> patterns = scanResult.getMatches().stream()

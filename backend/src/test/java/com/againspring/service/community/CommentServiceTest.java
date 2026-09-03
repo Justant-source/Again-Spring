@@ -8,7 +8,9 @@ import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.safety.KeywordGuard;
+import com.againspring.safety.ScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.ai.SyntheticOutputGuard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,10 +23,13 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +48,7 @@ class CommentServiceTest {
     @Mock private KeywordGuard keywordGuard;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private AiUserOutboxWriter aiUserOutboxWriter;
+    @Mock private SyntheticOutputGuard syntheticOutputGuard;
 
     @InjectMocks private CommentService commentService;
 
@@ -97,6 +103,36 @@ class CommentServiceTest {
                 .extracting("code")
                 .isEqualTo("COMMENT_DEPTH_EXCEEDED");
         verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("addComment — synthetic 작성자의 LLM 오류 출력 문자열은 SyntheticOutputGuard가 거부한다")
+    void addComment_rejectsSyntheticAuthorErrorOutput() {
+        String body = "Your credit balance is too low to access the Anthropic API.";
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).build()));
+        doThrow(new BusinessException(SyntheticOutputGuard.CODE, "AI 출력 오류 문자열은 게시할 수 없습니다", 422))
+                .when(syntheticOutputGuard).assertPublishable(eq("ai_persona_1"), eq(body));
+
+        assertThatThrownBy(() -> commentService.addComment(POST_ID, null, "ai_persona_1", body))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("게시할 수 없습니다");
+
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("addComment — 실사용자가 동일한 오류 문자열을 쓰더라도 SyntheticOutputGuard는 막지 않는다(fail-open)")
+    void addComment_realUserSameErrorStringIsPublished() {
+        String body = "Your credit balance is too low to access the Anthropic API.";
+        when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId("other-user").build()));
+        when(keywordGuard.scanUserInput(eq(body), anyString())).thenReturn(ScanResult.empty());
+        when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // syntheticOutputGuard는 실사용자에 대해 stub 없이도(fail-open) 아무 것도 던지지 않는다.
+
+        assertThatCode(() -> commentService.addComment(POST_ID, null, "real_user_1", body))
+                .doesNotThrowAnyException();
+
+        verify(commentRepository).save(any());
     }
 
     @Test

@@ -4,10 +4,12 @@ import com.againspring.domain.community.Post;
 import com.againspring.domain.enums.PostCategory;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
+import com.againspring.common.exception.BusinessException;
 import com.againspring.safety.KeywordGuard;
 import com.againspring.safety.Level;
 import com.againspring.safety.ScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.ai.SyntheticOutputGuard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,9 +23,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +46,7 @@ class PostComposeServicePlazaPolicyTest {
     @Mock private PostSearchNgramIndexer postSearchNgramIndexer;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private SibomCandidateService sibomCandidateService;
+    @Mock private SyntheticOutputGuard syntheticOutputGuard;
 
     @InjectMocks private PostComposeService composeService;
 
@@ -69,5 +74,39 @@ class PostComposeServicePlazaPolicyTest {
         assertThat(captor.getValue().getBodyRaw()).contains("소송");
         assertThat(captor.getValue().getBodyRaw()).contains("피해자");
         verify(keywordGuard).scanUserInput(eq(body), eq("user_bot"));
+    }
+
+    @Test
+    @DisplayName("synthetic 작성자의 LLM 오류 출력 문자열은 SyntheticOutputGuard가 거부한다")
+    void compose_rejectsSyntheticAuthorErrorOutput() {
+        String body = "Your credit balance is too low to access the Anthropic API.";
+        doThrow(new BusinessException(SyntheticOutputGuard.CODE, "AI 출력 오류 문자열은 게시할 수 없습니다", 422))
+                .when(syntheticOutputGuard).assertPublishable(eq("ai_persona_1"), eq(body));
+
+        assertThatThrownBy(() -> composeService.composeAndPublish(
+                "ai_persona_1", "제목", body,
+                PostCategory.FAMILY, "PUBLIC", null, null, null, null, null, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("게시할 수 없습니다");
+
+        verify(postRepository, org.mockito.Mockito.never()).save(any(Post.class));
+    }
+
+    @Test
+    @DisplayName("실사용자가 동일한 오류 문자열을 쓰더라도 SyntheticOutputGuard는 막지 않는다(fail-open)")
+    void compose_realUserSameErrorStringIsPublished() {
+        String body = "Your credit balance is too low to access the Anthropic API.";
+        when(keywordGuard.scanUserInput(eq(body), anyString())).thenReturn(ScanResult.empty());
+        when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
+        when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        // syntheticOutputGuard는 실사용자에 대해 stub 없이도(fail-open) 아무 것도 던지지 않는다.
+
+        assertThatCode(() -> composeService.composeAndPublish(
+                "real_user_1", "제목", body,
+                PostCategory.FAMILY, "PUBLIC", null, null, null, null, null, null))
+                .doesNotThrowAnyException();
+
+        verify(postRepository).save(any(Post.class));
     }
 }

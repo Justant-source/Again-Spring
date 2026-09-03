@@ -12,6 +12,7 @@ import com.againspring.safety.KeywordGuard;
 import com.againspring.service.notification.event.NewCommentEvent;
 import com.againspring.service.notification.event.NewReplyEvent;
 import com.againspring.service.ai.AiUserOutboxWriter;
+import com.againspring.service.ai.SyntheticOutputGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,6 +37,7 @@ public class CommentService {
     private final KeywordGuard keywordGuard;
     private final ApplicationEventPublisher eventPublisher;
     private final AiUserOutboxWriter aiUserOutboxWriter;
+    private final SyntheticOutputGuard syntheticOutputGuard;
 
     /** Internal idempotency replay lookup; not a public API read path. */
     @Transactional(readOnly = true)
@@ -59,6 +61,7 @@ public class CommentService {
                 .orElseThrow(() -> new BusinessException("POST_NOT_FOUND", "Post not found: " + postId, 404));
 
         // 위기 감지
+        syntheticOutputGuard.assertPublishable(authorId, body);
         keywordGuard.scanUserInput(body, authorId);
 
         // 부모 댓글 존재 확인 (nullable). UI는 2단만 지원 — 대댓글의 대댓글(depth≥2) 금지.
@@ -127,6 +130,7 @@ public class CommentService {
         }
 
         // 위기 감지
+        syntheticOutputGuard.assertPublishable(userId, body);
         keywordGuard.scanUserInput(body, userId);
 
         comment.setBody(body);
