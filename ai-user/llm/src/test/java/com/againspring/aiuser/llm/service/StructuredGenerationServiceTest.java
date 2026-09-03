@@ -534,4 +534,11 @@ class StructuredGenerationServiceTest {
                 "갑자기 달라진 남편 적응이 안 되네요 ㅠㅠ"));
     }
 
+    @Test
+    void validTextRejectsLeakFromSharedJson() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                StructuredGenerationService.validTextForTest("정상 본문입니다 진짜로요\n적용 처리 메모\n- 트리거: 어쩌구", "comment.body", 2, 1000))
+            .isInstanceOf(StructuredGenerationException.class);
+    }
+
 }

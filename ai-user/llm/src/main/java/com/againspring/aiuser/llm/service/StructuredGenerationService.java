@@ -33,7 +33,7 @@ public class StructuredGenerationService {
     @Value("${llm.structured.prompt-mode-enabled:false}")
     private boolean structuredPromptModeEnabled;
 
-    private static final Pattern META = Pattern.compile("(?i)(적용 처리 메모|작성 노트|<<<|```|i can't help|i am (claude|codex))");
+    private static final Pattern META = Pattern.compile("(?i)(<<<|```)");
     /** SNS hook emotion enum (PLAN {@code hook_emotion}). */
     static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
     /** Flattened promo_title length bounds (independent of plaza title). */
@@ -1014,10 +1014,12 @@ public class StructuredGenerationService {
     private static void validRef(String v) { if (!v.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")) throw new StructuredGenerationException("invalid ref"); }
     private static void validText(String v, String field, int min, int max) {
         if (v.length() < min || v.length() > max || LlmErrorSignature.looksLikeProviderError(v)
-                || META.matcher(v).find() || looksLikeStructuredSchemaLeak(v) || koreanRatio(v) < .10) {
+                || META.matcher(v).find() || LlmErrorSignatures.get().hasPromptLeak(v)
+                || looksLikeStructuredSchemaLeak(v) || koreanRatio(v) < LlmErrorSignatures.get().koreanRatioMin()) {
             throw new StructuredGenerationException("invalid " + field);
         }
     }
+    static void validTextForTest(String v, String field, int min, int max) { validText(v, field, min, max); }
 
     /**
      * Thread-plan JSON dumped into a body field (2026-08-11). Keep in sync with

@@ -20,10 +20,6 @@ public class OutputSanitizer {
     private static final Pattern CODE_BLOCK = Pattern.compile("```[^\n]*\n?(.*?)```", Pattern.DOTALL);
     // 수평 구분선 (--- 단독 줄) — Sonnet의 "제목\n---\n본문" 분리에 쓰임
     private static final Pattern HR_LINE = Pattern.compile("\n[ \\t]*-{3,}[ \\t]*\n");
-    // 내부 운영/첨삭 메타가 본문 뒤에 누출된 패턴 — 발견 즉시 해당 지점부터 꼬리 제거
-    private static final Pattern TRAILING_META_TABLE = Pattern.compile("(?m)^\\|\\s*항목\\s*\\|\\s*처리\\s*내용\\s*\\|");
-    private static final Pattern TRAILING_NOTE_BULLET = Pattern.compile(
-        "(?m)(?:^-\\s*(?:트리거|어미 변화|모바일 오타|페르소나 표현):|^-\\s*온점·쌍따옴표 없음\\s*$)");
     // AI 메타 응답 패턴 (앞부분에서만 제거)
     private static final Pattern LEADING_META = Pattern.compile(
         "^(?:안녕하세요[,!. ]*|물론이죠[,. ]*|물론입니다[,. ]*|네,? 저는 [^\n]*\n?|제가 도와드릴게요[,. ]*" +
@@ -401,8 +397,7 @@ public class OutputSanitizer {
                 break;
             }
         }
-        s = cutAtPattern(s, TRAILING_META_TABLE);
-        s = cutAtPattern(s, TRAILING_NOTE_BULLET);
+        s = cutTrailingLeak(s);
         // 선두 작업명 에코 제거: "커뮤니티 글 창작", "일상 글 창작", "카페 경험 공유글" 등
         s = s.replaceAll("(?m)^[^\n]{1,20}글 창작[^\n]*\n?", "").stripLeading();
         s = s.replaceAll("(?m)^[^\n]{1,20} 경험 공유글[^\n]*\n?", "").stripLeading();
@@ -503,6 +498,16 @@ public class OutputSanitizer {
         Matcher matcher = pattern.matcher(text);
         if (!matcher.find()) return text;
         return text.substring(0, matcher.start()).stripTrailing();
+    }
+
+    /** 내부 메모/표가 본문 뒤에 누출되면 첫 매치 지점부터 꼬리를 자른다 (패턴 SSOT = llm-error-signatures.json). */
+    private static String cutTrailingLeak(String text) {
+        int cut = -1;
+        for (Pattern p : LlmErrorSignatures.get().promptLeakPatterns()) {
+            Matcher m = p.matcher(text);
+            if (m.find() && (cut < 0 || m.start() < cut)) cut = m.start();
+        }
+        return cut < 0 ? text : text.substring(0, cut).stripTrailing();
     }
 
     /** 멀티 옵션 텍스트에서 첫 번째 실제 내용만 추출 */
