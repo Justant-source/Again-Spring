@@ -103,6 +103,20 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 - prompt caching flag는 `llm.api.prompt-caching`에 있고, compose/env로 제어할 수 있다.
 - `/internal/rewrite/post`는 legacy 사연 큐레이션 배치용이며, backend 기본값을 `API`로 잡아 clcocloud 직접 경로를 우선 사용한다.
 
+### STUB persona 치환 규칙 (dev canary 전용)
+
+`StubInvoker.substitute()`가 요청 prompt에서 32-hex persona id를 등장 순서대로 추출해
+`__PERSONA_1__`, `__PERSONA_2__`… 자리표시자에 순서대로 대입한다. prompt에 등장한 persona
+수보다 큰 번호의 placeholder를 쓰는 `comments[]` 항목은 통째로 드롭한다(예: persona가 1개뿐인데
+픽스처가 `__PERSONA_3__`를 쓰면 그 댓글은 제거). 치환 대상 hex id가 하나도 없으면 픽스처를
+그대로 반환한다.
+
+**픽스처 위치**: classpath `ai-user/llm/src/main/resources/stub/*.json`이 기본이며,
+`LLM_STUB_FIXTURE_DIR`(compose 기본값 `/app/stub-fixtures`)이 설정되면 그 디렉토리를 classpath보다
+우선한다. dev canary(`scripts/ai-user-canary.sh`)는 호스트 `.temp/llm-stub-fixtures`
+(override `LLM_STUB_FIXTURE_HOST_DIR`)를 `/app/stub-fixtures`에 read-only 마운트하고, 실행
+전에 classpath `stub/*`를 그 디렉토리로 복사해 채운다.
+
 ## provider 인증 상태 (2026-09-03)
 
 CLI exit code≠0일 때 `ClaudeCliInvoker`/`CodexCliInvoker`는 stderr 마지막 2KB를 `CliAuthFailureDetector.isAuthFailure()`로 분류한다 — 세션 만료(`not logged in`, `token has expired`, `invalid_grant` 등)·조직 차단(`organization has disabled`, `subscription access`)·키 무효(`invalid api key`, `401`) 패턴에 걸리면 `errorType=AUTH_ERROR`, 아니면 기존 `CLAUDE_ERROR`/`CODEX_ERROR`로 남는다. 토큰을 태우는 canary 호출 없이 실제 요청 결과로만 판단한다.

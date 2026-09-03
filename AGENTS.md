@@ -73,7 +73,7 @@ python3 scripts/lint_docs.py
 2. **BE는 RemoteLlmProvider만 사용** — HTTP POST → `againspring-llm:8090/v1/invoke` (base 스택 공유)
 3. **AI-user 콘텐츠는 검열하지 않는다** — AI-user가 쓴 글·댓글에 금지어·표현 denylist를 두지 않는다(욕설 포함). 유일한 사후 통제는 실사용자 신고(`community_reports`)다. 단, LLM 오류·거절·누출 문자열은 콘텐츠가 아니라 오류다(#7).
 4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **dev/prod 완전 격리**. 필수 순서:
-   ① local unit/build → ② **`scripts/deploy.sh dev`** (기동+헬스대기+검증 일체) → ③ e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
+   ① local unit/build → ② **`scripts/deploy.sh dev [--ai-user-canary]`** (기동+헬스대기+검증 일체, AI-user 변경 시 canary 병행) → ③ e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
    → ④ (명시 지시 시에만) **`scripts/deploy.sh prod --i-mean-it`** (백업+기동+헬스대기+검증 일체) → ⑤ main commit & push
    **prod에서 e2e·직접 반영 금지.** `prod-dev-sync`=5분 콘텐츠+24h full. **dev LLM 금지(L3)**. e2e는 `:8090`만(E3).
 5. **`.env.prod` git 커밋 절대 금지**

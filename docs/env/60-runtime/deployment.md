@@ -54,6 +54,19 @@ server-dev는 compose에서 `SPRING_FLYWAY_ENABLED=true` · `SPRING_JPA_HIBERNAT
 `LLM_ENABLED=false` · **againspring(LLM) 네트워크 미연결(L3)** 로 올린다.
 (local `bootRun`의 `application-dev.yml`은 편집용으로 별도.)
 
+### `--ai-user-canary` — AI-user 경로 dev 게이트
+
+```bash
+scripts/deploy.sh dev --ai-user-canary
+```
+
+`verify-deploy.sh dev` 통과 후 `scripts/ai-user-canary.sh`를 이어 실행한다. dev DB의
+`ai_user_generation_config` provider 3종을 일시 `STUB`로 바꾸고(원래값은 스냅샷 후 trap으로
+복원), `ai-user-orchestrator-dev`를 기동해 `generate-scheduled-posts?skipSourceClaim=true`
+→ `publish-scheduled-post?force=true` 1사이클을 backend-dev에 실제로 태운다. LLM은 전혀
+호출하지 않고(STUB provider, `.temp/llm-stub-fixtures` 픽스처만 반환), 생성한 글·예약 row는
+스크립트 종료 시 trap이 정리한다. `--ai-user-canary`는 dev 전용 — prod 경로에서 주면 즉시 거부된다.
+
 ## 2단계: e2e 검증 (dev:8090)
 
 `scripts/deploy.sh dev`가 이미 `/api/health/deep` + `verify-deploy.sh dev`로 실물 검증을 마친
@@ -94,6 +107,9 @@ docker logs -f againspring-prod-dev-sync
 - `ai-user-orchestrator-dev`: 기본 미기동 (`profiles: [ai-user-dev]`, `AI_USER_DEV_ENABLED=false`)
 - 네트워크: sync만 `againspring-prod` + `againspring-dev` (유일한 교차 쓰기 경로)
 - backend-dev는 `againspring`(LLM) 네트워크에 **연결하지 않음** (L3)
+- STUB 픽스처 마운트 경로: 호스트 `.temp/llm-stub-fixtures`(override `LLM_STUB_FIXTURE_HOST_DIR`) →
+  컨테이너 `/app/stub-fixtures`(read-only, `LLM_STUB_FIXTURE_DIR`). `scripts/ai-user-canary.sh`가
+  실행 전 classpath `ai-user/llm/src/main/resources/stub/*`를 이 경로로 복사해 채운다
 
 ### 계정 생성 1회 절차 — orchestrator 스코프 DB 계정
 

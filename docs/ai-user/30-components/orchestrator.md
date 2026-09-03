@@ -280,6 +280,8 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 - `POST /admin/trigger/reset-counter`
 - `POST /admin/trigger/backfill-comment-likes`
 - `POST /admin/trigger/generate-posts`
+- `POST /admin/trigger/generate-scheduled-posts?skipSourceClaim=true` — `PlanSourceStoryResolver`의 소스 claim(reconstruct) 단계를 건너뛴다. dev canary 전용(`scripts/ai-user-canary.sh`) — prod에서 쓰면 실제 소스 없이 freestyle로 발행되므로 쓰지 않는다
+- `POST /admin/trigger/publish-scheduled-post?id=&force=true` — 예약글 단건 즉시 게시. dev canary 전용. `force=true`는 슬롯 시각(`scheduledPublishAt` 미도래)과 QuietHours(KST 02–06) 밴만 무시하며, kill switch(`ai_user_kill_switch`/`schedule_execution_paused`)는 절대 우회하지 않는다(96b1b935). prod에서 `force=true` 호출 금지 — 새벽 게시가 발생할 수 있다
 - `POST /admin/trigger/update-cap`
 
 ### test
