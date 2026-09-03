@@ -132,7 +132,7 @@ last_updated: 2026-09-01
 | `AI_USER_DAILY_GLOBAL_CAP` | 일일 상한 fallback | `500` |
 | `AI_USER_BOT_PASSWORD` | synthetic 계정 로그인용 | **vault** `ai_user.bot_password` (env 비권장) |
 | `AI_USER_INTERNAL_TOKEN` | `/api/internal/ai-user/**`(backend) 인증 Bearer 토큰. JWT 아님, fail-closed. BE·orchestrator 동일 값 필수 | **vault** `ai_user.internal_token` (env 비권장) |
-| `AI_USER_DB_USER` / `AI_USER_DB_PASSWORD` | 선택. orchestrator 전용 스코프 DB 계정(`ai_user_orch`, `docs/backend/40-data.md` §"스키마 소유"). 비우면 기존 전체 권한 `MARIADB_USER`/`MARIADB_PASSWORD`(dev는 `DEV_MARIADB_PASSWORD`)로 fallback | 미설정(fallback) |
+| `AI_USER_DB_USER` / `AI_USER_DB_PASSWORD` | orchestrator 전용 스코프 DB 계정(`ai_user_orch`, `docs/backend/40-data.md` §"스키마 소유"). **2026-09-03부터 dev·prod 모두 이 계정으로 전환됨**(양쪽 mariadb에 동일 비밀번호로 생성·`ALTER USER`로 통일 — `.env.ai-user` 하나를 두 orchestrator 인스턴스가 공유하므로 값도 하나다). 비우면 기존 전체 권한 `MARIADB_USER`/`MARIADB_PASSWORD`(dev는 `DEV_MARIADB_PASSWORD`)로 fallback | `ai_user_orch` (활성) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | 예약 글 게시 성공·최종 실패 알림 · Justant-Bot 선댓글/대댓글 게시 통보 | 기본은 host watchdog credential file(`~/.config/again-spring-watchdog/telegram.env`)에서 compose가 주입. Git에 커밋 금지. BE는 vault `telegram.bot_token` / `telegram.chat_id` |
 | `TELEGRAM_ENV_FILE` | ai-user compose의 Telegram credential file 경로 override | 기본값=`/home/justant/.config/again-spring-watchdog/telegram.env`; 다른 host 경로일 때만 설정 |
 | `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
