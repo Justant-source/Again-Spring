@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Database lease protocol for {@link ScheduledPostPublisher}, split into its own bean for the
@@ -39,6 +40,33 @@ public class ScheduledPostLeaseService {
             row.setAttemptCount(row.getAttemptCount() + 1);
         });
         return due;
+    }
+
+    /**
+     * Claim a single row by id for {@link ScheduledPostPublisher#publishNow} — dev canary only.
+     * Only claims rows still {@code SCHEDULED} (not already publishing/published/failed).
+     */
+    @Transactional
+    public Optional<AiScheduledPost> claimById(String id, String workerId, Duration leaseDuration) {
+        Optional<AiScheduledPost> found = scheduledPosts.findById(id);
+        if (found.isEmpty()) return Optional.empty();
+        AiScheduledPost row = found.get();
+        if (row.getStatus() != ScheduledPostStatus.SCHEDULED) return Optional.empty();
+        row.setStatus(ScheduledPostStatus.PUBLISHING);
+        row.setLeaseOwner(workerId);
+        row.setLeaseUntil(Instant.now().plus(leaseDuration));
+        row.setAttemptCount(row.getAttemptCount() + 1);
+        return Optional.of(row);
+    }
+
+    /** Undo a {@link #claimById} lease (e.g. force=false and the slot isn't due yet) without failing the row. */
+    @Transactional
+    public void release(String id, String workerId) {
+        AiScheduledPost row = owned(id, workerId);
+        row.setStatus(ScheduledPostStatus.SCHEDULED);
+        row.setLeaseOwner(null);
+        row.setLeaseUntil(null);
+        row.setAttemptCount(Math.max(0, row.getAttemptCount() - 1));
     }
 
     @Transactional

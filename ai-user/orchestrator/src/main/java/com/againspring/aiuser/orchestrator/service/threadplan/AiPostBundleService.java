@@ -230,6 +230,20 @@ public class AiPostBundleService {
     public HoldResult generateAndHoldResult(Persona author, String category, String topicHint,
                                             String correlationId, Instant scheduledPublishAt,
                                             String preferredSource, Set<Long> skipExampleIds) {
+        return generateAndHoldResult(author, category, topicHint, correlationId, scheduledPublishAt,
+                preferredSource, skipExampleIds, false);
+    }
+
+    /**
+     * {@code skipSourceClaim=true} bypasses the popular-source claim entirely and generates from a
+     * freestyle source (no {@code sourceContext}/{@code sourceExampleId}) — <strong>dev canary
+     * only</strong>, so the canary script does not need real crawled content in {@code example_bank}
+     * to produce a test post.
+     */
+    public HoldResult generateAndHoldResult(Persona author, String category, String topicHint,
+                                            String correlationId, Instant scheduledPublishAt,
+                                            String preferredSource, Set<Long> skipExampleIds,
+                                            boolean skipSourceClaim) {
         String personaId = author == null ? null : author.getId();
         String plaza = category;
         if (scheduledPublishAt == null) {
@@ -241,8 +255,10 @@ public class AiPostBundleService {
         Instant reserveUntil = scheduledPublishAt.plus(Duration.ofHours(24));
         String sourceName = SourceReservationSupport.resolvePreferredSource(preferredSource, author);
 
-        Optional<PlanSourceStoryResolver.ResolvedSource> claimed = sourceStoryResolver.claimAndResolve(
-                author, sourceName, holdId, reserveUntil, category, skipExampleIds);
+        Optional<PlanSourceStoryResolver.ResolvedSource> claimed = skipSourceClaim
+                ? Optional.of(freestyleSource(sourceName))
+                : sourceStoryResolver.claimAndResolve(
+                        author, sourceName, holdId, reserveUntil, category, skipExampleIds);
         if (claimed.isEmpty()) {
             log.info("AI post hold skipped: no claimed source preferred={} plaza={} holdId={} corr={}",
                     sourceName, plaza, holdId, correlationId);
@@ -307,6 +323,16 @@ public class AiPostBundleService {
             sourceReservationSupport.release(exampleId, holdId);
             return HoldResult.persist(sourceName, plaza, personaId, exampleId, persistFailure.getMessage());
         }
+    }
+
+    /**
+     * Synthetic {@link PlanSourceStoryResolver.ResolvedSource} for {@code skipSourceClaim=true}:
+     * no popular-crawl grounding ({@code sourceContext}/{@code sourceExampleId}/{@code sourceBody}
+     * all null, {@code reconstructMode=false}) — dev canary only, never a real claim.
+     */
+    private static PlanSourceStoryResolver.ResolvedSource freestyleSource(String sourceName) {
+        return new PlanSourceStoryResolver.ResolvedSource(
+                "", null, false, null, null, sourceName, null, null, "", List.of());
     }
 
     /**

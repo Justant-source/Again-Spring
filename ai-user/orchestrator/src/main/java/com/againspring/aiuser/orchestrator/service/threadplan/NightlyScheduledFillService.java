@@ -113,8 +113,25 @@ public class NightlyScheduledFillService {
         return fillSolo(count, fromHour, toHour, minSpacingMinutes, budget, failures, scheduledIds);
     }
 
+    /**
+     * {@code skipSourceClaim=true} — dev canary only, see {@link AiPostBundleService#generateAndHoldResult(
+     * Persona, String, String, String, java.time.Instant, String, java.util.Set, boolean)}.
+     */
+    public FillResult fillSolo(int count, int fromHour, int toHour, long minSpacingMinutes,
+                                LlmCallBudget budget, boolean skipSourceClaim) {
+        List<NightlySlotFailure> failures = new ArrayList<>();
+        List<String> scheduledIds = new ArrayList<>();
+        return fillSolo(count, fromHour, toHour, minSpacingMinutes, budget, failures, scheduledIds, skipSourceClaim);
+    }
+
     FillResult fillSolo(int count, int fromHour, int toHour, long minSpacingMinutes,
                         LlmCallBudget budget, List<NightlySlotFailure> failures, List<String> scheduledIds) {
+        return fillSolo(count, fromHour, toHour, minSpacingMinutes, budget, failures, scheduledIds, false);
+    }
+
+    FillResult fillSolo(int count, int fromHour, int toHour, long minSpacingMinutes,
+                        LlmCallBudget budget, List<NightlySlotFailure> failures, List<String> scheduledIds,
+                        boolean skipSourceClaim) {
         int need = Math.max(0, Math.min(count, 100));
         if (need == 0) {
             return new FillResult(0, 0, 0, budget.used(), budget.max(), 0, 0, scheduledIds, failures, null, 0);
@@ -136,12 +153,19 @@ public class NightlyScheduledFillService {
             return new FillResult(need, 0, 0, budget.used(), budget.max(), 0, 0, scheduledIds, failures,
                     "슬롯 샘플링 실패: " + e.getMessage(), 0);
         }
-        return fillSoloWithPlan(need, sources, slots, new ArrayList<>(active), budget, failures, scheduledIds, rng);
+        return fillSoloWithPlan(need, sources, slots, new ArrayList<>(active), budget, failures, scheduledIds, rng,
+                skipSourceClaim);
     }
 
     FillResult fillSoloWithPlan(int need, List<String> sources, List<Instant> slots, List<Persona> pool,
                                 LlmCallBudget budget, List<NightlySlotFailure> failures,
                                 List<String> scheduledIds, Random rng) {
+        return fillSoloWithPlan(need, sources, slots, pool, budget, failures, scheduledIds, rng, false);
+    }
+
+    FillResult fillSoloWithPlan(int need, List<String> sources, List<Instant> slots, List<Persona> pool,
+                                LlmCallBudget budget, List<NightlySlotFailure> failures,
+                                List<String> scheduledIds, Random rng, boolean skipSourceClaim) {
         // Precompute empty (source, plaza) pairs to avoid doomed claim attempts
         Set<String> emptyPlazaSources = precomputeEmptyPairs();
         Set<Long> skipExampleIds = new HashSet<>();
@@ -157,7 +181,7 @@ public class NightlyScheduledFillService {
             String preferred = sources.get(i);
             Instant slot = slots.get(i);
             SlotSave save = tryFillOneSlot(i, preferred, slot, pool, rng, budget, emptyPlazaSources,
-                    skipExampleIds, failures);
+                    skipExampleIds, failures, skipSourceClaim);
             attempted += save.attempted();
             skipped += save.skipped();
             if (save.savedId() != null) {
@@ -219,7 +243,8 @@ public class NightlyScheduledFillService {
 
     private SlotSave tryFillOneSlot(int slotIndex, String preferredSource, Instant slot, List<Persona> pool,
                                     Random rng, LlmCallBudget budget, Set<String> emptyPlazaSources,
-                                    Set<Long> skipExampleIds, List<NightlySlotFailure> failures) {
+                                    Set<Long> skipExampleIds, List<NightlySlotFailure> failures,
+                                    boolean skipSourceClaim) {
         int attempted = 0;
         int skipped = 0;
         List<String> sourceOrder = sourceRetryOrder(preferredSource);
@@ -251,8 +276,11 @@ public class NightlyScheduledFillService {
                     while (budget.hasRemaining() && inner < 8) {
                         inner++;
                         String corrId = "nightly-hold-" + persona.getId() + "-s" + slotIndex + "-a" + attempted;
-                        HoldResult result = aiPostBundleService.generateAndHoldResult(
-                                persona, plaza, null, corrId, slot, source, skipExampleIds);
+                        HoldResult result = skipSourceClaim
+                                ? aiPostBundleService.generateAndHoldResult(
+                                        persona, plaza, null, corrId, slot, source, skipExampleIds, true)
+                                : aiPostBundleService.generateAndHoldResult(
+                                        persona, plaza, null, corrId, slot, source, skipExampleIds);
                         attempted++;
                         log.info("[nightly-fill] attempt slot={} {}", slotIndex, result.detailedReason());
                         if (result.outcome() == HoldResult.Outcome.CLAIM_EMPTY) {

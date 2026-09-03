@@ -21,6 +21,7 @@ import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
 import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
 import com.againspring.aiuser.orchestrator.service.threadplan.NightlyScheduledFillService;
+import com.againspring.aiuser.orchestrator.service.threadplan.ScheduledPostPublisher;
 import com.againspring.aiuser.orchestrator.service.threadplan.ThreadPlanGenerationService;
 import com.againspring.aiuser.orchestrator.task.ActionExecutor;
 import lombok.RequiredArgsConstructor;
@@ -73,6 +74,7 @@ public class AdminTriggerController {
     private final ThreadPlanGenerationService threadPlanGenerationService;
     private final LlmGenerationGateService llmGenerationGateService;
     private final EffectiveGatesService effectiveGatesService;
+    private final ScheduledPostPublisher scheduledPostPublisher;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -109,10 +111,12 @@ public class AdminTriggerController {
             @RequestParam(defaultValue = "5") int count,
             @RequestParam(defaultValue = "8") int fromHour,
             @RequestParam(defaultValue = "22") int toHour,
-            @RequestParam(defaultValue = "45") long minSpacingMinutes) {
+            @RequestParam(defaultValue = "45") long minSpacingMinutes,
+            @RequestParam(defaultValue = "false") boolean skipSourceClaim) {
         int n = Math.max(1, Math.min(count, 100));
         NightlyScheduledFillService.FillResult result = nightlyScheduledFillService.fillSolo(
-                n, fromHour, toHour, minSpacingMinutes, LlmCallBudget.ofMultiplier(n, NightlyScheduledFillService.LLM_CAP_MULTIPLIER));
+                n, fromHour, toHour, minSpacingMinutes,
+                LlmCallBudget.ofMultiplier(n, NightlyScheduledFillService.LLM_CAP_MULTIPLIER), skipSourceClaim);
         if (result.error() != null && result.error().startsWith("슬롯 샘플링 실패")) {
             return ResponseEntity.badRequest().body(Map.of("error", result.error()));
         }
@@ -599,6 +603,22 @@ public class AdminTriggerController {
         body.put("reason", gate.getReason());
         body.put("updatedAt", gate.getUpdatedAt());
         return ResponseEntity.ok(body);
+    }
+
+    /**
+     * 예약글 단건 즉시 게시 — <strong>dev canary 전용</strong>.
+     * force=true는 슬롯 시각(scheduledPublishAt 미도래)과 QuietHours 밴을 모두 무시하고 즉시 게시한다.
+     * prod에서 force=true로 호출하면 새벽(KST 02:00–06:00) 게시가 발생할 수 있으니 쓰지 마라.
+     */
+    @PostMapping("/publish-scheduled-post")
+    public ResponseEntity<Map<String, Object>> publishScheduledPost(
+            @RequestParam String id,
+            @RequestParam(defaultValue = "false") boolean force) {
+        return scheduledPostPublisher.publishNow(id, force)
+                .<ResponseEntity<Map<String, Object>>>map(postId -> ResponseEntity.ok(
+                        Map.of("scheduledId", id, "postId", postId)))
+                .orElseGet(() -> ResponseEntity.status(409)
+                        .body(Map.of("error", "NOT_DUE_OR_NOT_FOUND", "scheduledId", id)));
     }
 
     /** 모든 생성/발행 게이트의 해석 결과 (backend /api/admin/ai-user/effective-gates 가 프록시). */

@@ -77,31 +77,50 @@ public class ScheduledPostPublisher {
         }
         int batchSize = properties.getThreadPlan().getScheduledPostPublishBatchSize();
         for (AiScheduledPost row : leases.claimDue(WORKER, batchSize, Duration.ofMinutes(5), Instant.now())) {
-            publish(row);
+            publishInternal(row, false);
         }
     }
 
-    private void publish(AiScheduledPost row) {
+    /**
+     * Single-row immediate publish. {@code force=true} ignores the slot time and the QuietHours
+     * ban — <strong>dev canary only</strong>, never for prod use (a forced publish can land in
+     * the KST 02:00–06:00 quiet window).
+     *
+     * @return the published backend {@code postId}, or empty when the id is unknown, already
+     *         claimed elsewhere, or (force=false) not yet due
+     */
+    public Optional<String> publishNow(String scheduledId, boolean force) {
+        Optional<AiScheduledPost> claimed = leases.claimById(scheduledId, WORKER, Duration.ofMinutes(5));
+        if (claimed.isEmpty()) return Optional.empty();
+        AiScheduledPost row = claimed.get();
+        if (!force && row.getScheduledPublishAt() != null && row.getScheduledPublishAt().isAfter(Instant.now())) {
+            leases.release(scheduledId, WORKER);
+            return Optional.empty();
+        }
+        return publishInternal(row, force);
+    }
+
+    private Optional<String> publishInternal(AiScheduledPost row, boolean force) {
         try {
-            // Author publish hard ban KST 02:00–06:00 (solo + paired).
-            if (QuietHours.isQuietNow()) {
+            // Author publish hard ban KST 02:00–06:00 (solo + paired). force=true (dev canary) skips this.
+            if (!force && QuietHours.isQuietNow()) {
                 Instant resume = QuietHours.nextResumeAfter(Instant.now());
                 log.info("Scheduled post deferred for quiet hours id={} until {}", row.getId(), resume);
                 leases.defer(row.getId(), WORKER, resume, "QUIET_HOURS");
-                return;
+                return Optional.empty();
             }
 
             Persona author = personas.findById(row.getPersonaId()).orElse(null);
             if (author == null) {
                 failAndRelease(row, "PERSONA_NOT_FOUND", false);
-                return;
+                return Optional.empty();
             }
             String email = jdbcTemplate.queryForObject("select email from users where id = ?", String.class, author.getId());
             Optional<String> jwt = tokens.getToken(author.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) {
                 // Keep soft-reserve across retryable auth failures.
                 leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true);
-                return;
+                return Optional.empty();
             }
 
             boolean paired = PairedHoldMeta.ORIGIN_PAIRED.equalsIgnoreCase(row.getOrigin());
@@ -132,7 +151,7 @@ public class ScheduledPostPublisher {
                 } else {
                     failAndRelease(row, "BACKEND_WRITE_FAILED", false);
                 }
-                return;
+                return Optional.empty();
             }
 
             PostDto post = published.get();
@@ -146,6 +165,7 @@ public class ScheduledPostPublisher {
             sourceReservationSupport.commitFromCandidatesJson(row.getCandidatesJson());
             leases.completePosted(row.getId(), WORKER, post.getId());
             telegramNotifier.published(row, post.getId());
+            return Optional.of(post.getId());
         } catch (Exception e) {
             log.warn("Scheduled post publish failed id={}: {}", row.getId(), e.getMessage());
             boolean retryable = row.getAttemptCount() < 3;
@@ -154,6 +174,7 @@ public class ScheduledPostPublisher {
             } else {
                 failAndRelease(row, "PUBLISH_EXCEPTION", false);
             }
+            return Optional.empty();
         }
     }
 
