@@ -50,7 +50,8 @@ class PairedPostKillSwitchTest {
                 mock(com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper.class),
                 mock(com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport.class),
                 mock(com.againspring.aiuser.orchestrator.service.GenerationConfigSupport.class),
-                mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class));
+                mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
+                mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class));
     }
 
     private Persona author() {

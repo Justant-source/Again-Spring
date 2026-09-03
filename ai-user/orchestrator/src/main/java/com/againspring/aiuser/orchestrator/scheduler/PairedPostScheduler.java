@@ -73,6 +73,7 @@ public class PairedPostScheduler {
     private final CandidateScheduleSupport candidateScheduleSupport;
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
@@ -341,6 +342,7 @@ public class PairedPostScheduler {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("provider", provider);
         request.put("model", model);
+        request.put("promptOverrides", promptTemplateCache.overrides());
         request.put("correlationId", corrId);
         request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", category);

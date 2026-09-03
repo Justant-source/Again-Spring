@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Map;
+
 public class GenDto {
     @Getter
     @Setter
@@ -54,6 +56,8 @@ public class GenDto {
         private String voiceType;
         /** 글 생성 모드: "CONFLICT"(갈등 서사, 기본) | "CASUAL"(일상/잡담). PromptAssembler 분기용. */
         private String postKind;
+        /** orchestrator PromptTemplateCache가 싣는 admin 편집 프롬프트 오버라이드. 없으면(빈맵) 워커는 classpath를 쓴다. */
+        private Map<String, String> promptOverrides;
     }
 
     @Getter
@@ -95,6 +99,8 @@ public class GenDto {
         private String modeHint;
         /** 커뮤니티 voice 타입 — OutputSanitizer 분포 매칭용. 없으면 null. */
         private String voiceType;
+        /** orchestrator PromptTemplateCache가 싣는 admin 편집 프롬프트 오버라이드. 없으면(빈맵) 워커는 classpath를 쓴다. */
+        private Map<String, String> promptOverrides;
     }
 
     @Getter
@@ -132,6 +138,8 @@ public class GenDto {
         private String modeHint;
         /** 커뮤니티 voice 타입 — OutputSanitizer 분포 매칭용. 없으면 null. */
         private String voiceType;
+        /** orchestrator PromptTemplateCache가 싣는 admin 편집 프롬프트 오버라이드. 없으면(빈맵) 워커는 classpath를 쓴다. */
+        private Map<String, String> promptOverrides;
     }
 
     @Getter

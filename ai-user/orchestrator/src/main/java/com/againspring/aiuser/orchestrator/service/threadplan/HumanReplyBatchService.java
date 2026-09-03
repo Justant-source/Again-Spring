@@ -57,6 +57,7 @@ public class HumanReplyBatchService {
     private final BackendBotClient backend;
     private final JdbcTemplate jdbc;
     private final LlmGenerationGateService llmGenerationGateService;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     public void run() {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
@@ -108,6 +109,7 @@ public class HumanReplyBatchService {
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("provider", config.getProviderHumanInteraction());
             if (!props.getThreadPlan().getHumanPlanModel().isBlank()) request.put("model", props.getThreadPlan().getHumanPlanModel());
+            request.put("promptOverrides", promptTemplateCache.overrides());
             request.put("correlationId", "human-replies-" + now.toEpochMilli() + "-c" + indexes.get(0));
             request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
             request.put("items", chunkItems);

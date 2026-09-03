@@ -66,6 +66,7 @@ public class ActionExecutor {
     private final PersonaHistoryStore personaHistoryStore;
     private final AiPostBundleService aiPostBundleService;
     private final LlmCircuitBreaker circuitBreaker;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
     @Value("${ai-user.repetition-threshold:0.45}")
@@ -248,6 +249,7 @@ public class ActionExecutor {
             .recentOutputs(formatRecentOutputs(recentBodies, 150))
             .modeHint(commentModeHint(pickCommentMode(persona, stance)))
             .voiceType(voiceProfileField(persona, "voice_type"))
+            .promptOverrides(promptTemplateCache.overrides())
             .build();
 
         // Check circuit breaker before generation
@@ -337,6 +339,7 @@ public class ActionExecutor {
             .recentOutputs(formatRecentOutputs(recentBodies, 150))
             .modeHint(replyLengthHint())
             .voiceType(voiceProfileField(persona, "voice_type"))
+            .promptOverrides(promptTemplateCache.overrides())
             .build();
 
         // Check circuit breaker before generation
@@ -487,6 +490,7 @@ public class ActionExecutor {
             .voiceType(voiceProfileField(persona, "voice_type"))
             // R9 Track B: 글 종류 (CONFLICT=갈등 서사, CASUAL=일상/잡담)
             .postKind(casual ? "CASUAL" : "CONFLICT")
+            .promptOverrides(promptTemplateCache.overrides())
             .build();
         String community = voiceProfileField(persona, "voice_type");
         // Best-of-N reranking — active when ai-user-ml.enabled=true

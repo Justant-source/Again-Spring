@@ -47,6 +47,8 @@ class ThreadPlanGenerationServiceTest {
     private PlanPersonaMapper planPersonaMapper;
     @Mock
     private InterestedPersonaSeeder interestedPersonaSeeder;
+    @Mock
+    private com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     private ThreadPlanGenerationService service;
 
@@ -61,7 +63,8 @@ class ThreadPlanGenerationServiceTest {
                 mock(com.againspring.aiuser.orchestrator.client.BackendBotClient.class),
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
                 mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
-                mock(org.springframework.jdbc.core.JdbcTemplate.class)
+                mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                promptTemplateCache
         );
     }
 

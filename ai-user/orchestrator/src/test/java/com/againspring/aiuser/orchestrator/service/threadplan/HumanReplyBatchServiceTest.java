@@ -47,6 +47,7 @@ class HumanReplyBatchServiceTest {
     @Mock private AiUserGenerationConfigRepository configRepository;
     @Mock private BackendBotClient backend;
     @Mock private JdbcTemplate jdbc;
+    @Mock private com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     private HumanReplyBatchService service;
     private OrchestratorProperties.HumanReply humanReply;
@@ -69,7 +70,7 @@ class HumanReplyBatchServiceTest {
         lenient().when(llmGate.isHeld()).thenReturn(false);
         service = new HumanReplyBatchService(
                 inbox, plans, planItems, personaRepository, interestedPersonas, llm, guard, props,
-                generationConfigSupport, configRepository, backend, jdbc, llmGate);
+                generationConfigSupport, configRepository, backend, jdbc, llmGate, promptTemplateCache);
     }
 
     @Test

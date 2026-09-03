@@ -83,6 +83,7 @@ public class AiPostBundleService {
     private final com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker circuitBreaker;
     private final StructuredGenerationFailureTelegramNotifier structuredGenNotifier;
     private final PlazaTopicalFitGate plazaTopicalFitGate;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     /** Derive environment (dev/prod) from backend base URL for alerting. */
     private String deriveEnvironment() {
@@ -597,6 +598,7 @@ public class AiPostBundleService {
         request.put("kind", "AI_POST");
         request.put("provider", provider);
         if (model != null && !model.isBlank()) request.put("model", model);
+        request.put("promptOverrides", promptTemplateCache.overrides());
         request.put("correlationId", correlationId);
         request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", category == null ? "OTHER" : category);

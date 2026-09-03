@@ -70,6 +70,7 @@ public class ThreadPlanGenerationService {
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
     private final JdbcTemplate jdbcTemplate;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -355,6 +356,7 @@ public class ThreadPlanGenerationService {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");
         r.put("provider", provider); if (model != null && !model.isBlank()) r.put("model", model);
+        r.put("promptOverrides", promptTemplateCache.overrides());
         r.put("correlationId", "thread-plan-" + plan.getId()); r.put("postId", plan.getPostId());
         r.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         r.put("postRevision", (long) plan.getPostRevision()); r.put("existingTitle", nullToEmpty(plan.getSourceTitle()));
@@ -493,6 +495,7 @@ public class ThreadPlanGenerationService {
         req.put("kind", "HUMAN_POST");
         req.put("provider", provider);
         if (model != null && !model.isBlank()) req.put("model", model);
+        req.put("promptOverrides", promptTemplateCache.overrides());
         req.put("correlationId", "thread-plan-quality-regen-" + plan.getId());
         req.put("postId", plan.getPostId());
         req.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());

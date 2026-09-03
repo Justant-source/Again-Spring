@@ -64,6 +64,7 @@ class AiPostBundleServiceTest {
     @Mock private PersonaMatcherService personaMatcherService;
     @Mock private StoryTwinGuard storyTwinGuard;
     @Mock private SourceReservationSupport sourceReservationSupport;
+    @Mock private com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     private AiPostBundleService service;
     private CandidateScheduleSupport scheduleSupport;
@@ -114,7 +115,8 @@ class AiPostBundleServiceTest {
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
                 storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
-                mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker, notifier, plazaTopicalFitGate);
+                mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker, notifier, plazaTopicalFitGate,
+                promptTemplateCache);
     }
 
     @Test

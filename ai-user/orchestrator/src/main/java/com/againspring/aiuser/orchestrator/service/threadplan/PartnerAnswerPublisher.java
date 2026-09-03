@@ -51,6 +51,7 @@ public class PartnerAnswerPublisher {
     private final JdbcTemplate jdbcTemplate;
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
+    private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
 
     public void publishDue() {
         if (!properties.isEnabled()) return;
@@ -169,6 +170,7 @@ public class PartnerAnswerPublisher {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("provider", provider);
         request.put("model", model);
+        request.put("promptOverrides", promptTemplateCache.overrides());
         request.put("correlationId", corr + "-P2");
         request.put("timeoutMs", generationConfigSupport.bundleTimeoutMs());
         request.put("category", row.getCategory());
