@@ -8,7 +8,9 @@ import com.againspring.domain.enums.CommentStatus;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
-import com.againspring.safety.KeywordGuard;
+import com.againspring.safety.CrisisDetectedEvent;
+import com.againspring.safety.CrisisKeywordGuard;
+import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.notification.event.NewCommentEvent;
 import com.againspring.service.notification.event.NewReplyEvent;
 import com.againspring.service.ai.AiUserOutboxWriter;
@@ -34,7 +36,7 @@ public class CommentService {
     private final PostCommentRepository commentRepository;
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
-    private final KeywordGuard keywordGuard;
+    private final CrisisKeywordGuard crisisKeywordGuard;
     private final ApplicationEventPublisher eventPublisher;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final SyntheticOutputGuard syntheticOutputGuard;
@@ -62,7 +64,12 @@ public class CommentService {
 
         // 위기 감지
         syntheticOutputGuard.assertPublishable(authorId, body);
-        keywordGuard.scanUserInput(body, authorId);
+        if (!syntheticOutputGuard.isSynthetic(authorId)) {
+            CrisisScanResult crisis = crisisKeywordGuard.scan(body);
+            if (crisis.crisis()) {
+                eventPublisher.publishEvent(new CrisisDetectedEvent(this, authorId, null, crisis.patterns()));
+            }
+        }
 
         // 부모 댓글 존재 확인 (nullable). UI는 2단만 지원 — 대댓글의 대댓글(depth≥2) 금지.
         PostComment parent = null;
@@ -131,7 +138,12 @@ public class CommentService {
 
         // 위기 감지
         syntheticOutputGuard.assertPublishable(userId, body);
-        keywordGuard.scanUserInput(body, userId);
+        if (!syntheticOutputGuard.isSynthetic(userId)) {
+            CrisisScanResult crisis = crisisKeywordGuard.scan(body);
+            if (crisis.crisis()) {
+                eventPublisher.publishEvent(new CrisisDetectedEvent(this, userId, null, crisis.patterns()));
+            }
+        }
 
         comment.setBody(body);
         comment.setUpdatedAt(Instant.now());

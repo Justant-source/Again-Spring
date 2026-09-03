@@ -37,21 +37,4 @@ public class SafetyAuditLogger {
 			event.getDetectedAt()
 		);
 	}
-
-	/**
-	 * Handles Level 2 warning events.
-	 *
-	 * Logs the warning with pattern names for compliance tracking.
-	 */
-	@EventListener
-	public void onSafetyTrigger(SafetyTriggerEvent event) {
-		auditLogger.warn(
-			"userId={} sessionId={} level={} patterns={} timestamp={}",
-			event.getUserId(),
-			event.getSessionId(),
-			event.getLevel().name(),
-			event.getMatchedPatterns(),
-			event.getTriggeredAt()
-		);
-	}
 }

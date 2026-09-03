@@ -7,10 +7,11 @@ import com.againspring.domain.enums.CommentStatus;
 import com.againspring.repository.community.PostCommentRepository;
 import com.againspring.repository.community.PostLikeRepository;
 import com.againspring.repository.community.PostRepository;
-import com.againspring.safety.KeywordGuard;
-import com.againspring.safety.ScanResult;
+import com.againspring.safety.CrisisKeywordGuard;
+import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.ai.SyntheticOutputGuard;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +47,7 @@ class CommentServiceTest {
     @Mock private PostCommentRepository commentRepository;
     @Mock private PostRepository postRepository;
     @Mock private PostLikeRepository postLikeRepository;
-    @Mock private KeywordGuard keywordGuard;
+    @Mock private CrisisKeywordGuard crisisKeywordGuard;
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private AiUserOutboxWriter aiUserOutboxWriter;
     @Mock private SyntheticOutputGuard syntheticOutputGuard;
@@ -53,6 +55,12 @@ class CommentServiceTest {
     @InjectMocks private CommentService commentService;
 
     private static final String POST_ID = "post_abc";
+
+    @BeforeEach
+    void setUp() {
+        // 실사용자 위기 관제는 기본적으로 무위기 — 개별 테스트가 필요 시 더 구체적으로 덮어쓴다.
+        lenient().when(crisisKeywordGuard.scan(anyString())).thenReturn(CrisisScanResult.none());
+    }
 
     @Test
     @DisplayName("getTopLevelComments — ACTIVE & deletedAt IS NULL 필터 쿼리만 사용 (무필터 쿼리 미사용)")
@@ -125,7 +133,8 @@ class CommentServiceTest {
     void addComment_realUserSameErrorStringIsPublished() {
         String body = "Your credit balance is too low to access the Anthropic API.";
         when(postRepository.findById(POST_ID)).thenReturn(Optional.of(Post.builder().id(POST_ID).authorId("other-user").build()));
-        when(keywordGuard.scanUserInput(eq(body), anyString())).thenReturn(ScanResult.empty());
+        when(syntheticOutputGuard.isSynthetic("real_user_1")).thenReturn(false);
+        when(crisisKeywordGuard.scan(eq(body))).thenReturn(CrisisScanResult.none());
         when(commentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // syntheticOutputGuard는 실사용자에 대해 stub 없이도(fail-open) 아무 것도 던지지 않는다.
 

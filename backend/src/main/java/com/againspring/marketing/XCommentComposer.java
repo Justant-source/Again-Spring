@@ -8,7 +8,6 @@ import com.againspring.llm.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.repository.marketing.XPersonaExampleRepository;
-import com.againspring.safety.KeywordGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +46,6 @@ public class XCommentComposer {
     private final SystemSettingRepository systemSettingRepository;
     private final LLMProvider llmProvider;
     private final PromptSanitizer promptSanitizer;
-    private final KeywordGuard keywordGuard;
     private final PromptLoader promptLoader;
     private final ObjectMapper objectMapper;
     private final XPersonaExampleRepository exampleRepository;
@@ -294,10 +292,10 @@ public class XCommentComposer {
         if (XPersonaLearnService.looksLikeLlmError(body)) {
             return Draft.skipped("LLM_ERROR");
         }
-        if (keywordGuard.scanLLMOutput(body).isBlocked() || containsVerdictBelt(body)) {
+        if (containsVerdictBelt(body)) {
             return Draft.skipped("SAFETY");
         }
-        String filtered = keywordGuard.applyOutputFilter(body);
+        String filtered = body;
         if (filtered == null || filtered.isBlank() || containsVerdictBelt(filtered)) {
             return Draft.skipped("SAFETY");
         }
@@ -466,10 +464,10 @@ public class XCommentComposer {
             || "SKIPPED".equalsIgnoreCase(compact)) {
             return Draft.skipped("NO_VOICE");
         }
-        if (keywordGuard.scanLLMOutput(body).isBlocked() || containsVerdictBelt(body)) {
+        if (containsVerdictBelt(body)) {
             return Draft.skipped("SAFETY");
         }
-        String filtered = keywordGuard.applyOutputFilter(body);
+        String filtered = body;
         if (filtered == null || filtered.isBlank() || containsVerdictBelt(filtered)) {
             return Draft.skipped("SAFETY");
         }

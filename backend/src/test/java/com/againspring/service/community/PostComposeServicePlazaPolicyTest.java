@@ -5,9 +5,8 @@ import com.againspring.domain.enums.PostCategory;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.common.exception.BusinessException;
-import com.againspring.safety.KeywordGuard;
-import com.againspring.safety.Level;
-import com.againspring.safety.ScanResult;
+import com.againspring.safety.CrisisKeywordGuard;
+import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.ai.SyntheticOutputGuard;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +40,7 @@ class PostComposeServicePlazaPolicyTest {
 
     @Mock private PostRepository postRepository;
     @Mock private VoteOptionRepository voteOptionRepository;
-    @Mock private KeywordGuard keywordGuard;
+    @Mock private CrisisKeywordGuard crisisKeywordGuard;
     @Mock private AiUserOutboxWriter aiUserOutboxWriter;
     @Mock private PostSearchNgramIndexer postSearchNgramIndexer;
     @Mock private ApplicationEventPublisher eventPublisher;
@@ -52,14 +51,11 @@ class PostComposeServicePlazaPolicyTest {
 
     @Test
     @DisplayName("LEVEL1(피해자·소송) 본문도 게시된다 — CRISIS_DETECTED로 막지 않는다")
-    void compose_doesNotBlockLevel1LegalWords() {
+    void compose_doesNotBlockAnyWording() {
         String body = "결국 경찰 신고와 민사 소송, 그리고 공론화를 결심했습니다. "
                 + "억울하게 피해자가 먼저 떠나야 하는 상황은 절대 만들고 싶지 않습니다.";
-        when(keywordGuard.scanUserInput(eq(body), anyString())).thenReturn(
-                ScanResult.blockedResult(Level.LEVEL1, List.of(
-                        new ScanResult.Match("소송", Level.LEVEL1, "LEGAL_RISK", false, 10),
-                        new ScanResult.Match("피해자", Level.LEVEL1, "STIGMA", false, 40)
-                )));
+        when(syntheticOutputGuard.isSynthetic("user_bot")).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
         when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -73,7 +69,6 @@ class PostComposeServicePlazaPolicyTest {
         verify(postRepository).save(captor.capture());
         assertThat(captor.getValue().getBodyRaw()).contains("소송");
         assertThat(captor.getValue().getBodyRaw()).contains("피해자");
-        verify(keywordGuard).scanUserInput(eq(body), eq("user_bot"));
     }
 
     @Test
@@ -96,7 +91,8 @@ class PostComposeServicePlazaPolicyTest {
     @DisplayName("실사용자가 동일한 오류 문자열을 쓰더라도 SyntheticOutputGuard는 막지 않는다(fail-open)")
     void compose_realUserSameErrorStringIsPublished() {
         String body = "Your credit balance is too low to access the Anthropic API.";
-        when(keywordGuard.scanUserInput(eq(body), anyString())).thenReturn(ScanResult.empty());
+        when(syntheticOutputGuard.isSynthetic("real_user_1")).thenReturn(false);
+        when(crisisKeywordGuard.scan(body)).thenReturn(CrisisScanResult.none());
         when(sibomCandidateService.shortlist(anyString(), any())).thenReturn(List.of());
         when(postRepository.save(any(Post.class))).thenAnswer(inv -> inv.getArgument(0));
         when(voteOptionRepository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));

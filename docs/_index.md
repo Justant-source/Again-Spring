@@ -99,7 +99,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | 12 | `ai-user/orchestrator/**` | `docs/ai-user/30-components/orchestrator.md` | M |
 | 13 | `ai-user/learning/**` | `docs/ai-user/30-components/learning.md` | M |
 | 14 | `env/docker-compose*.yml` | `docs/env/20-containers/architecture.md` | M |
-| 15 | `backend/src/main/java/com/againspring/safety/KeywordGuard.java` | `docs/frontend/60-runtime/flows/08-crisis.md` | M |
+| 15 | `backend/src/main/java/com/againspring/safety/CrisisKeywordGuard.java` | `docs/frontend/60-runtime/flows/08-crisis.md` | M |
 | 16 | `backend/src/main/java/com/againspring/llm/prompt/PromptLoader.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 17 | `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 18 | `backend/src/main/java/com/againspring/marketing/**` | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | M |

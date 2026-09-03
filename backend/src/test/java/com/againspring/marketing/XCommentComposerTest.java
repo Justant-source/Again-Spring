@@ -7,8 +7,6 @@ import com.againspring.llm.PromptSanitizer;
 import com.againspring.llm.prompt.PromptLoader;
 import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.repository.marketing.XPersonaExampleRepository;
-import com.againspring.safety.KeywordGuard;
-import com.againspring.safety.ScanResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,8 +46,6 @@ class XCommentComposerTest {
     @Mock
     private PromptSanitizer promptSanitizer;
     @Mock
-    private KeywordGuard keywordGuard;
-    @Mock
     private PromptLoader promptLoader;
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -67,8 +63,6 @@ class XCommentComposerTest {
             Object arg = inv.getArgument(0);
             return arg == null ? "" : arg.toString();
         });
-        when(keywordGuard.scanLLMOutput(any())).thenReturn(ScanResult.empty());
-        when(keywordGuard.applyOutputFilter(any())).thenAnswer(inv -> inv.getArgument(0));
         when(systemSettingRepository.findById(XPersonaLearnService.KEY_PROFILE))
             .thenReturn(Optional.of(SystemSetting.builder()
                 .settingKey(XPersonaLearnService.KEY_PROFILE)

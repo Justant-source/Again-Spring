@@ -5,9 +5,6 @@ import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
-import com.againspring.safety.KeywordGuard;
-import com.againspring.safety.Level;
-import com.againspring.safety.ScanResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,8 +44,6 @@ class XOriginalPostServiceTest {
     @Mock
     private XCommentComposer composer;
     @Mock
-    private KeywordGuard keywordGuard;
-    @Mock
     private AsmClient asmClient;
     @Mock
     private XOpsActionLedger ledger;
@@ -70,7 +65,6 @@ class XOriginalPostServiceTest {
         when(ledger.countPostedToday(eq(XOpsAction.Kind.ORIGINAL), any())).thenReturn(0);
         when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(keywordGuard.scanLLMOutput(any())).thenReturn(ScanResult.empty());
         when(composer.composeOriginal(any(), any())).thenReturn(XCommentComposer.Draft.of("그 마음 알겠음"));
         when(asmClient.publishX(anyString(), any(), any(), any()))
             .thenReturn(new AsmClient.XPublishResult(true, "orig-1", "https://x.com/i/orig", null));
@@ -150,19 +144,6 @@ class XOriginalPostServiceTest {
             ref.capture());
         assertThat(ref.getValue()).isEqualTo(1002L);
         verify(asmClient).publishX(anyString(), isNull(), isNull(), isNull());
-    }
-
-    @Test
-    void keywordSkip_doesNotPublish() {
-        when(keywordGuard.scanLLMOutput(any())).thenReturn(ScanResult.blockedResult(
-            Level.LEVEL1,
-            List.of(new ScanResult.Match("판결", Level.LEVEL1, "JUDGMENT", false, 0))));
-
-        service.runIfDue(noon);
-
-        verify(asmClient, never()).publishX(any(), any(), any(), any());
-        verify(ledger).recordSkipped(eq(XOpsAction.Kind.ORIGINAL), eq("1001"), eq("SAFETY"), eq(noon));
-        verify(telegramNotifier, never()).send(any());
     }
 
     @Test

@@ -8,7 +8,8 @@ import com.againspring.domain.enums.PostVisibility;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.community.VoteOptionRepository;
 import com.againspring.safety.CrisisDetectedEvent;
-import com.againspring.safety.KeywordGuard;
+import com.againspring.safety.CrisisKeywordGuard;
+import com.againspring.safety.CrisisScanResult;
 import com.againspring.service.ai.AiUserOutboxWriter;
 import com.againspring.service.ai.SyntheticOutputGuard;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * PostComposeService - 커뮤니티 사연 등록 서비스
@@ -35,7 +35,7 @@ public class PostComposeService {
 
     private final PostRepository postRepository;
     private final VoteOptionRepository voteOptionRepository;
-    private final KeywordGuard keywordGuard;
+    private final CrisisKeywordGuard crisisKeywordGuard;
     private final AiUserOutboxWriter aiUserOutboxWriter;
     private final SyntheticOutputGuard syntheticOutputGuard;
     private final PostSearchNgramIndexer postSearchNgramIndexer;
@@ -147,18 +147,15 @@ public class PostComposeService {
                                   String hookEmotion) {
         log.info("Publishing post for author {} category {}", authorId, category);
 
-        // 광장형 정책(docs/frontend/60-runtime/flows/08-crisis.md): 사연·댓글 입력은 차단하지 않는다.
-        // KeywordGuard LEVEL1(피해자·소송 등)은 AI 출력 금지어이며 커뮤니티 본문 차단 사유가 아니다.
-        // CRISIS 키워드만 관제 이벤트(감사 로그)로 남기고 게시는 계속한다.
         syntheticOutputGuard.assertPublishable(authorId, bodyRaw);
-        var scanResult = keywordGuard.scanUserInput(bodyRaw, authorId);
-        if (scanResult.isCrisis()) {
-            List<String> patterns = scanResult.getMatches().stream()
-                    .map(m -> m.getPattern())
-                    .collect(Collectors.toList());
-            log.warn("Crisis keyword detected on post compose author={} patterns={} — publishing anyway (plaza policy)",
-                    authorId, patterns);
-            eventPublisher.publishEvent(new CrisisDetectedEvent(this, authorId, sessionId, patterns));
+        // 실사용자 위기 키워드 관제(docs/frontend/60-runtime/flows/08-crisis.md): 게시는 계속, 감사 로그만. AI-user 본문엔 적용하지 않는다.
+        if (!syntheticOutputGuard.isSynthetic(authorId)) {
+            CrisisScanResult crisis = crisisKeywordGuard.scan(bodyRaw);
+            if (crisis.crisis()) {
+                log.warn("Crisis keyword detected on post compose author={} patterns={} — publishing anyway (plaza policy)",
+                        authorId, crisis.patterns());
+                eventPublisher.publishEvent(new CrisisDetectedEvent(this, authorId, sessionId, crisis.patterns()));
+            }
         }
 
         String postId = "post_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);

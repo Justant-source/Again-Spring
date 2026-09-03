@@ -111,8 +111,7 @@ app:
   user-permissions:
     path: ${USER_PERMISSIONS_PATH:./shared/docs/policies/user-permissions.json}
   safety:
-    enabled: true
-    forbidden-words-path: ${SAFETY_FORBIDDEN_WORDS_PATH:classpath:/safety/forbidden-words.yml}
+    crisis-keywords-path: ${SAFETY_CRISIS_KEYWORDS_PATH:classpath:/safety/crisis-keywords.yml}
   crisis:
     webhook-url: ${CRISIS_WEBHOOK_URL:}
     email: ${CRISIS_EMAIL:}

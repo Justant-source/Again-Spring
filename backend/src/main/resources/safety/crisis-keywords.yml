@@ -1,0 +1,99 @@
+# 실사용자 위기 키워드 관제 — 게시 차단 없음, 감사 로그 전용. AI-user 본문 미적용.
+crisis_keywords:
+  # Domestic violence — 명확한 동사/명사
+  - pattern: "때리"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때렸"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때릴"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "때려"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "폭행"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "폭력"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "학대"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "구타"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  # Domestic violence — 맥락 명확한 합성 표현
+  # (단독 '맞고/맞았/상해'는 '옳고/옳았/Shanghai/상해보험'과 동음 → 제외)
+  - pattern: "맞고 살"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞고 자랐"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞고 컸"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "맞아 죽"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "두들겨 맞"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  - pattern: "손찌검"
+    category: DOMESTIC_VIOLENCE
+    crisis: true
+  # Sexual violence — 명확한 명사 + 합성 표현
+  # (단독 '강제로'는 '강제로 야근' 등 일반 맥락과 충돌 → 제외)
+  - pattern: "강간"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "성폭행"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "성폭력"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로 옷"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로 관계"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제로 끌"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  - pattern: "강제 추행"
+    category: SEXUAL_VIOLENCE
+    crisis: true
+  # Self-harm/suicide
+  - pattern: "죽고싶"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "자살"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "자해"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "뛰어내리"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "목매"
+    category: SELF_HARM
+    crisis: true
+  - pattern: "약먹고죽"
+    category: SELF_HARM
+    crisis: true
+  # Child abuse
+  - pattern: "아이를때"
+    category: CHILD_ABUSE
+    crisis: true
+  - pattern: "애를때"
+    category: CHILD_ABUSE
+    crisis: true
+  - pattern: "아동학대"
+    category: CHILD_ABUSE
+    crisis: true

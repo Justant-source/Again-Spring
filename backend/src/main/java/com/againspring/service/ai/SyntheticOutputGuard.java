@@ -19,10 +19,15 @@ public class SyntheticOutputGuard {
     public static final String CODE = "LLM_ERROR_OUTPUT";
     private final UserRepository userRepository;
 
+    /** 작성자가 AI 계정(users.synthetic=1)인지 여부. authorId가 null이면 false. */
+    public boolean isSynthetic(String authorId) {
+        if (authorId == null) return false;
+        return userRepository.findById(authorId).map(u -> u.isSynthetic()).orElse(false);
+    }
+
     public void assertPublishable(String authorId, String body) {
         if (authorId == null || body == null) return;
-        boolean synthetic = userRepository.findById(authorId).map(u -> u.isSynthetic()).orElse(false);
-        if (!synthetic) return;
+        if (!isSynthetic(authorId)) return;
         LlmErrorSignatures s = LlmErrorSignatures.get();
         String reason = null;
         if (s.containsSignature(body.toLowerCase(Locale.ROOT))) reason = "LLM_ERROR_SIGNATURE";

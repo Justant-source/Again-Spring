@@ -5,7 +5,6 @@ import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.notification.TelegramNotifier;
 import com.againspring.repository.community.PostRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
-import com.againspring.safety.KeywordGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,7 +41,6 @@ public class XOriginalPostService {
     private final PostRepository postRepository;
     private final MarketingJobRepository marketingJobRepository;
     private final XCommentComposer composer;
-    private final KeywordGuard keywordGuard;
     private final AsmClient asmClient;
     private final XOpsActionLedger ledger;
     private final TelegramNotifier telegramNotifier;
@@ -109,11 +107,6 @@ public class XOriginalPostService {
                 ledger.recordSkipped(XOpsAction.Kind.ORIGINAL, post.getId(), "TOO_LONG", now);
                 continue;
             }
-            if (keywordGuard.scanLLMOutput(text).isBlocked()) {
-                ledger.recordSkipped(XOpsAction.Kind.ORIGINAL, post.getId(), "SAFETY", now);
-                continue;
-            }
-
             try {
                 AsmClient.XPublishResult result = asmClient.publishX(text, null, null, null);
                 if (result != null && result.ok()) {

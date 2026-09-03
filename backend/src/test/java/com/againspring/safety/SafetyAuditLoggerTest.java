@@ -71,30 +71,6 @@ class SafetyAuditLoggerTest {
 	}
 
 	@Test
-	@DisplayName("Safety trigger event is logged")
-	void testSafetyTriggerEventLogged() {
-		List<String> patterns = List.of("이혼");
-		SafetyTriggerEvent event = new SafetyTriggerEvent(
-			this,
-			"user789",
-			"session012",
-			Level.LEVEL2,
-			patterns
-		);
-
-		auditLogger.onSafetyTrigger(event);
-
-		assertEquals(1, listAppender.list.size());
-		ILoggingEvent logEvent = listAppender.list.get(0);
-		String message = logEvent.getFormattedMessage();
-
-		assertTrue(message.contains("userId=user789"));
-		assertTrue(message.contains("sessionId=session012"));
-		assertTrue(message.contains("level=LEVEL2"));
-		assertTrue(message.contains("patterns"));
-	}
-
-	@Test
 	@DisplayName("Log format is key=value")
 	void testLogFormatKeyValue() {
 		List<String> patterns = List.of("강간");
