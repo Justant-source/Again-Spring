@@ -50,6 +50,7 @@ ai-user:
   tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}
   bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
+  internal-token: ${AI_USER_INTERNAL_TOKEN:}
   backend-base-url: ${BACKEND_BASE_URL:}
   llm-ai-user-url: ${LLM_AI_USER_URL:http://againspring-llm-ai-user:8092}
   personas-dir: ${AI_USER_PERSONAS_DIR:/app/personas}

@@ -19,6 +19,8 @@ public class OrchestratorProperties {
     private String tickCron = "0 */10 * * * *";
     private int dailyGlobalCap = 200;
     private String botPassword = "ai-user-dev-pw-2026";
+    /** backend 내부 API(/api/internal/ai-user) 인증 토큰. AI_USER_INTERNAL_TOKEN. */
+    private String internalToken = "";
     private String backendBaseUrl = "";
     private String llmAiUserUrl = "http://againspring-llm-ai-user:8092";
     private int personaTarget = 10;

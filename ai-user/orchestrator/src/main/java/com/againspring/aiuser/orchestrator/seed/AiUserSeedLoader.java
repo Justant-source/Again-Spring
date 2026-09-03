@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.seed;
 
+import com.againspring.aiuser.orchestrator.client.BackendInternalClient;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaRelationship;
@@ -10,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
@@ -37,11 +37,11 @@ public class AiUserSeedLoader {
     private final JdbcTemplate jdbcTemplate;
     private final OrchestratorProperties props;
     private final PersonaFactory personaFactory;
+    private final BackendInternalClient internalClient;
 
     @Value("${ai-user.seed.enabled:true}")
     private boolean seedEnabled;
 
-    private static final BCryptPasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder(12);
     private static final String SENTINEL_EMAIL = "ai-user-001@againspring.internal";
 
     @PostConstruct
@@ -61,7 +61,6 @@ public class AiUserSeedLoader {
             );
             if (count != null && count > 0) {
                 log.info("AI users already seeded. Skipping anchor seed.");
-                markSyntheticFlag();
                 repairBotUserAccounts();
                 // 앵커 시드 스킵해도 PersonaFactory는 항상 실행 (부족분 생성)
                 try {
@@ -107,7 +106,6 @@ public class AiUserSeedLoader {
         }
         log.info("Found {} persona profiles in {}", profileDirs.length, profilesDir.getAbsolutePath());
 
-        String hashedPassword = PASSWORD_ENCODER.encode(props.getBotPassword());
         Instant now = Instant.now();
         int userCount = 0, personaCount = 0;
 
@@ -133,30 +131,17 @@ public class AiUserSeedLoader {
             // Load voice.yml from sibling path
             Map<String, Object> voiceData = loadSiblingVoice(profileDir, id, yaml);
 
-            // Insert user — synthetic=1 컬럼 포함 (V59 이후 스키마 기준)
-            // V59 미적용 시 synthetic 컬럼 없어 예외 발생 → catch에서 무시하지 않고
-            // markSyntheticFlag()가 boot 시 자가치유하므로 INSERT IGNORE로 안전하게 진행.
-            try {
-                jdbcTemplate.update(
-                    "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
-                    "is_guest, must_change_password, synthetic, created_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, 1, ?, ?)",
-                    id, email, hashedPassword, nickname, now, now);
-                userCount++;
-            } catch (Exception e) {
-                // synthetic 컬럼 없는 경우(V59 미적용) — 컬럼 없이 재시도
-                try {
-                    jdbcTemplate.update(
-                        "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
-                        "is_guest, must_change_password, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, ?, ?)",
-                        id, email, hashedPassword, nickname, now, now);
-                    userCount++;
-                } catch (Exception e2) {
-                    log.error("Failed to insert user {}: {}", email, e2.getMessage());
-                    continue;
-                }
+            // users 계정 upsert — backend 내부 API 경유(soft-delete 존중, synthetic=1은 backend가 보장)
+            Optional<String> upsertStatus = internalClient.upsertPersona(id, email, nickname, props.getBotPassword());
+            applyUpsertOutcome(id, upsertStatus);
+            if (upsertStatus.isEmpty()) {
+                log.error("Failed to upsert user {}", email);
+                continue;
             }
+            if ("DELETED_SKIPPED".equals(upsertStatus.get())) {
+                continue;
+            }
+            userCount++;
 
             // Build and insert Persona
             if (!personaRepo.existsById(id)) {
@@ -173,8 +158,6 @@ public class AiUserSeedLoader {
         // Load relationships
         seedRelationships(yaml);
 
-        // Mark synthetic flag
-        markSyntheticFlag();
         repairBotUserAccounts();
 
         // LLM으로 부족분 페르소나 생성
@@ -337,37 +320,18 @@ public class AiUserSeedLoader {
         }
     }
 
-    private void markSyntheticFlag() {
-        // 자가치유 업데이트: .internal 도메인 + personas 테이블 기준 (도메인 불문 안전)
-        // synthetic=0 또는 NULL인 봇 계정만 업데이트해 멱등성 보장.
-        try {
-            int updated = jdbcTemplate.update(
-                "UPDATE users SET synthetic = 1 " +
-                "WHERE (synthetic = 0 OR synthetic IS NULL) " +
-                "  AND (email LIKE 'ai-user-%@againspring.internal' " +
-                "       OR id IN (SELECT id FROM personas))");
-            if (updated > 0) log.info("markSyntheticFlag: {} users marked as synthetic=1", updated);
-        } catch (Exception e) {
-            log.debug("synthetic column not available yet (V59 pending): {}", e.getMessage());
-        }
-    }
-
     /**
      * Runtime repair for the invariant personas.id == users.id.
      *
      * Existing deployments may have personas without matching users, or bot users
      * hashed with an older AI_USER_BOT_PASSWORD. Runtime DB schema does not carry
      * nickname/email separately on personas, so nickname repair must source those
-     * fields from the mounted profile.yml files — but password sync must not be
-     * scoped to that same file set, or any bot account without a mounted profile.yml
-     * silently stops receiving password rotations (see 2026-07-30 incident: accounts
-     * outside the profile.yml set were frozen on the pre-2026-06-26 shared hash).
+     * fields from the mounted profile.yml files. All writes go through
+     * {@link BackendInternalClient} — soft-deleted accounts are never resurrected
+     * (backend returns {@code DELETED_SKIPPED}; see {@link #applyUpsertOutcome}).
      */
     private void repairBotUserAccounts() {
-        String hashedPassword = PASSWORD_ENCODER.encode(props.getBotPassword());
-        Set<String> profiledIds = new HashSet<>();
-        int inserted = 0;
-        int updated = 0;
+        int upserted = 0;
 
         File profilesDir = new File(props.getPersonasDir() + "/profiles");
         File[] profileDirs = profilesDir.listFiles(
@@ -396,52 +360,42 @@ public class AiUserSeedLoader {
                     continue;
                 }
 
-                try {
-                    inserted += jdbcTemplate.update(
-                        "INSERT IGNORE INTO users (id, email, password_hash, nickname, roles, " +
-                        "is_guest, must_change_password, synthetic, status, created_at, updated_at) " +
-                        "VALUES (?, ?, ?, ?, '[\"USER\"]', 0, 0, 1, 'ACTIVE', NOW(3), NOW(3))",
-                        id, email, hashedPassword, nickname
-                    );
-
-                    updated += jdbcTemplate.update(
-                        "UPDATE users SET password_hash = ?, nickname = ?, synthetic = 1, " +
-                        "must_change_password = 0, is_guest = 0, status = 'ACTIVE', " +
-                        "deleted_at = NULL, updated_at = NOW(3) WHERE id = ?",
-                        hashedPassword, nickname, id
-                    );
-                    profiledIds.add(id);
-                } catch (Exception e) {
-                    log.warn("repairBotUserAccounts: failed for {}: {}", id, e.getMessage());
+                Optional<String> status = internalClient.upsertPersona(id, email, nickname, props.getBotPassword());
+                applyUpsertOutcome(id, status);
+                if (status.isPresent() && !"DELETED_SKIPPED".equals(status.get())) {
+                    upserted++;
                 }
             }
         }
 
         // Fallback pass: keep every synthetic bot account's password in sync with the
-        // current AI_USER_BOT_PASSWORD, even when it has no mounted profile.yml. Only
-        // touches password_hash — nickname/email are left untouched here.
-        int passwordSynced;
-        if (profiledIds.isEmpty()) {
-            passwordSynced = jdbcTemplate.update(
-                "UPDATE users SET password_hash = ?, updated_at = NOW(3) WHERE synthetic = 1",
-                hashedPassword
-            );
-        } else {
-            String placeholders = String.join(",", Collections.nCopies(profiledIds.size(), "?"));
-            List<Object> args = new ArrayList<>();
-            args.add(hashedPassword);
-            args.addAll(profiledIds);
-            passwordSynced = jdbcTemplate.update(
-                "UPDATE users SET password_hash = ?, updated_at = NOW(3) " +
-                "WHERE synthetic = 1 AND id NOT IN (" + placeholders + ")",
-                args.toArray()
-            );
-        }
+        // current AI_USER_BOT_PASSWORD, even when it has no mounted profile.yml.
+        int finalUpserted = upserted;
+        internalClient.rotatePassword(props.getBotPassword()).ifPresentOrElse(
+            passwordSynced -> {
+                if (finalUpserted > 0 || passwordSynced > 0) {
+                    log.info("repairBotUserAccounts: upserted={} passwordSynced={}", finalUpserted, passwordSynced);
+                }
+            },
+            () -> log.warn("repairBotUserAccounts: rotatePassword returned empty")
+        );
+    }
 
-        if (inserted > 0 || updated > 0 || passwordSynced > 0) {
-            log.info("repairBotUserAccounts: inserted={} updated={} passwordSyncedFallback={}",
-                inserted, updated, passwordSynced);
-        }
+    /**
+     * backend upsert 결과를 반영한다. {@code DELETED_SKIPPED}면 (soft-delete된 계정을
+     * 되살리지 않고) 대응 persona를 비활성화한다. HTTP 실패({@link Optional#empty()})는
+     * 로그만 남기고 다른 페르소나 시딩을 막지 않는다.
+     */
+    void applyUpsertOutcome(String id, Optional<String> statusOpt) {
+        statusOpt.ifPresentOrElse(status -> {
+            if ("DELETED_SKIPPED".equals(status)) {
+                personaRepo.findById(id).ifPresent(p -> {
+                    p.setActive(false);
+                    personaRepo.save(p);
+                });
+                log.warn("Persona {} is soft-deleted in backend; marked inactive, not resurrected", id);
+            }
+        }, () -> log.warn("upsertPersona returned empty for {}", id));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

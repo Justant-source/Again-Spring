@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.seed;
 
+import com.againspring.aiuser.orchestrator.client.BackendInternalClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.GenDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
@@ -9,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -34,6 +34,7 @@ public class PersonaFactory {
     private final JdbcTemplate jdbcTemplate;
     private final OrchestratorProperties props;
     private final ObjectMapper objectMapper;
+    private final BackendInternalClient internalClient;
 
     // 다양성 매트릭스 — 부족분 생성에 사용
     private static final String[] AGES      = {"10s","20s_early","20s_late","30s_early","30s_late","40s","50s","60s"};
@@ -154,43 +155,18 @@ public class PersonaFactory {
         // ID 생성 (UUID 32자)
         String id = UUID.randomUUID().toString().replace("-", "");
 
-        // users 테이블 INSERT — synthetic=1 포함, 충돌 시 suffix 재계산 후 재시도
+        // users 계정 upsert — backend 내부 API 경유(soft-delete 존중, synthetic=1은 backend가 보장)
         long nextNum = personaRepository.count() + 1;
         String email = String.format("ai-user-%03d@againspring.internal", nextNum);
-        String pwHash = new BCryptPasswordEncoder().encode(props.getBotPassword());
-        // synthetic=1 컬럼 포함 (V59 이후). 컬럼 없으면 fallback INSERT 사용.
-        boolean inserted = false;
-        for (int attempt = 0; attempt < 5 && !inserted; attempt++) {
-            if (attempt > 0) {
-                // email 중복(삭제/동시성) 시 MAX suffix 기반 재계산
-                try {
-                    Long maxSuffix = jdbcTemplate.queryForObject(
-                        "SELECT MAX(CAST(REGEXP_REPLACE(email, '[^0-9]', '') AS UNSIGNED)) " +
-                        "FROM users WHERE email LIKE 'ai-user-%@againspring.internal'", Long.class);
-                    nextNum = (maxSuffix != null ? maxSuffix : 0L) + 1;
-                    email = String.format("ai-user-%03d@againspring.internal", nextNum);
-                } catch (Exception ignored) { nextNum++; email = String.format("ai-user-%03d@againspring.internal", nextNum); }
-            }
-            try {
-                jdbcTemplate.update(
-                    "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, synthetic, created_at, updated_at) " +
-                    "VALUES (?,?,?,?,'[\"USER\"]',0,0,1,NOW(3),NOW(3))",
-                    id, email, pwHash, nickname);
-                inserted = true;
-            } catch (org.springframework.dao.DuplicateKeyException dke) {
-                log.debug("Email {} already exists, retrying with next suffix", email);
-            } catch (Exception e) {
-                // synthetic 컬럼 없는 경우(V59 미적용) — 컬럼 없이 삽입
-                try {
-                    jdbcTemplate.update(
-                        "INSERT INTO users (id, email, password_hash, nickname, roles, is_guest, must_change_password, created_at, updated_at) " +
-                        "VALUES (?,?,?,?,'[\"USER\"]',0,0,NOW(3),NOW(3))",
-                        id, email, pwHash, nickname);
-                    inserted = true;
-                } catch (Exception e2) { log.warn("PersonaFactory insert failed: {}", e2.getMessage()); break; }
-            }
+        Optional<String> upsertStatus = internalClient.upsertPersona(id, email, nickname, props.getBotPassword());
+        if (upsertStatus.isEmpty()) {
+            log.error("PersonaFactory: upsertPersona failed for {}", id);
+            return Optional.empty();
         }
-        if (!inserted) { log.error("PersonaFactory: failed to insert user after 5 attempts"); return Optional.empty(); }
+        if ("DELETED_SKIPPED".equals(upsertStatus.get())) {
+            log.warn("PersonaFactory: {} is soft-deleted in backend; skipping", id);
+            return Optional.empty();
+        }
 
         // interests, bias, circadian 생성
         Map<String, Double> interests = buildInterests(age, politics, job);
