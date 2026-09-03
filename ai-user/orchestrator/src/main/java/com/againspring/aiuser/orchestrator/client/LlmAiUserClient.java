@@ -130,7 +130,21 @@ public class LlmAiUserClient {
             || lowerMsg.contains("unauthorized")
             || lowerMsg.contains("forbidden")
             || lowerMsg.contains("404")
-            || lowerMsg.contains("not found");
+            || lowerMsg.contains("not found")
+            || lowerMsg.contains("auth_error");
+    }
+
+    /** 워커 provider 인증 상태. 도달 불가면 empty. */
+    public Optional<java.util.Map<String, Object>> providersStatus() {
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> body = restClient.get().uri("/v1/providers/status").retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+            return Optional.ofNullable(body);
+        } catch (Exception e) {
+            log.debug("providersStatus unreachable: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /** Extract correlationId from request map if present, otherwise generate one. */

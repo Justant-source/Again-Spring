@@ -4,6 +4,7 @@ import com.againspring.aiuser.llm.exception.LlmTimeoutException;
 import com.againspring.aiuser.llm.service.Invoker;
 import com.againspring.aiuser.llm.service.InvokerRouter;
 import com.againspring.aiuser.llm.service.LlmProvider;
+import com.againspring.aiuser.llm.service.ProviderHealthRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -34,7 +35,8 @@ class LlmWorkerPoolTimeoutTest {
         InvokerRouter router = mock(InvokerRouter.class);
         when(router.routeProvider(any())).thenReturn(slow);
 
-        LlmWorkerPool pool = new LlmWorkerPool(null, router, new ProcessTerminator(200));
+        LlmWorkerPool pool = new LlmWorkerPool(null, router, new ProcessTerminator(200),
+                new ProviderHealthRegistry(10, java.time.Clock.systemUTC()));
         ReflectionTestUtils.setField(pool, "poolSize", 1);
         ReflectionTestUtils.setField(pool, "queueCapacity", 2);
         ReflectionTestUtils.setField(pool, "queueWaitTimeoutMs", 5000L);

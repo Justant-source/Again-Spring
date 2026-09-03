@@ -57,6 +57,8 @@ llm:
   stub:
     # provider=STUB일 때 픽스처 디렉토리(비면 classpath stub/) — dev canary 전용
     fixture-dir: ${LLM_STUB_FIXTURE_DIR:}
+  # AUTH_DOWN 자동 해제까지 대기 시간 — ProviderHealthRegistry (2026-09-03)
+  auth-down-ttl-minutes: ${LLM_AUTH_DOWN_TTL_MINUTES:10}
 
 logging:
   level:

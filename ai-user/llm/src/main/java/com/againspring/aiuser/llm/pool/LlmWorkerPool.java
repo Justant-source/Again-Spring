@@ -5,6 +5,7 @@ import com.againspring.aiuser.llm.exception.*;
 import com.againspring.aiuser.llm.service.ClaudeCliInvoker;
 import com.againspring.aiuser.llm.service.InvokerRouter;
 import com.againspring.aiuser.llm.service.LlmProvider;
+import com.againspring.aiuser.llm.service.ProviderHealthRegistry;
 import com.againspring.aiuser.llm.service.StructuredOutputSchema;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -48,6 +49,7 @@ public class LlmWorkerPool {
     private final ClaudeCliInvoker invoker;
     private final InvokerRouter invokerRouter;
     private final ProcessTerminator processTerminator;
+    private final ProviderHealthRegistry healthRegistry;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4,
             r -> { Thread t = new Thread(r, "llm-pool-scheduler"); t.setDaemon(true); return t; });
 
@@ -60,10 +62,12 @@ public class LlmWorkerPool {
     private final AtomicLong throttledCount = new AtomicLong(0);
     private final AtomicLong timedOutCount = new AtomicLong(0);
 
-    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter, ProcessTerminator processTerminator) {
+    public LlmWorkerPool(ClaudeCliInvoker invoker, InvokerRouter invokerRouter, ProcessTerminator processTerminator,
+                          ProviderHealthRegistry healthRegistry) {
         this.invoker = invoker;
         this.invokerRouter = invokerRouter;
         this.processTerminator = processTerminator;
+        this.healthRegistry = healthRegistry;
     }
 
     @PostConstruct
@@ -122,12 +126,14 @@ public class LlmWorkerPool {
                 slotRef[0] = slot;
                 try {
                     String result = selectedInvoker.invoke(prompt, resolvedModel);
+                    healthRegistry.markUp(provider);
                     if (!slot.isTerminated()) {
                         resultFuture.complete(result);
                         completedCount.incrementAndGet();
                     }
                 } catch (ClaudeCodeException e) {
                     if (e.isThrottled()) throttledCount.incrementAndGet();
+                    if (e.isAuthFailure()) healthRegistry.markAuthDown(provider, e.getMessage());
                     if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
                 } catch (Exception e) {
                     if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
@@ -199,12 +205,16 @@ public class LlmWorkerPool {
                     String result = schema == null
                             ? selectedInvoker.invokeSingleAttempt(prompt, resolvedModel)
                             : selectedInvoker.invokeSingleAttempt(prompt, resolvedModel, schema);
+                    healthRegistry.markUp(provider);
                     if (!slot.isTerminated()) {
                         resultFuture.complete(result);
                         completedCount.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    if (e instanceof ClaudeCodeException c && c.isThrottled()) throttledCount.incrementAndGet();
+                    if (e instanceof ClaudeCodeException c) {
+                        if (c.isThrottled()) throttledCount.incrementAndGet();
+                        if (c.isAuthFailure()) healthRegistry.markAuthDown(provider, c.getMessage());
+                    }
                     if (!slot.isTerminated()) resultFuture.completeExceptionally(e);
                 } finally {
                     slot.close();

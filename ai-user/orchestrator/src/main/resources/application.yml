@@ -48,6 +48,8 @@ ai-user:
   seed:
     enabled: ${AI_USER_SEED_ENABLED:true}
   tick-cron: ${AI_USER_TICK_CRON:"0 */10 * * * *"}
+  # LlmAvailabilityGate: 워커 provider AUTH_DOWN을 llm_generation_gate에 자동 반영 (2026-09-03)
+  llm-availability-cron: "${AI_USER_LLM_AVAILABILITY_CRON:0 */5 * * * *}"
   daily-global-cap: ${AI_USER_DAILY_GLOBAL_CAP:200}
   bot-password: ${AI_USER_BOT_PASSWORD:ai-user-dev-pw-2026}
   internal-token: ${AI_USER_INTERNAL_TOKEN:}
