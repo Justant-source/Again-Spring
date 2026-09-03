@@ -67,12 +67,23 @@ CONTENT_LOOKBACK_MINUTES = int(_env("SYNC_CONTENT_LOOKBACK_MINUTES", "15"))
 
 
 @dataclass(frozen=True)
+class SyncContext:
+    """한 sync cycle 동안 고정되는 문맥. synthetic_ids = prod users.synthetic=1 의 id 집합."""
+
+    synthetic_ids: frozenset[str]
+
+
+@dataclass(frozen=True)
 class TableSpec:
     name: str
     primary_keys: tuple[str, ...]
     mode: str = "incremental"  # incremental | full
     time_columns: tuple[str, ...] = ()
-    transform: Callable[[dict, datetime], dict] | None = None
+    transform: Callable[[dict, datetime, "SyncContext"], dict] | None = None
+    where: str | None = None  # 추가 SELECT 조건 (컬럼 존재 시에만 적용; build_select_sql 참고)
+
+
+REAL_POST_BODY = "[prod 본문은 dev로 복사하지 않습니다]"
 
 
 def _is_truthy_db(value) -> bool:
@@ -81,7 +92,41 @@ def _is_truthy_db(value) -> bool:
     return bool(value)
 
 
-def _mask_real_user(row: dict, now: datetime) -> dict:
+def _is_real_author(row: dict, ctx: "SyncContext") -> bool:
+    author = row.get("author_id")
+    return author is None or str(author) not in ctx.synthetic_ids
+
+
+def _mask_real_post(row: dict, now: datetime, ctx: "SyncContext") -> dict:
+    masked = dict(row)
+    if "invite_token" in masked:
+        masked["invite_token"] = None  # 비밀값은 작성자 불문 제거
+    if not _is_real_author(masked, ctx):
+        return masked
+    pid = str(masked.get("id", ""))
+    if "title" in masked:
+        masked["title"] = f"[비식별] 사연 {pid[-6:]}"
+    for col in ("body_published", "body"):
+        if col in masked and masked[col] is not None:
+            masked[col] = REAL_POST_BODY
+    if "partner_body_published" in masked and masked["partner_body_published"]:
+        masked["partner_body_published"] = REAL_POST_BODY
+    for col in ("body_raw", "partner_body_raw", "source_original_body", "promo_title"):
+        if col in masked:
+            masked[col] = None
+    return masked
+
+
+def _mask_real_comment(row: dict, now: datetime, ctx: "SyncContext") -> dict:
+    if not _is_real_author(row, ctx):
+        return row
+    masked = dict(row)
+    if "body" in masked:
+        masked["body"] = f"[비식별 댓글 {masked.get('id')}]"
+    return masked
+
+
+def _mask_real_user(row: dict, now: datetime, ctx: "SyncContext | None" = None) -> dict:
     if _is_truthy_db(row.get("synthetic")):
         return row
 
@@ -254,6 +299,7 @@ def upsert_rows(
     spec: TableSpec,
     rows: list[dict],
     now: datetime,
+    ctx: SyncContext,
 ) -> int:
     if not rows:
         return 0
@@ -272,14 +318,16 @@ def upsert_rows(
     for row in rows:
         working = dict(row)
         if spec.transform is not None:
-            working = spec.transform(working, now)
+            working = spec.transform(working, now, ctx)
         values = [working.get(col) for col in common_columns]
         dev_cur.execute(upsert_sql, values)
         synced += 1
     return synced
 
 
-def sync_table(prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetime) -> tuple[int, list[dict]]:
+def sync_table(
+    prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetime, ctx: SyncContext
+) -> tuple[int, list[dict]]:
     if not ensure_dev_table(prod_cur, dev_cur, spec.name):
         return 0, []
 
@@ -296,7 +344,7 @@ def sync_table(prod_cur, dev_cur, spec: TableSpec, since: datetime, now: datetim
     if not rows:
         return 0, []
 
-    count = upsert_rows(prod_cur, dev_cur, spec, rows, now)
+    count = upsert_rows(prod_cur, dev_cur, spec, rows, now, ctx)
     return count, [dict(r) for r in rows]
 
 
@@ -316,6 +364,7 @@ def sync_rows_by_ids(
     spec: TableSpec,
     ids: set[str],
     now: datetime,
+    ctx: SyncContext,
 ) -> int:
     if not ids:
         return 0
@@ -341,7 +390,7 @@ def sync_rows_by_ids(
             chunk,
         )
         rows = prod_cur.fetchall()
-        synced += upsert_rows(prod_cur, dev_cur, spec, rows, now)
+        synced += upsert_rows(prod_cur, dev_cur, spec, rows, now, ctx)
     return synced
 
 
