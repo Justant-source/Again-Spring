@@ -84,13 +84,20 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 | base model | `claude-haiku-4-5-20251001` |
 | post model override | 빈 값, compose에서는 `claude-sonnet-5` |
 
-### backend 경로 (legacy 전용)
+### provider 선택
 
-아래 API 경로는 기존 legacy endpoint의 호환 설명이다. **PLAN `/v2/generate/*`는 이를 사용하지 않으며 Claude Code/Codex CLI 세션만 허용한다.**
+레거시 API 경로(`backend=CLI|API`)와 신규 `provider` 필드가 공존한다. **PLAN `/v2/generate/*`는 legacy `backend` selector를 받지 않으며 request의 workload/provider snapshot(`CLAUDE`|`CODEX`)만 허용한다.**
 
-- 기본 경로는 Claude CLI bridge다.
-- `backend=API`면 `ClaudeApiInvoker`가 `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시를 직접 호출한다.
-- `backend=null|CLI|기타`는 `ClaudeCliInvoker`로 내려가며, CLI 서브프로세스 env에서는 `ANTHROPIC_API_KEY`를 제거해 OAuth 세션을 강제한다.
+각 요청 DTO(`PostGenRequest`·`CommentGenRequest`·`ReplyGenRequest`·`ProofreadRequest`·`PostRewriteRequest`)는 `resolveProvider()`로 최종 provider를 하나로 정한다 — `LlmProvider.parseLegacy(provider, backend)`: `provider` 필드가 있으면 그것을 쓰고, 없으면 구 `backend` 필드(`CLI`→`CLAUDE`, `API`→`API`)로 해석하며, 둘 다 없으면 `CLAUDE`가 기본값이다.
+
+| provider | 라우팅 대상 | 비고 |
+|---|---|---|
+| `CLAUDE` | `ClaudeCliInvoker` | 기본값. CLI 서브프로세스 env에서 `ANTHROPIC_API_KEY`를 제거해 OAuth 세션 강제 |
+| `CODEX` | `CodexCliInvoker` | Codex CLI 세션 |
+| `API` | `ClaudeApiInvoker` | `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL`(DB `system_setting` 우선)로 clcocloud 프록시 직접 호출 |
+| `STUB` | `StubInvoker` | LLM 미호출. classpath `stub/*` 픽스처 반환(`personaId`는 `__PERSONA_n__` 자리표시자로 치환), `LLM_STUB_FIXTURE_DIR` 설정 시 그 디렉토리를 classpath보다 우선 — dev canary 전용 |
+
+- `InvokerRouter.routeProvider(LlmProvider)`가 위 4종을 라우팅한다.
 - prompt caching flag는 `llm.api.prompt-caching`에 있고, compose/env로 제어할 수 있다.
 - `/internal/rewrite/post`는 legacy 사연 큐레이션 배치용이며, backend 기본값을 `API`로 잡아 clcocloud 직접 경로를 우선 사용한다.
 

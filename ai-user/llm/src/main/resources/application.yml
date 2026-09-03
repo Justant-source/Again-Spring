@@ -54,6 +54,9 @@ llm:
   parse-failure-sampling:
     enabled: ${LLM_PARSE_FAILURE_SAMPLING_ENABLED:true}
     dir: ${LLM_PARSE_FAILURE_SAMPLING_DIR:/tmp/llm-parse-failures}
+  stub:
+    # provider=STUB일 때 픽스처 디렉토리(비면 classpath stub/) — dev canary 전용
+    fixture-dir: ${LLM_STUB_FIXTURE_DIR:}
 
 logging:
   level:

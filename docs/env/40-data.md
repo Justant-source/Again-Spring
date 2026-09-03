@@ -182,6 +182,7 @@ last_updated: 2026-09-01
 | `SELF_CRITIQUE_RARE_VOCAB_PENALTY` | 어휘이질 감점 폭 | `1` |
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
+| `LLM_STUB_FIXTURE_DIR` | provider=STUB일 때 픽스처 디렉토리(비면 classpath `stub/`) — dev canary 전용 | 공란 |
 | `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
 | `LLM_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | 구조화 생성 번들 실패 시 Telegram 알림(워커) | `true` |
 | `LLM_STRUCTURED_GENERATION_PARSE_FAIL_THRESHOLD` | PARSE_FAIL 이벤트 임계값(워커) — N회 이상 초과 시 1회 알림 | `3` |
