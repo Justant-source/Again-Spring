@@ -62,7 +62,7 @@ flowchart LR
 
 1. `OrchestratorScheduler`가 cron으로 `BehaviorEngine.tick()`을 호출한다.
 2. `AI_USER_ENABLED=true`가 아니면 scheduler 단계에서 바로 skip된다.
-3. `BehaviorEngine`는 prod DB의 `ai_user_runtime.enabled`와 일일 cap을 확인한다.
+3. `BehaviorEngine`는 prod DB의 `ai_user_generation_config.ai_user_kill_switch`와 일일 cap을 확인한다.
 4. feed를 읽고, 필요하면 신규 글을 LLM으로 분석해 캐시한다.
 5. `ActionPlanner`와 `ActionExecutor`가 좋아요, 투표, 댓글, 대댓글, 글 생성을 실행한다.
 6. 결과는 `backend-prod`를 통해 운영 커뮤니티에 게시된다.

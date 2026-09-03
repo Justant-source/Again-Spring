@@ -147,7 +147,7 @@ last_updated: 2026-09-01
 중요:
 
 - `AI_USER_ENABLED`는 더 이상 단순 로그 플래그가 아니다.
-- DB `ai_user_runtime.enabled`는 2차 kill-switch로 계속 사용된다.
+- DB `ai_user_generation_config.ai_user_kill_switch`는 2차 kill-switch로 계속 사용된다.
 - 실제 운영 목표치는 `/api/admin/ai-user/generation-config`가 우선한다.
 
 ### AI-user LLM

@@ -28,9 +28,6 @@
 #      둔 사람 댓글 답글 등은 낮에도 그대로 유지된다.
 #      schedule_execution_paused는 건드리지 않는다 — 게시 자체는 하루 종일 계속.
 #
-# ai_user_runtime.enabled(LEGACY tick 킬스위치)는 건드리지 않는다 — 이 파이프라인과
-# 무관하다.
-#
 # LLM을 수동으로 호출해 콘텐츠를 만들어 DB에 넣지 않는다 — 전부 기존 orchestrator
 # admin trigger 엔드포인트(내부 도커 네트워크 전용, 외부 미노출)를 통해서만 동작한다.
 set -uo pipefail

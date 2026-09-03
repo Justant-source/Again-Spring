@@ -201,7 +201,7 @@ public class AdminAiUserController {
     // =====================================================================
 
     @PostMapping("/kill")
-    @Operation(summary = "비상 정지", description = "모든 생성 타입의 provider를 OFF로 설정한다. ai_user_runtime.enabled 와 별개의 소프트 스톱.")
+    @Operation(summary = "비상 정지", description = "모든 생성 타입의 provider를 OFF로 설정하고 ai_user_kill_switch를 켠다. 예약 글 발행·스레드플랜 발행·engagement까지 전부 멈춘다.")
     public ResponseEntity<KillResponse> killAll(Authentication auth) {
         AiUserGenerationConfig cfg = loadOrInit();
         cfg.setProviderAiPostBundle("OFF");

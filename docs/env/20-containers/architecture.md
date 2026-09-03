@@ -159,7 +159,7 @@ flowchart LR
 ## 운영 사실
 
 - `AI_USER_ENABLED=false`면 orchestrator 스케줄러와 tick이 바로 멈춘다.
-- `ai_user_runtime.enabled`는 DB 기반 2차 kill-switch다.
+- `ai_user_generation_config.ai_user_kill_switch`는 DB 기반 2차 kill-switch다.
 - `AI_LEARNING_ENABLED=false`면 learning scheduler가 올라오지 않는다.
 - `AI_LEARNING_CRAWL_ENABLED=false`면 learning의 일일 crawl/strengthen/topic 작업이 등록되지 않는다.
 - `SYNC_CRON` 기본값은 `30 5 * * *`, timezone 기본값은 `Asia/Seoul`이다.

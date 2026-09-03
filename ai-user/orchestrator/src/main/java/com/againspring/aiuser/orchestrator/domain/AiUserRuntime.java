@@ -17,10 +17,6 @@ public class AiUserRuntime {
     @Id
     private Integer id;  // always 1 (singleton row)
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean enabled = false;  // master kill-switch
-
     @Column(name = "daily_global_cap", nullable = false)
     @Builder.Default
     private int dailyGlobalCap = 200;

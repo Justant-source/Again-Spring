@@ -32,7 +32,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - **양면 댓글 phase1/phase2**: phase1은 파트너 전(author-only). 파트너 도착 시 미게시 cancel + phase2 both-context(게시된 phase1 보존). outbox REQUESTED만 믿으면 `provider_*=OFF`에서 댓글 0건 — yml fallback 유지.
 - 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 paired 스케줄과 동일 replan 계약.
 - `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
-- 실제 2차 kill-switch는 여전히 DB `ai_user_runtime.enabled`다.
+- 실제 2차 kill-switch는 DB `ai_user_generation_config.ai_user_kill_switch`다.
 - **LLM 생성 게이트 (2026-08-08)**: `llm_generation_gate` 테이블(singleton)로 GENERATION(생성)만 차단. PUBLISHING(기존 콘텐츠 발행)은 계속 진행. LLM 세션 장애 시 admin이 `POST /admin/trigger/llm-generation-hold?reason=<text>` 호출 → 다음 생성 틱부터 skip (3-attempt 재시도는 여전히 적용됨). `POST /admin/trigger/llm-generation-resume` 또는 watchdog이 자동 복구. `GET /admin/trigger/llm-generation-status`로 상태 조회. 상세: [operations.md](60-runtime/operations.md) §9.
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단하고, 상대 순위는 **광장별** 상위 50%(+ source 절대 하한)다.
 - human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.

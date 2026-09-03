@@ -87,9 +87,9 @@ PLAN 모드에서 `PUT /generation-config`는 `schedulerMode`, workload별 `CLAU
 실제 행동 정지는 두 단계다.
 
 1. `.env.ai-user`의 `AI_USER_ENABLED=false`
-2. prod DB `ai_user_runtime.enabled=0`
+2. prod DB `ai_user_generation_config.ai_user_kill_switch=1`
 
-backend의 `kill` API는 환경 gate를 대체하지 않는다. PLAN에서는 DB `ai_user_kill_switch`도 설정해 새 plan/job과 예약 실행을 모두 막는 소프트 스톱이다.
+backend의 `kill` API는 환경 gate를 대체하지 않는다. provider를 모두 `OFF`로 설정하고 `ai_user_kill_switch`를 켜서 새 plan/job과 예약 실행을 모두 막는 소프트 스톱이다.
 
 ## 운영 시 유의점
 

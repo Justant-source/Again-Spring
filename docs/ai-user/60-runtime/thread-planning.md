@@ -179,9 +179,8 @@ Hold 직전 맞춤법: `SoftProofread` — 오탈자 휴리스틱이 있을 때�
 목표에 점진적으로만 접근한다. **구현: `PlanEngagementDispatcher`**
 (`ai-user/orchestrator/.../service/engagement/`, 2026-07-31~) — LEGACY
 `BehaviorEngine.tick()`이 삭제된 뒤에도 완전히 독립적으로 5분 cron
-(`AI_USER_ENGAGEMENT_CRON`)으로 돈다. 게이트는 `ai_user_runtime.enabled`가
-**아니라** `AI_USER_ENGAGEMENT_ENABLED` + `ai_user_kill_switch`/
-`schedule_execution_paused`.
+(`AI_USER_ENGAGEMENT_CRON`)으로 돈다. 게이트는 `AI_USER_ENGAGEMENT_ENABLED` +
+`ai_user_kill_switch`/`schedule_execution_paused`.
 
 - comment like target: `log1p(post views) * 0.75 + child replies * 1.0`, × jitter × popularity, 최대 12
 - reply like target: `log1p(post views) * 0.40`, × jitter × popularity, 최대 5

@@ -171,7 +171,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `persona_relationships` | 페르소나 관계 그래프 | BIGINT auto |
 | `persona_seen_posts` | 조회/행동 이력 캐시 | 복합 PK |
 | `persona_action_log` | 행동 실행 로그 | BIGINT auto |
-| `ai_user_runtime` | global kill-switch / cap | INT(1 row) |
+| `ai_user_runtime` | 일일 cap / actions_today | INT(1 row) |
 | `persona_history_entries` | 글/댓글 재주입용 history | BIGINT auto |
 | `persona_life_state` | casual streak / ongoing situation | VARCHAR(32) |
 | `ai_user_outbox` | backend transaction에서 기록하는 AI-user lifecycle event | CHAR(36) UUID | V87, orchestrator 전달 보장 |

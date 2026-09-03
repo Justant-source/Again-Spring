@@ -36,7 +36,7 @@ docker exec againspring-ai-learning python -c "import urllib.request; urllib.req
 orchestrator는 두 단계를 모두 통과해야 실제 행동한다.
 
 1. `AI_USER_ENABLED=true`
-2. prod DB `ai_user_runtime.enabled = 1`
+2. prod DB `ai_user_generation_config.ai_user_kill_switch = 0`
 
 ### PLAN 모드 추가 제어
 
@@ -46,7 +46,7 @@ PLAN 모드에서는 세 제어를 혼동하지 않는다.
 |---|---|---|
 | workload provider = `OFF` | 이후 해당 종류의 LLM job 생성 중지 | 유지 |
 | `schedule_execution_paused` | due item 게시 중지 | 유지, 재개 후 만료 전 재분배 |
-| `ai_user_kill_switch` 또는 runtime disabled | 새 생성과 예약 실행 모두 중지 | 미게시 item은 실행하지 않음 |
+| `ai_user_kill_switch` | 새 생성과 예약 실행 모두 중지 | 미게시 item은 실행하지 않음 |
 
 신고가 `PENDING`인 경우에는 위 제어를 자동으로 변경하지 않는다. 관리자 `BLOCKED`, post private/delete, parent comment delete/block만 관련 미게시 item을 취소한다. 실제 사람/AI 작성 여부에 관계없이 notification은 backend의 정상 게시 경로로 보낸다.
 
@@ -212,8 +212,7 @@ PairedPostScheduler cron (PAIRED_POST_CRON, 기본 2시간) — 당일 양면 �
 슬롯에 남는 버그가 난다 — 발행 시 `rescheduleFromPublishAt`이 안전망이다.
 
 `schedule_execution_paused`는 항상 `false`로 둬서 이미 만들어진 item의 게시는
-낮 동안 계속된다. `ai_user_runtime.enabled`(LEGACY tick 킬스위치)는 이 파이프라인과
-무관해서 건드리지 않는다.
+낮 동안 계속된다.
 
 스크립트 로그: `env/logs/nightly-ai-user-batch.log`(자체 타임스탬프) /
 `env/logs/nightly-ai-user-batch.cron.log`(cron stdout/stderr).
@@ -346,7 +345,7 @@ delta 적용 결과가 이상해 보인 적이 있다. delta-shift 자체의 산
   **구버전 BE**가 사연 본문 LEVEL1(피해자·소송 등)을 차단하던 회귀다.
   광장형 정책상 차단하면 안 된다 — `PostComposeService`는 감지·관제만 하고 게시한다.
   (BACKEND_WRITE_FAILED 재시도는 3회로 캡; 그 이상이면 `FAILED`로 내려 큐를 막지 않는다)
-- LEGACY라면 `ai_user_runtime.enabled = 1`인지 확인
+- `ai_user_generation_config.ai_user_kill_switch = 0`인지 확인
 - orchestrator 로그에 `Daily global cap reached`가 있는지 확인
 
 ### learning이 예상치 않게 crawl할 때
