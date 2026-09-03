@@ -49,4 +49,17 @@ public class BackendInternalClient {
             return Optional.empty();
         }
     }
+
+    public Optional<Integer> reconcileViews() {
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = restClient.post().uri("/api/internal/ai-user/views/reconcile")
+                .header("Authorization", "Bearer " + token)
+                .retrieve().body(Map.class);
+            return Optional.ofNullable(body == null ? null : ((Number) body.get("updated")).intValue());
+        } catch (Exception e) {
+            log.error("reconcileViews failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
 }

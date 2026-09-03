@@ -3,6 +3,7 @@ package com.againspring.api.internal;
 import com.againspring.service.ai.SyntheticUserService;
 import com.againspring.service.ai.SyntheticUserService.PersonaUpsertRequest;
 import com.againspring.service.ai.SyntheticUserService.PersonaUpsertResponse;
+import com.againspring.service.ai.SyntheticViewReconcileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class AiUserInternalController {
     private final AiUserInternalTokenGuard guard;
     private final SyntheticUserService syntheticUserService;
+    private final SyntheticViewReconcileService syntheticViewReconcileService;
 
     @PostMapping("/personas/upsert")
     public ResponseEntity<PersonaUpsertResponse> upsert(
@@ -38,5 +40,13 @@ public class AiUserInternalController {
             @RequestBody RotateRequest req) {
         if (!guard.isAuthorized(auth)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(Map.of("updated", syntheticUserService.rotatePassword(req.password())));
+    }
+
+    @PostMapping("/views/reconcile")
+    public ResponseEntity<Map<String, Integer>> reconcileViews(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String auth) {
+        if (!guard.isAuthorized(auth)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        SyntheticViewReconcileService.Result r = syntheticViewReconcileService.reconcile();
+        return ResponseEntity.ok(Map.of("updated", r.updated(), "viewsInserted", r.viewsInserted()));
     }
 }
