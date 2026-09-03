@@ -101,3 +101,7 @@
 - `.result/ai-user-v2/` 문서는 historical artifact였으나 로컬 전용(gitignore) 문서라 디렉토리 자체가 소실됐다(복구 불가, 위 안내 참고). 현재 런타임 truth는 `ai-user/*` 코드와 compose 파일이다.
 - compose/env에 있는 flag가 곧 실제 kill-switch는 아니다. 지금 코드에서는 runtime row나 scheduler 구현이 더 직접적인 truth다.
 - persona corpus는 실험을 거치며 누적된 상태라 target 값과 실제 디렉토리 수가 다를 수 있다.
+
+## 2026-09 결함 2: provider 추상화·무상태 워커·dev canary — 실측 (Task 7.4 최종 게이트)
+
+단위: llm/backend OK, orchestrator 374건 중 실패 8건(AiPostBundleServiceTest NPE, 계획 이전부터 있던 기지 결함 — 무관), sync 8/8 PASS(.venv), frontend vitest 62/62 + lint:docs·lint:e2e-llm PASS(lint:emoji는 baseline부터 있던 기지 위반이라 범위 밖), docs lint 11/11 PASS. dev 배포 검증 PASS=2/WARN=0/SKIP=2(방문 트래픽 없음, 정상)/FAIL=0. AI-user canary `✅ [canary] PASS scheduled=03f2b0cb-717c-4fd5-9010-567d58f09b9e post=post_d4efe71010454927b736`(정리 후 종료, orchestrator-dev는 상시 서비스라 유지). e2e-realbe(`:8090`) 125/125 PASS(2.7m). 결함 2 계획 종결.
