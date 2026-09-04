@@ -215,6 +215,12 @@ Graph API 자체가 응답하지 못했을 때만 Playwright fallback을 시도�
 작성자·**원래 발행 permalink**를 담는다. 브라우저가 로그인/홈으로 리다이렉트된 현재 URL은
 링크로 사용하지 않는다.
 
+**X (`x_thread`)**: 상태 페이지의 `article[data-testid="tweet"]`를 긁을 때 **프로모션/광고
+카드는 댓글이 아니다.** socialContext `Promoted`/`프로모션`/`광고`, `placementTracking`,
+`/status/{id}/analytics` 딥링크는 스크래퍼(`social-poster` `POST /comments/x`)와
+`comment_notify` 양쪽에서 버린다. 타임라인에 끼어든 브랜드 광고(예: Starlink)를 텔레그램
+「다시봄 댓글」로 보내지 않는다.
+
 ### 데이터 흐름 다이어그램
 
 ```
