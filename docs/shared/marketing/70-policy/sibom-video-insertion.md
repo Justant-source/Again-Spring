@@ -111,8 +111,14 @@ WaggleBot `min_sibom` 하드 게이트는 이 최소선(4)과 같아야 한다. 
     → 채널당 1회 + (대본 공백 또는 가드 후 플랜 미달이고 OK/PARSE_ERROR)이면 보정 1회
     → 인증 회로 open → 0회, 상태 LLM_AUTH_CIRCUIT_OPEN
     → session limit 문자열은 인증 오류가 아님 (회로를 열지 않음)
-    → 컨텍스트: shortlist ≤10 1줄 카드 + soft_fill 목록 + 본문 ≤900자 + 훅/emotion
+    → 컨텍스트: shortlist ≤10 1줄 카드(`id|arc|people|meaning|maxChars|motion`,
+      2026-09-04부터 motion 포함) + soft_fill 목록 + 본문 ≤900자 + 훅/emotion
     → 금지: 60장 풀 catalog dump
+    → 2026-09-04: 60장 중 47장(78%)이 motion=sway라 motion을 프롬프트에서 안 보여주면
+      sibom_plan이 자연스레 sway 위주로 편중된다(실제 발행 영상 캐릭터 리액션이 밋밋하다는
+      지적으로 발견). `SibomCatalog.oneLineCard`가 motion을 카드 끝에 싣고,
+      `VideoVariantService.buildChannelPrompt`가 강한 감정 비트엔 shake/sink/sob/pop을
+      우선하도록, 같은 sibom_plan 안에서 sway만 연속 고르지 말라고 명시 지시한다.
     → ASM/WaggleBot은 이 JSON을 렌더만 함 (추가 사연 LLM 없음)
 ```
 

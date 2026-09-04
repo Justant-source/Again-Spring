@@ -30,7 +30,8 @@ public final class SibomCatalog {
             int maxChars,
             List<String> keywords,
             String trigger,
-            List<String> triggerTokens
+            List<String> triggerTokens,
+            String motion
     ) {}
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -59,7 +60,8 @@ public final class SibomCatalog {
                             n.path("maxChars").asInt(SibomPlanGuard.CAPTION_MAX_CHARS),
                             readStringArray(n.path("keywords")),
                             trigger,
-                            tokenizeTrigger(trigger)
+                            tokenizeTrigger(trigger),
+                            n.path("motion").asText("sway").trim()
                     ));
                 }
             }
@@ -127,9 +129,14 @@ public final class SibomCatalog {
         return ORDERED;
     }
 
-    /** One-line prompt card: {@code id|arc|people|meaning|maxChars}. */
+    /**
+     * One-line prompt card: {@code id|arc|people|meaning|maxChars|motion}.
+     * motion 노출 이유(2026-09-04): 카탈로그 60장 중 47장(78%)이 motion=sway라
+     * LLM이 motion을 볼 수 없으면 sibom_plan이 자연스레 sway 위주로만 뽑힌다.
+     * 후보 카드에 motion을 실어 프롬프트가 명시적으로 다양성을 요구할 수 있게 한다.
+     */
     public static String oneLineCard(Entry e) {
-        return e.id() + "|" + e.arc() + "|" + e.people() + "|" + e.meaning() + "|" + e.maxChars();
+        return e.id() + "|" + e.arc() + "|" + e.people() + "|" + e.meaning() + "|" + e.maxChars() + "|" + e.motion();
     }
 
     public static int size() {

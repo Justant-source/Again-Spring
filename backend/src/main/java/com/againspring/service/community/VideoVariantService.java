@@ -540,8 +540,13 @@ public class VideoVariantService {
               caption은 감정·상황을 나타내는 명사구여야 합니다("낯섦", "말못함"처럼). 본문/제목 문장이나
               그 안의 어절(사건·금액·날짜·이름 등 구체적 사실)을 그대로 잘라 caption에 쓰지 마세요.
               beat_index=대본 비트 인덱스. 1피크=hook_emotion 정렬, 2피크=결말/반전만·후반.
+              motion 다양성: 카드 끝의 motion(sway/shake/sink/sob/pop)을 확인하세요. sway는 잔잔한
+              호흡 정도라 카탈로그의 대다수(78%%)를 차지합니다 — 후보 중 같은 서사 비트의 감정이
+              충격·분노·격한 다툼이면 sway보다 shake/sink/sob/pop 후보를 우선 고려하세요. 한 영상의
+              sibom_plan 안에서 sway만 연속으로 고르지 마세요 — 후보에 다른 motion이 있는데도 의미가
+              비슷하면 sway 대신 그쪽을 쓰세요.
 
-            ## 시봄이 후보 카드 (id|arc|people|meaning|maxChars) — 전체 카탈로그 금지
+            ## 시봄이 후보 카드 (id|arc|people|meaning|maxChars|motion) — 전체 카탈로그 금지
             %s
 
             ## soft_fill 풀

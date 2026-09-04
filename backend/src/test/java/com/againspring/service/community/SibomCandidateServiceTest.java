@@ -105,10 +105,10 @@ class SibomCandidateServiceTest {
     void keywordBeatsTriggerOnly() {
         SibomCatalog.Entry keywordHit = new SibomCatalog.Entry(
                 "kw-img", "reaction", 1, "m", "c", "g", null, 16,
-                List.of("읽씹"), "unused", List.of("unused"));
+                List.of("읽씹"), "unused", List.of("unused"), "sway");
         SibomCatalog.Entry triggerOnly = new SibomCatalog.Entry(
                 "tr-img", "reaction", 1, "m", "c", "g", null, 16,
-                List.of("전혀다른키워드"), "읽씹 관련", List.of("읽씹"));
+                List.of("전혀다른키워드"), "읽씹 관련", List.of("읽씹"), "sway");
         String text = "결국 읽씹만 당했다.";
         assertThat(SibomCandidateService.score(keywordHit, text))
                 .isGreaterThan(SibomCandidateService.score(triggerOnly, text));

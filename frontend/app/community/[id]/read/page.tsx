@@ -97,7 +97,7 @@ export default function C3StoryRead({ params }: PageProps) {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--L-bg)', padding: '16px 24px 32px' }}>
-      {/* 헤더: ‹ 제목 */}
+      {/* 헤더: ‹ */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <button
           onClick={() => router.back()}
@@ -105,9 +105,6 @@ export default function C3StoryRead({ params }: PageProps) {
         >
           ‹
         </button>
-        <span style={{ fontSize: 13, color: 'var(--L-sub)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {post.title}
-        </span>
       </div>
 
       {/* 진영 탭 — 양쪽 글이 있을 때만 표시 */}
@@ -153,6 +150,11 @@ export default function C3StoryRead({ params }: PageProps) {
           <span style={{ fontSize: 13, color: c, fontWeight: 500 }}>{label}의 이야기</span>
         </div>
       )}
+
+      {/* 헤드라인 */}
+      <h1 style={{ fontSize: 20, color: 'var(--L-ink)', fontWeight: 500, fontFamily: 'var(--font-serif)', margin: 0, marginBottom: 14, lineHeight: 1.4, letterSpacing: '-0.01em' }}>
+        {post.title}
+      </h1>
 
       {/* 전문 카드 + 우측 하단 ⋯ */}
       <div style={{ position: 'relative', background: bg, borderRadius: 12, padding: '22px 22px 44px' }}>
