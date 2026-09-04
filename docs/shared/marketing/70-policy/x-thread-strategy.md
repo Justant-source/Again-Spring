@@ -270,8 +270,8 @@ prod에서 자동 발행 중(2026-08-02 기준). 짧은 사연 3단/긴 사연 4
 | 공감 비율 퍼센트 표기 | **추가하지 않음**(2026-07-31 결정). 마지막 칸에 남는 숫자는 표수뿐이다. |
 | 공감 비율 막대가 항상 50:50 | **수정 완료**(2026-08-11). 원인: 목록 `PostResponse`에 `authorPct` 미노출 + FE `authorPct ?? 50`/`percentage ?? 50`. 조치: BE 목록에 raw `authorPct`/`partnerPct` 추가; FE `resolveAuthorPct`가 `voteResult.options[0].percentage` → `authorPct` → count 비율 순으로 해석(실표 있으면 50 강제 금지); 상세 로드 시 `post.voteResult`를 로컬 상태에 시드. SEO/OG(`fetchPostForOg`)는 기존 `voteResult` 경로 유지. |
 | 콘텐츠가 사실상 전부 봇(synthetic) | **그대로 진행** — AI/합성 고지는 **2027-01** 「AI가 일부 각색」까지 없음. 고지·수익화 재평가는 예약(F1~F3). |
-| `paired` 사연이 141건 중 1건 | 상대방(세이지) 카드가 거의 항상 빈 칸으로 캡처된다. |
-| PLAN 아이템 실패율 19.4% | 원인 미진단. 댓글 게이트로 증상만 가린 상태. |
+| `paired` 사연이 141건 중 1건 | **2026-09-04 재조사**: 원래 가설(`MarketingJobService`의 `paired` 판정이 `partner_answered_at` 누락으로 항상 false)은 prod 실측으로 기각됨 — `partner_body_published`가 있는 65건 전부 `partner_answered_at`도 이미 채워져 있어(불일치 0건) 게이팅 로직 자체는 정상. 진짜 원인은 캡처 단계(`capture-x-thread.js` side=r 경로) 쪽일 가능성이 크나 아직 미확인 — 재조사 필요. |
+| PLAN 아이템 실패율 19.4% | **2026-09-04 재실측**: 낡은 수치. 실패 44건 전부 2026-07-31~08-11 사이(`AUTH_FAILED` 29·`BACKEND_WRITE_FAILED` 15)에 몰려 있고 최근 7일은 747건 중 **0건 실패**. 그 구간 이후 원인이 이미 해소된 것으로 보임 — 추가 조치 불필요, 재발 시에만 재조사. |
 | 2026-08-02 이전 발행분(job148~152 등) | **미정리**. 같은 배치로 구버전 캡처 코드(비율 여백 없음, 픽셀 기반 컷)로 발행된 트윗들이 라이브에 남아있다. job146/147/153은 삭제 후 재발행 완료, 나머지는 아직 손대지 않음. |
 
 ---
