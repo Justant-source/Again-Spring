@@ -94,7 +94,7 @@ last_updated: 2026-09-01
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `MARKETING_RENDER_PROFILE` | `marketing_fast` | WaggleBot 렌더 프로필 선택. `marketing_fast` = 현행 운영 (간편 레이아웃) / `marketing_v2` = 신규 v2 (BGM·SFX·전환·앱크롬제거·투표바). 기본값은 env, 잡 생성 시 `renderProfile` 필드로 개별 지정 가능 (Phase 3: 2026-08-23, 기준선 수집 중) |
+| `MARKETING_RENDER_PROFILE` | 코드 폴백 `marketing_fast`, **prod 실제값 `marketing_v2`**(2026-08-29~) | WaggleBot 렌더 프로필 선택. `marketing_fast` = 간편 레이아웃 / `marketing_v2` = BGM·SFX·전환·앱크롬제거·투표바. 잡 생성 시 `renderProfile` 필드로 개별 지정 가능. BGM은 2026-09-04부터 정상 동작(그 전 v2 렌더는 무음) |
 | `MARKETING_X_TIMELINE_BASE_URL` | `https://api.fxtwitter.com` | `@againspring_net` 타임라인 읽기(페르소나 학습). 발행 아님. Spring `marketing.x.timeline-base-url` |
 | `MARKETING_X_PERSONA_LEARN_MODEL` | `claude-sonnet-5` | Justant-Bot 페르소나 프로필 증류. Spring `marketing.x.persona-learn-model`. 선댓글 작문은 Haiku. 상세 `docs/shared/marketing/70-policy/justant-bot-x-ops.md` |
 

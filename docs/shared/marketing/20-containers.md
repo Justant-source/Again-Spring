@@ -16,12 +16,14 @@
 
 ## 렌더 프로필 (Phase 3: 2026-08-23)
 
-**렌더 프로필**은 WaggleBot이 영상을 렌더링할 때 사용할 기능 세트를 지정합니다. 기본값은 env `MARKETING_RENDER_PROFILE` (기본 `marketing_fast`), 잡 생성 시 `POST /api/v1/jobs`의 `renderProfile` 필드로 개별 지정 가능.
+**렌더 프로필**은 WaggleBot이 영상을 렌더링할 때 사용할 기능 세트를 지정합니다. 코드 폴백값은 `marketing_fast`(env `MARKETING_RENDER_PROFILE` 미설정 시), 잡 생성 시 `POST /api/v1/jobs`의 `renderProfile` 필드로 개별 지정 가능.
+
+**⚠️ prod 실제값은 `marketing_v2`입니다** (`.env.prod`, 늦어도 2026-08-29부터 — 첫 백업 파일 기준. `.env.prod.example` 템플릿과 이 표는 그동안 `marketing_fast`를 "활성"으로 잘못 적어왔다). 2026-09-04에 BGM이 전역 꺼짐→잔잔한 5곡 풀로 고쳐지면서 v2의 핵심 차별 요소가 그제서야 실제로 살아났다 — 그 전까지 v2로 나간 영상은 BGM 없이 렌더됐다는 뜻이다. 사용자 결정(2026-09-04): 지금부터 BGM 켜진 v2로 재측정 시작.
 
 | 프로필 | 설명 | 상태 |
 |---|---|---|
-| `marketing_fast` | 현행 운영 중인 기본 프로필. 간편 레이아웃, BGM/SFX/전환 없음 | 활성 |
-| `marketing_v2` | 신규 v2 렌더. BGM(잔잔한 단일 풀 5곡, `assets/media/bgm/calm/` — 2026-09-02부터 감정별 매칭 폐지) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | Phase 3 기준선 수집 중, 사용자 승인 대기 |
+| `marketing_fast` | 간편 레이아웃, BGM/SFX/전환 없음 | 코드 폴백값(env 미설정 시만) |
+| `marketing_v2` | BGM(잔잔한 단일 풀 5곡, `assets/media/bgm/calm/` — 2026-09-02부터 감정별 매칭 폐지) + SFX(7종 팔레트, `assets/media/sfx/<event>.wav`) + ffmpeg 전환(xfade) + 앱 크롬 제거(인트로 포함) + 투표 비율 바(실제 `empathy_ratio` 없으면 미표시) | **prod 실제 기본값** (2026-08-29~) |
 
 **SFX 팔레트 — 삽입 지점 17개.** 음원·음량·오프셋은 **어드민 「설정 → 효과음 매핑」에서 직접 고른다**
 (`GET`/`PUT /api/admin/marketing/sfx/mapping` → ASM → WaggleBot `/api/sfx/mapping` → `settings.yaml`의 `sfx.active`).
