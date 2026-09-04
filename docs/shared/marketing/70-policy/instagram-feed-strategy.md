@@ -98,6 +98,24 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 - 공백 후 고정 유도 문구
 - 해시태그: 브랜드 2(`#다시봄` `#againspring`) + `#공감비율` + `#[카테고리]` 등 **≤5**. `platform_specs` hashtag_cap으로 clamp
 
+### 2.4.1 캡션 프로필 링크 안내 (2026-09-04 추가)
+
+8/29 계측 정상화 이후 릴스 4,021·피드 59 reach 대비 유입 0건이었던 원인 후보: 캡션에 "프로필 링크 확인"을 안내하는 문구가 없었음. raw URL은 정책상 금지이나(`plan C1`), 사용자가 프로필에서 링크를 찾을 수 있다는 명시적 안내가 필요.
+
+**추가 문구**: `당신은 어느 쪽에 공감하나요?` 다음 줄에 `전체 이야기는 프로필 링크에서 볼 수 있어요` 추가.
+
+최종 캡션 형태:
+```
+{hook flattened}
+
+당신은 어느 쪽에 공감하나요?
+전체 이야기는 프로필 링크에서 볼 수 있어요
+
+#다시봄 #againspring #공감비율 #[카테고리한글]
+```
+
+구현: ASM `app/worker/ig_feed_pipeline.py`의 `PROFILE_LINK_LINE` 상수 및 `build_caption()` 함수.
+
 ### 2.5 마스터 훅 (`promoTitle` / `hook*` · AS SSOT)
 
 - 컬럼: `posts.promo_title` 또는 `hook_text` (+ `hook_emotion`, optional `hook_packed`). 스키마는 구현 PR에서 Flyway와 맞춤

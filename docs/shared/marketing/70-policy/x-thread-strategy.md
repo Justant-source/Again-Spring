@@ -109,6 +109,15 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 코드: `app/publishers/dispatcher.py` (`_publish_x_thread`) · 테스트: `tests/test_x_thread_publish.py`,
 `tests/test_x_thread_link_placement.py` (ASM 리포).
 
+**추가 수정 (2026-09-04)**: 링크 위치 변경 후에도 클릭 유도가 부족했다. 48개 스레드 노출 85~377+회씩 
+발생했으나 사이트 유입은 **1건뿐**이었다. 원인: 메인 트윗에 "답글에 링크 있음"이라는 안내가 없고, 
+첫 답글 캡션도 순수 URL만 있어서 사용자가 클릭할 이유가 없었다. 
+수정 사항:
+- 메인 트윗에 `REPLY_CTA = "답글에 전체 이야기 링크가 있어요"` 조건부 추가 — 실제로 답글이 있을 때만 (step_map > 1)
+- 첫 답글(steps[1])의 `link_text` 캡션을 `"전체 이야기 보기\n{URL}"`로 변경
+
+코드: `app/worker/pipeline.py` (ASM) · 테스트: `tests/test_x_thread_pipeline.py` (신규 테스트 추가).
+
 ### 2.1 캡처 사양
 
 모바일 뷰포트 `430×932`, `deviceScaleFactor: 3`, 로케일 `ko-KR`.
