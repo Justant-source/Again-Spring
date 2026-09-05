@@ -79,17 +79,21 @@ class PersonaProfileRegeneratorTest {
                 .build();
     }
 
-    /** style_axes + voice_profile.profile_rev 마커까지 갖춘, 정상적으로 완료된 페르소나. */
-    /** 완료 상태: profile_rev 마커 + 계획과 일치하는 voice_type. 둘 다 맞아야 재개가 건너뛴다. */
+    /**
+     * 완료 상태: profile_rev 마커 + 계획과 일치하는 voice_type + 계획과 일치하는 job_field.
+     * 셋이 다 맞아야 재개가 건너뛴다 — 축이 계획과 어긋나면 프로필 본문과 짝이 안 맞는다.
+     */
     private static Persona donePersona(String id) {
-        return persona(id, Map.of("speech", "BANMAL"),
+        Persona p = persona(id, Map.of("speech", "BANMAL"),
                 Map.of(PersonaProfileRegenerator.PROFILE_REV_KEY, PersonaProfileRegenerator.CURRENT_PROFILE_REV,
                         "voice_type", "NATEPAN"));
+        p.setJobField("DEV");
+        return p;
     }
 
     private static PersonaQuotaPlanner.IdentityAxes axes() {
         return new PersonaQuotaPlanner.IdentityAxes(30, "F", "SINGLE", null, false, "CORP_LARGE", "REGULAR",
-                Map.of("speech", "BANMAL", "emoticon", "LOW", "profanity", "NONE"), "NATEPAN");
+                Map.of("speech", "BANMAL", "emoticon", "LOW", "profanity", "NONE"), "NATEPAN", "DEV");
     }
 
     /** §4 응답 스키마 필수 키를 전부 채운 완전한 응답 — 성공 케이스 픽스처. */

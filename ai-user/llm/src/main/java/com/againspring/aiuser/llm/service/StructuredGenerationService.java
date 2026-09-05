@@ -60,7 +60,10 @@ public class StructuredGenerationService {
             - 반드시 "누가 무엇을 했다" 형태의 구체 사건 1개를 중심에 둔다. 감정 나열만 하는 글은 실격.
             - 작성자 시점(A)이면 author_claim을 말하되 gray_zone을 숨기지 않는다. 독자가 B에게도 표를 줄 여지를 남긴다.
             - 상대방 시점(B) 글이면 counterpart_claim으로 같은 사건을 다시 말한다.
-            - 뼈대 문장을 그대로 옮기지 마라. 카드의 말투 축·시그니처 표현을 실제로 쓴다.""";
+            - 뼈대 문장을 그대로 옮기지 마라. 카드의 말투 축·시그니처 표현을 실제로 쓴다.
+            - 글에 쓰는 기간은 personaCard의 나이와 앞뒤가 맞아야 한다: 연애 기간 ≤ (나이−19)년,
+              직장 경력 ≤ (나이−22)년, 결혼 년차·자녀 나이는 카드에 적힌 값을 따른다.
+              23세가 "6년째 만나는 남친"을 말하는 식의 조합을 쓰지 마라.""";
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
     private final LlmParseFailureSampler parseFailureSampler;

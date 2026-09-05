@@ -37,7 +37,8 @@ public class PersonaQuotaPlanner {
             String jobType,
             String tier,
             Map<String, String> styleAxes,
-            String voiceType
+            String voiceType,
+            String jobField
     ) {
     }
 
@@ -127,6 +128,26 @@ public class PersonaQuotaPlanner {
         Map<String, String> voiceType = zip(sortedIds, weightedLabels(n, linked(
                 "NATEPAN", 75.0, "BLIND", 75.0), new Random(seed ^ 0x5EED_0501CE1L)));
 
+        // 직군 — voice_type과 같은 이유로 별도 난수 스트림을 쓴다(기존 축 배정 불변).
+        //
+        // job_type은 "어떤 조직"(대기업·스타트업·공공…)만 정하고 "무슨 일"을 안 정했다.
+        // 그래서 프로필 LLM이 job_title을 자유롭게 지어냈고 prod 실측에서 6명 중 4명이
+        // 마케팅·구매팀으로 몰렸다. 직군을 명시 쿼터로 올려 갈라놓는다(2026-09-06).
+        Map<String, String> jobField = zip(sortedIds, weightedLabels(n, linked(
+                "OFFICE", 22.0,          // 일반 사무·기획·총무
+                "DEV", 20.0,             // 개발·IT
+                "SALES", 16.0,           // 영업·영업관리
+                "MANUFACTURING", 14.0,   // 제조·생산·품질
+                "SERVICE", 12.0,         // 고객서비스·판매·요식
+                "DESIGN", 11.0,          // 디자인·크리에이티브
+                "FINANCE", 11.0,         // 회계·재무·금융
+                "LOGISTICS", 10.0,       // 물류·유통·구매
+                "HEALTHCARE", 10.0,      // 의료·간호·복지
+                "EDUCATION", 9.0,        // 교육·강사
+                "CONSTRUCTION", 8.0,     // 건설·토목·설비
+                "RESEARCH", 7.0          // 연구·엔지니어링
+        ), new Random(seed ^ 0x1B0F1E1DL)));
+
         Map<String, IdentityAxes> out = new LinkedHashMap<>();
         for (String id : sortedIds) {
             String maritalFinal = marital.get(id);
@@ -139,7 +160,8 @@ public class PersonaQuotaPlanner {
                     jobType.get(id),
                     tier.get(id),
                     styleAxes.get(id),
-                    voiceType.get(id)
+                    voiceType.get(id),
+                    jobField.get(id)
             ));
         }
         return out;

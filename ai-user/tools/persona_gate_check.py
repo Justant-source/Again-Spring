@@ -42,7 +42,8 @@ CONTAINERS = {
 }
 
 # 계약 1(00-shared.md) — V22__persona_identity_axes.sql로 추가되는 컬럼 중 게이트 a/b가 읽는 것.
-REQUIRED_V22_COLUMNS = {"age_years", "gender", "marital", "married_years", "has_kids", "style_axes"}
+REQUIRED_V22_COLUMNS = {"age_years", "gender", "marital", "married_years", "has_kids", "style_axes",
+                        "job_field"}  # job_field는 V23
 
 # PersonaProfileRegenerator.CURRENT_PROFILE_REV(voice_profile.profile_rev 마커)와 동기화 —
 # 값을 바꾸면 두 곳 모두 갱신할 것. style_axes 유무만으로 "재생성 완료"를 판정하면 오염 상태
@@ -60,6 +61,13 @@ MARITAL_GROUP_QUOTA = {"SINGLE_GROUP": 60, "MARRIED": 90}
 MARRIED_BY_AGE_BAND_QUOTA = {"23-29": 15, "30-36": 45, "37-49": 30}
 TIER_QUOTA = {"HEAVY": 20, "REGULAR": 80, "LIGHT": 50}
 VOICE_TYPE_QUOTA = {"NATEPAN": 75, "BLIND": 75}
+# 직군(V23, 2026-09-06). job_type이 "어떤 조직"이라면 이쪽은 "무슨 일"이다. 이 축이 없던
+# 시절 prod 실측에서 하루치 6건 중 4건이 마케팅·구매팀으로 몰렸다.
+JOB_FIELD_QUOTA = {
+    "OFFICE": 22, "DEV": 20, "SALES": 16, "MANUFACTURING": 14, "SERVICE": 12,
+    "DESIGN": 11, "FINANCE": 11, "LOGISTICS": 10, "HEALTHCARE": 10,
+    "EDUCATION": 9, "CONSTRUCTION": 8, "RESEARCH": 7,
+}
 HAS_KIDS_OF_MARRIED_QUOTA = 45  # MARRIED 90명 중 45명
 
 STYLE_AXES_OPTIONS: dict[str, list[str]] = {
@@ -227,7 +235,7 @@ def fetch_persona_rows(target: DbTarget) -> list[dict[str, Any]]:
         "SELECT JSON_ARRAYAGG(JSON_OBJECT("
         "'id', id, 'age_years', age_years, 'gender', gender, 'marital', marital, "
         "'married_years', married_years, 'has_kids', has_kids + 0, 'tier', tier, "
-        "'voice_profile', voice_profile, 'style_axes', style_axes"
+        "'voice_profile', voice_profile, 'style_axes', style_axes, 'job_field', job_field"
         ")) FROM personas WHERE active = 1;"
     )
     raw = run_mariadb_sql(target, sql).strip()
@@ -332,6 +340,7 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     married_by_age_band: dict[str, int] = {}
     tier_counts: dict[str, int] = {}
     voice_type_counts: dict[str, int] = {}
+    job_field_counts: dict[str, int] = {}
     kids_of_married = 0
     married_total = 0
 
@@ -378,6 +387,9 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
             tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if voice_type is not None:
             voice_type_counts[voice_type] = voice_type_counts.get(voice_type, 0) + 1
+        job_field = row.get("job_field")
+        if job_field:
+            job_field_counts[job_field] = job_field_counts.get(job_field, 0) + 1
 
     _quota_check(result, "gender", gender_counts, GENDER_QUOTA)
     _quota_check(result, "age_band", age_band_counts, AGE_BAND_QUOTA)
@@ -385,6 +397,7 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     _quota_check(result, "married_by_age_band", married_by_age_band, MARRIED_BY_AGE_BAND_QUOTA)
     _quota_check(result, "tier", tier_counts, TIER_QUOTA)
     _quota_check(result, "voice_type", voice_type_counts, VOICE_TYPE_QUOTA)
+    _quota_check(result, "job_field", job_field_counts, JOB_FIELD_QUOTA)
 
     result.add(
         "has_kids_of_married",

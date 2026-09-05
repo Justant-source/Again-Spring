@@ -94,6 +94,10 @@ public class Persona {
     @Column(name = "job_title", length = 80)
     private String jobTitle;
 
+    /** 직군(V23). job_type이 "어떤 조직"이라면 이쪽은 "무슨 일"이다. */
+    @Column(name = "job_field", length = 24)
+    private String jobField;
+
     @Type(JsonType.class)
     @Column(name = "style_axes", columnDefinition = "JSON")
     private Map<String, String> styleAxes;

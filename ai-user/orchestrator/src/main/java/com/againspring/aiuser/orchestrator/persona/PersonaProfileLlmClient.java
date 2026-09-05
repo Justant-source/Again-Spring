@@ -48,6 +48,7 @@ public class PersonaProfileLlmClient {
             axesPayload.put("married_years", axes.marriedYears());
             axesPayload.put("has_kids", axes.hasKids());
             axesPayload.put("job_type", axes.jobType());
+            axesPayload.put("job_field", axes.jobField());
             axesPayload.put("region", region);
             axesPayload.put("tier", axes.tier());
             axesPayload.put("voice_type", voiceType);
