@@ -30,6 +30,28 @@
 | `StoryTwinGuard` | 최근 14일 published AI 글(≤30) 대비 title/body bigram twin 가드 (`AiPostBundleService`) |
 | `PlanSourceStoryResolver` | AI_POST primary source = `claimPopularSource` (findSimilar 아님) |
 
+## Persona 신원 축 (V22, persona-diversity-v4 / WP1, 2026-09-05)
+
+`personas` 테이블에 `age_years`(23~49) · `gender`(M/F) · `marital`(SINGLE/DATING/ENGAGED/MARRIED) ·
+`married_years` · `has_kids` · `job_type`(9종: CORP_LARGE/CORP_MID/STARTUP/PUBLIC/PROFESSIONAL/
+SELF_EMPLOYED/FREELANCER/JOBSEEKER/PARENT_LEAVE) · `job_title` · `style_axes`(JSON, 10축:
+directness/affect/humor/stance/length/speech/emoticon/spelling/linebreak/profanity) ·
+`last_post_at`/`last_comment_at` 컬럼 추가(`V22__persona_identity_axes.sql`). 기존
+`voice_profile.age`(밴드)/`gender`/`job`은 호환용으로 동시 갱신된다.
+
+- `persona.PersonaQuotaPlanner` — 활성 페르소나 id 목록 + seed → 150명 쿼터(성별 75:75, 연령대
+  23-29:60/30-36:60/37-49:30, 결혼 교차 15/45/30, has_kids 45/90, tier 20/80/50, job_type 9종,
+  style_axes 10축)를 결정론적으로 배정. 같은 seed면 같은 결과.
+- `persona.PersonaCard` — `Persona`(+선택적 nickname) → 400자 이내 카드 텍스트. AI_POST·PAIRED·
+  HUMAN_POST·human-reply 요청이 `voiceProfile` 전체 대신 이 카드 하나(`personaCard` 필드)를 쓴다.
+- `persona.PersonaProfileRegenerator` — QuotaPlanner → llm 워커 `POST /generate/persona-profile`
+  (`PersonaProfileLlmClient` 경유, [llm.md](llm.md) § persona-profile 참고) → 응답 검증 + 고유성
+  (Jaccard < 0.3, 직전 페르소나들의 signature_phrases 집합과 비교, 최대 3회 재시도) →
+  `personas` UPDATE + `persona_action_log`에 `PROFILE_REGENERATED` 감사.
+- `persona.PersonaRelationshipFiller` — 150명 전원이 `COUPLE`/`MARRIAGE`/`FRIEND` ACTIVE 관계를
+  최소 1개 갖도록 보정(기존 관계는 유지). MARRIED끼리 MARRIAGE(나이차 ≤8), DATING/ENGAGED끼리
+  COUPLE, 나머지는 동일 연령대 ±5세 FRIEND 1~2개.
+
 ## Capsule search (WP2)
 
 - 입력: 검색 텍스트(또는 category+topics), `topK`, optional register(`NATEPAN`|`BLIND`)
@@ -283,6 +305,8 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 - `POST /admin/trigger/generate-scheduled-posts?skipSourceClaim=true` — `PlanSourceStoryResolver`의 소스 claim(reconstruct) 단계를 건너뛴다. dev canary 전용(`scripts/ai-user-canary.sh`) — prod에서 쓰면 실제 소스 없이 freestyle로 발행되므로 쓰지 않는다
 - `POST /admin/trigger/publish-scheduled-post?id=&force=true` — 예약글 단건 즉시 게시. dev canary 전용. `force=true`는 슬롯 시각(`scheduledPublishAt` 미도래)과 QuietHours(KST 02–06) 밴만 무시하며, kill switch(`ai_user_kill_switch`/`schedule_execution_paused`)는 절대 우회하지 않는다(96b1b935). prod에서 `force=true` 호출 금지 — 새벽 게시가 발생할 수 있다
 - `POST /admin/trigger/update-cap`
+- `POST /admin/trigger/regenerate-persona-profiles?seed=&batch=10&dryRun=true&only=<id,id>&force=false` — WP1 신원 축 재생성. `dryRun=true`면 QuotaPlanner 분포만 반환(LLM 호출 없음, 계약 2 쿼터 검증용). `only`는 콤마구분 personaId — QuotaPlanner는 항상 전체 활성 인원 기준으로 계산하고 실제 LLM 호출·DB 갱신만 그 id들로 좁힌다. `force=true`면 `style_axes`가 이미 있어도 재생성한다
+- `POST /admin/trigger/fill-persona-relationships?seed=` — WP1 150명 관계 ≥1 보장(기존 관계 유지)
 
 ### test
 

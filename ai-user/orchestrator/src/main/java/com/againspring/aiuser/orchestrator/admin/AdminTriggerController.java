@@ -4,6 +4,8 @@ import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.LlmGenerationGate;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
+import com.againspring.aiuser.orchestrator.persona.PersonaProfileRegenerator;
+import com.againspring.aiuser.orchestrator.persona.PersonaRelationshipFiller;
 import com.againspring.aiuser.orchestrator.engine.ViewDispatcher;
 import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
@@ -75,6 +77,8 @@ public class AdminTriggerController {
     private final LlmGenerationGateService llmGenerationGateService;
     private final EffectiveGatesService effectiveGatesService;
     private final ScheduledPostPublisher scheduledPostPublisher;
+    private final PersonaProfileRegenerator personaProfileRegenerator;
+    private final PersonaRelationshipFiller personaRelationshipFiller;
 
     /**
      * KST 시간대 곡선으로 발행 슬롯 N개를 샘플링만 해서 보여준다(부작용 없음).
@@ -625,5 +629,54 @@ public class AdminTriggerController {
     @GetMapping("/effective-gates")
     public ResponseEntity<Map<String, Object>> effectiveGates() {
         return ResponseEntity.ok(effectiveGatesService.resolve());
+    }
+
+    /**
+     * WP1 — 페르소나 신원 축 재생성 (00-shared.md 계약 1~4, 01-wp1-persona-data.md §3).
+     * dryRun=true면 QuotaPlanner 분포만 반환하고 LLM 호출이 전혀 없다(게이트 a 검증용).
+     * only는 콤마구분 personaId 목록 — 지정 시 QuotaPlanner는 전체 활성 인원 기준으로 계산하되
+     * 실제 LLM 호출·DB 갱신은 그 id들에만 수행한다. force=true면 style_axes가 이미 있어도 재생성한다.
+     */
+    @PostMapping("/regenerate-persona-profiles")
+    public ResponseEntity<Map<String, Object>> regeneratePersonaProfiles(
+            @RequestParam long seed,
+            @RequestParam(defaultValue = "10") int batch,
+            @RequestParam(defaultValue = "false") boolean dryRun,
+            @RequestParam(required = false) String only,
+            @RequestParam(defaultValue = "false") boolean force) {
+        List<String> onlyIds = (only == null || only.isBlank())
+                ? null
+                : java.util.Arrays.stream(only.split(",")).map(String::trim)
+                    .filter(s -> !s.isBlank()).toList();
+        try {
+            Map<String, Object> result = dryRun
+                    ? personaProfileRegenerator.dryRun(seed)
+                    : personaProfileRegenerator.regenerate(seed, batch, onlyIds, force);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("[AdminTrigger] regenerate-persona-profiles failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * WP1 — 150명 전원 관계 ≥1 보장 (01-wp1-persona-data.md §6). 기존 관계는 유지·존중한다.
+     */
+    @PostMapping("/fill-persona-relationships")
+    public ResponseEntity<Map<String, Object>> fillPersonaRelationships(@RequestParam long seed) {
+        try {
+            var result = personaRelationshipFiller.fillAndPersist(seed);
+            return ResponseEntity.ok(Map.of(
+                    "totalActive", result.totalActive(),
+                    "coveredBefore", result.coveredBefore(),
+                    "coveredAfter", result.coveredAfter(),
+                    "created", result.created(),
+                    "stillUncovered", result.stillUncovered()));
+        } catch (Exception e) {
+            log.error("[AdminTrigger] fill-persona-relationships failed: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
     }
 }

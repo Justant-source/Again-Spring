@@ -9,7 +9,8 @@
 | `POST` | `/generate/post` | 게시글 생성 |
 | `POST` | `/generate/comment` | 댓글 생성 |
 | `POST` | `/generate/reply` | 대댓글 생성 |
-| `POST` | `/generate/persona` | 페르소나 JSON 생성 |
+| `POST` | `/generate/persona` | 페르소나 JSON 생성 (strengthener 전용, `PersonaFactory`/persona_strengthener.py가 씀) |
+| `POST` | `/generate/persona-profile` | WP1 persona-diversity-v4 전용 — 고정 축(나이·성별·결혼·직업·style_axes)에서 job_title/life_context/lexicon/writing_quirks/hot_buttons/reactions/example_*/interests를 생성. 모델 `claudePostModel`(Sonnet). 응답은 `PersonaProfileService`가 필수 키·signature_phrases(6~10개)·example_comments(5개)·오류 시그니처·프롬프트 누출·한글 비율을 검증 후 반환. `<<<PERSONA_SECTION>>>` 마커 뒤에만 가변 축·usedPhrases를 둔다(캐시 prefix 불변식). 소비자: orchestrator `PersonaProfileRegenerator`(오케스트레이터 문서 § Persona 신원 축) |
 | `POST` | `/generate/proofread` | 게시 직전 맞춤법 교정 — persona/voice 없음, 의미·구조 보존하고 오탈자만 수정. orchestrator는 오탈자 휴리스틱(`됬` 등)이 맞을 때만 호출하고, 호출/구조/안전 실패 시 **원문 유지**(fail-open, 2026-08-18) |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |

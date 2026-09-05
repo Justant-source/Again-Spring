@@ -150,67 +150,23 @@ def analyze_style_with_llm(voice_type: str, examples: list[str]) -> dict:
 
 
 def update_persona_profiles(voice_type: str, patterns: dict) -> int:
-    """해당 Voice 타입의 페르소나 voice_profile 업데이트"""
+    """DEPRECATED (persona-diversity-v4 / WP1, 2026-09-05) — 항상 0을 반환하는 no-op.
+
+    lexicon·writing_quirks·general_style·post_style·comment_style·reply_style는 이제
+    PersonaProfileRegenerator(오케스트레이터, LLM 프로필 재생성)가 유일한 쓰기 경로다.
+    이 크롤 분석 강화 루프가 같은 필드를 덮어쓰면 재생성이 만든 페르소나별 개별화 표현이
+    지워지고 voice_type당 3종 수렴 문제가 재발한다(01-wp1-persona-data.md §7).
+    시그니처는 하위 호환을 위해 유지한다(app/api/strengthen.py가 여전히 직접 호출한다).
+    """
     if not patterns:
         return 0
 
-    sanitized = _sanitize_patterns(patterns)
-    sig_phrases = sanitized.get("signature_phrases", [])
-    errors = sanitized.get("consistent_errors", [])
-    typing_habit = sanitized.get("typing_habit", "")
-    hot_topics = sanitized.get("hot_topics", [])
-
-    if not sig_phrases and not errors and not hot_topics:
-        return 0
-
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            # voice_profile JSON의 lexicon, writing_quirks 업데이트
-            cur.execute("""
-                SELECT id, voice_profile FROM personas
-                WHERE JSON_UNQUOTE(JSON_EXTRACT(voice_profile, '$.voice_type')) = %s
-                LIMIT 50
-            """, (voice_type,))
-            rows = cur.fetchall()
-
-            updated = 0
-            for row in rows:
-                persona_id = row["id"] if isinstance(row, dict) else row[0]
-                vp_raw = row["voice_profile"] if isinstance(row, dict) else row[1]
-                try:
-                    vp = json.loads(vp_raw) if isinstance(vp_raw, str) else vp_raw
-                    # lexicon 업데이트
-                    if "lexicon" not in vp or not isinstance(vp.get("lexicon"), dict):
-                        vp["lexicon"] = {}
-                    if sig_phrases:
-                        existing = _sanitize_text_list(vp["lexicon"].get("signature_phrases", []), 8)
-                        merged = list(dict.fromkeys(existing + sig_phrases))[:8]
-                        vp["lexicon"]["signature_phrases"] = merged
-                    if typing_habit:
-                        vp["lexicon"]["typing_habit"] = typing_habit
-                    # writing_quirks 업데이트
-                    if "writing_quirks" not in vp or not isinstance(vp.get("writing_quirks"), dict):
-                        vp["writing_quirks"] = {}
-                    if errors:
-                        existing_errs = _sanitize_text_list(vp["writing_quirks"].get("consistent_errors", []), 4)
-                        merged_errs = list(dict.fromkeys(existing_errs + errors))[:4]
-                        vp["writing_quirks"]["consistent_errors"] = merged_errs
-                    # hot_topics 저장 — topic_synthesizer가 힌트로 소비
-                    if hot_topics:
-                        existing_topics = _sanitize_text_list(vp.get("hot_topics", []), 5)
-                        merged_topics = list(dict.fromkeys(existing_topics + hot_topics))[:5]
-                        vp["hot_topics"] = merged_topics
-
-                    cur.execute(
-                        "UPDATE personas SET voice_profile = %s WHERE id = %s",
-                        (json.dumps(vp, ensure_ascii=False), persona_id)
-                    )
-                    updated += 1
-                except Exception as e:
-                    logger.debug(f"Failed to update persona {persona_id}: {e}")
-                    continue
-
-    return updated
+    logger.info(
+        f"update_persona_profiles({voice_type}): no-op (persona-diversity-v4 / WP1, 2026-09-05) — "
+        "lexicon/writing_quirks/general_style/*_style은 PersonaProfileRegenerator 전용 쓰기 경로로 "
+        "이관됨. 01-wp1-persona-data.md §7 참고."
+    )
+    return 0
 
 
 def _clean_example(text: str) -> str:
@@ -363,22 +319,19 @@ def expand_persona_example_pools(voice_type: str, source: str | None) -> int:
 
 
 def strengthen_all(min_examples: int = 10) -> dict:
-    """전체 Voice 타입 강화 실행 (말투 분석 + 예시 풀 확장).
+    """전체 Voice 타입 강화 실행 — 예시 풀 확장만 수행한다.
 
     WP1B: NATEPAN·BLIND만 순회. 레거시 voice_type 페르소나는 재배정 전에는 건드리지 않는다.
+
+    persona-diversity-v4(WP1, 2026-09-05): lexicon/writing_quirks/general_style/*_style은
+    이제 PersonaProfileRegenerator 전용 쓰기 경로다(01-wp1-persona-data.md §7). 이 함수는
+    더 이상 analyze_style_with_llm/update_persona_profiles를 호출하지 않는다 — 어차피
+    update_persona_profiles가 no-op이 됐으므로 LLM 호출만 낭비하기 때문이다.
+    min_examples 파라미터는 호출부 하위 호환을 위해 유지하되 이제 쓰이지 않는다.
     """
     results = {}
     for voice_type, source in VOICE_SOURCE_MAP.items():
-        examples = get_examples_by_source(source, limit=30)
-        if len(examples) < min_examples:
-            logger.info(f"[{voice_type}] analysis skip — only {len(examples)} examples (need {min_examples})")
-            pool_n = expand_persona_example_pools(voice_type, source)
-            results[voice_type] = {"status": "skip", "examples": len(examples), "pool_updated": pool_n}
-            continue
-        patterns = analyze_style_with_llm(voice_type, examples)
-        updated = update_persona_profiles(voice_type, patterns)
         pool_n = expand_persona_example_pools(voice_type, source)
-        logger.info(f"[{voice_type}] strengthened {updated} personas, pool expanded {pool_n}")
-        results[voice_type] = {"status": "ok", "updated": updated, "pool_updated": pool_n,
-                               "patterns": list(patterns.keys())}
+        logger.info(f"[{voice_type}] pool expanded {pool_n} (analysis/update skipped — see §7)")
+        results[voice_type] = {"status": "ok", "pool_updated": pool_n}
     return results

@@ -222,6 +222,20 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
   기존 `_looks_like_llm_error`/`LLM_ERROR_SIGNATURES` 하드코딩 목록 폐기). 판정 결과가
   `voice_profile`에 섞이지 않게 막는 동작 자체는 그대로다 — 상세: `.claude/rules/llm-safety.md` §2.
 
+### `lexicon`/`general_style`은 이제 오케스트레이터 전용 (persona-diversity-v4 / WP1, 2026-09-05)
+
+`update_persona_profiles()`는 **no-op**(항상 0 반환, DB에 쓰지 않음)으로 바뀌었다. `lexicon`·
+`writing_quirks`·`general_style`·`post_style`·`comment_style`·`reply_style`은 이제
+오케스트레이터의 `PersonaProfileRegenerator`(V22 신원 축 재생성, [orchestrator.md](orchestrator.md)
+§ Persona 신원 축)가 유일한 쓰기 경로다. 이 크롤 강화 루프가 같은 필드를 계속 덮어썼던 것이
+voice_type당 소수 lexicon으로 수렴하던 문제(3종 수렴)의 직접 원인이었다.
+
+- `strengthen_all()`은 이제 `expand_persona_example_pools()`(example_comments/example_replies
+  풀 확장, 페르소나별 상한 12/8)만 호출한다. `analyze_style_with_llm`/`get_examples_by_source`는
+  더 이상 `strengthen_all` 경로에서 쓰이지 않는다(불필요한 LLM 호출 제거).
+- `POST /strengthen/{voice_type}`(admin 단건 트리거, `app/api/strengthen.py`)는 여전히
+  `update_persona_profiles`를 직접 호출하지만 이제 no-op이라 안전하다 — 하위 호환을 위해 시그니처만 유지.
+
 ## daily topics
 
 `/topics/today`는 오늘 날짜의 `daily_topic` 행을 `used_count ASC, RAND()`로 돌려준다.

@@ -6,6 +6,30 @@
 
 ---
 
+## 0. 2026-09-05 갱신 — persona-diversity-v4 (WP1): 150명 + 신원 축
+
+**아래 §1~§9는 100명·voice-type 12종 시절(2026-06-05, WP1B 이전) 기록이다. 현재 SoT는 다음과 같다:**
+
+- **총원 150명** (기존 100 YAML + 50 코드생성 → 150 확장). 활성 `voice_type`은 **NATEPAN·BLIND만**
+  (§4의 12종 voice 매트릭스는 폐기, `PersonaFactory` 주석 "WP1B: register 단일화" 참고).
+- **150명 쿼터** (`.request/persona-diversity-v4/00-shared.md` 계약 2, `personas` V22 컬럼):
+  성별 M75/F75 · 연령 23-29:60/30-36:60/37-49:30 · 결혼(미혼 60/MARRIED 90, 연령대 교차
+  15/45/30) · has_kids(MARRIED 90 중 45) · tier HEAVY20/REGULAR80/LIGHT50 · job_type 9종
+  (CORP_LARGE 30·CORP_MID 25·STARTUP 20·PUBLIC 15·PROFESSIONAL 15·SELF_EMPLOYED 15·
+  FREELANCER 10·JOBSEEKER 10·PARENT_LEAVE 10).
+- **`style_axes`(JSON, 10축)**: directness/affect/humor/stance/length(2값 75:75) ·
+  speech/emoticon/profanity(3값 50:50:50) · spelling/linebreak(2값 75:75). 축 간 독립 배정,
+  `speech=JONDAE` + `profanity=HEAVY` 조합만 금지.
+- **쿼터 배정·재생성 코드**: `ai-user/orchestrator/.../persona/PersonaQuotaPlanner.java`(결정론적
+  축 배정) · `PersonaProfileRegenerator.java`(LLM 프로필 재생성 오케스트레이션) ·
+  `PersonaCard.java`(400자 카드, LLM 요청 필드 `personaCard`) · `PersonaRelationshipFiller.java`
+  (전원 관계 ≥1 보장). 상세: `docs/ai-user/30-components/orchestrator.md` § Persona 신원 축.
+- **YAML 동기화**: `ai-user/tools/export_persona_yaml.py` (DB → `profiles/*/profile.yml`
+  `identity:` 블록 + `voice.yml`, `_specsheet.md` 재생성). Phase 3 이후 Fable이 `--apply`로 실행 —
+  이 시점까지는 아래 §6의 100인 목록·§3의 12-voice 매트릭스가 파일상 최신 상태로 남아있을 수 있다.
+
+---
+
 ## 목차
 
 1. [개요](#1-개요)
