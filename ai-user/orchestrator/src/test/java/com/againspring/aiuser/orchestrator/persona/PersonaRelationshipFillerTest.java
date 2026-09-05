@@ -65,18 +65,95 @@ class PersonaRelationshipFillerTest {
     void plan_respectsExistingRelationships() {
         List<Persona> pool = List.of(
                 persona("m1", "M", 34, "MARRIED"), persona("f1", "F", 32, "MARRIED"),
-                persona("solo", "F", 50, "SINGLE"));
+                persona("solo", "F", 32, "SINGLE"));
         List<PersonaRelationship> existing = List.of(
+                // solo(32)-m1(34) 나이차 2 ≤ 5 → FRIEND 유효, STALE 처리되지 않고 그대로 커버 유지
                 PersonaRelationship.builder().personaId("solo").otherId("m1")
                         .relationType("FRIEND").status("ACTIVE").build());
 
         var plan = filler.plan(pool, existing, 3L);
 
-        // solo는 이미 FRIEND로 커버되어 있으므로 새 관계가 필요 없다
+        // solo는 이미 (여전히 유효한) FRIEND로 커버되어 있으므로 새 관계가 필요 없다
         boolean soloGetsNewRelation = plan.toCreate().stream()
                 .anyMatch(r -> r.getPersonaId().equals("solo") || r.getOtherId().equals("solo"));
         assertThat(soloGetsNewRelation).isFalse();
+        assertThat(plan.toInvalidate()).isEmpty();
         assertThat(plan.result().stillUncovered()).isEmpty();
+    }
+
+    // --- 재실행 안전성 (PersonaProfileRegenerator가 age_years/gender/marital을 덮어쓴 뒤 재실행) ---
+
+    @Test
+    void plan_invalidatesStaleFriendWhenAgeDriftsPastRegeneration() {
+        // a-b는 재생성 전 나이로 FRIEND를 맺었으나, 재생성 후 a가 45세로 바뀌어 b(24)와 나이차가
+        // 5를 넘는다 — 더 이상 유효하지 않으므로 STALE 처리되고, 각자 나이대가 맞는 새 상대
+        // (a↔c, b↔d)로 재배정되어야 한다.
+        List<Persona> pool = List.of(
+                persona("a", "M", 45, "SINGLE"),
+                persona("b", "F", 24, "SINGLE"),
+                persona("c", "M", 44, "SINGLE"),
+                persona("d", "F", 26, "SINGLE"));
+        List<PersonaRelationship> existing = List.of(
+                PersonaRelationship.builder().personaId("a").otherId("b")
+                        .relationType("FRIEND").status("ACTIVE").build());
+
+        var plan = filler.plan(pool, existing, 7L);
+
+        assertThat(plan.toInvalidate()).hasSize(1);
+        assertThat(plan.toInvalidate().get(0).getStatus()).isEqualTo("STALE");
+        assertThat(plan.toInvalidate().get(0).getPersonaId()).isEqualTo("a");
+        assertThat(plan.result().invalidated()).isEqualTo(1);
+        // a·b 모두 stale 관계 제거 후 covered에서 빠졌다가, 나이대가 맞는 새 상대로 재배정된다
+        assertThat(plan.result().stillUncovered()).isEmpty();
+        boolean aGetsNewRelation = plan.toCreate().stream()
+                .anyMatch(r -> r.getPersonaId().equals("a") || r.getOtherId().equals("a"));
+        boolean bGetsNewRelation = plan.toCreate().stream()
+                .anyMatch(r -> r.getPersonaId().equals("b") || r.getOtherId().equals("b"));
+        assertThat(aGetsNewRelation).isTrue();
+        assertThat(bGetsNewRelation).isTrue();
+    }
+
+    @Test
+    void plan_invalidatesStaleMarriageWhenMaritalRegressesToSingle() {
+        // m1-f1은 예전에 MARRIAGE였으나 재생성 후 둘 다 SINGLE로 바뀌었다 — marital 정합성이
+        // 깨졌으므로 STALE 처리되어야 한다.
+        List<Persona> pool = List.of(
+                persona("m1", "M", 34, "SINGLE"),
+                persona("f1", "F", 32, "SINGLE"));
+        List<PersonaRelationship> existing = List.of(
+                PersonaRelationship.builder().personaId("m1").otherId("f1")
+                        .relationType("MARRIAGE").status("ACTIVE").build());
+
+        var plan = filler.plan(pool, existing, 11L);
+
+        assertThat(plan.toInvalidate()).hasSize(1);
+        assertThat(plan.toInvalidate().get(0).getRelationType()).isEqualTo("MARRIAGE");
+        assertThat(plan.result().invalidated()).isEqualTo(1);
+        // 정합성 깨진 관계 제거 후에도 서로 나이차 2 ≤ 5라 FRIEND로 재커버된다
+        assertThat(plan.result().stillUncovered()).isEmpty();
+    }
+
+    @Test
+    void plan_reassignsMarriageAfterSubsequentRegenerationMakesPersonasMarried() {
+        // 1차 실행(재생성 전, 전원 SINGLE): FRIEND만 생성됨
+        List<Persona> preRegen = List.of(
+                persona("m1", "M", 34, "SINGLE"), persona("f1", "F", 32, "SINGLE"),
+                persona("m2", "M", 40, "SINGLE"), persona("f2", "F", 38, "SINGLE"));
+        var firstPlan = filler.plan(preRegen, List.of(), 42L);
+        assertThat(firstPlan.toCreate()).allMatch(r -> "FRIEND".equals(r.getRelationType()));
+
+        // 2차 실행(재생성 후): m1/f1이 MARRIED로 바뀜. 1차에서 만든 FRIEND는 age가 그대로라
+        // 여전히 유효하므로 STALE 처리되지 않고, 추가로 올바른 MARRIAGE가 생성되어야 한다.
+        List<Persona> postRegen = List.of(
+                persona("m1", "M", 34, "MARRIED"), persona("f1", "F", 32, "MARRIED"),
+                persona("m2", "M", 40, "SINGLE"), persona("f2", "F", 38, "SINGLE"));
+        var secondPlan = filler.plan(postRegen, firstPlan.toCreate(), 42L);
+
+        boolean marriageCreated = secondPlan.toCreate().stream()
+                .anyMatch(r -> "MARRIAGE".equals(r.getRelationType())
+                        && Set.of(r.getPersonaId(), r.getOtherId()).equals(Set.of("m1", "f1")));
+        assertThat(marriageCreated).isTrue();
+        assertThat(secondPlan.result().stillUncovered()).isEmpty();
     }
 
     @Test

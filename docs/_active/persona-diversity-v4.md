@@ -1,7 +1,9 @@
 # AI-user 페르소나 다양성 v4 (persona-diversity-v4)
 
-> **상태**: Phase 1·2 완료 — WP1~WP4 병합 완료(commit `81ba5dc9`), 감사에서 발견된 결함 3건
-> 수정 중(§6) · **마지막 갱신**: 2026-09-05
+> **상태**: Phase 1·2·3 완료 — WP1~WP4 병합(commit `81ba5dc9`) 후 감사에서 발견된 결함 10건
+> (계약 위반 3·미배선 3·데이터 무결성 2·게이트 집계 2, §6) 전부 수정 완료. **Phase 4 진행
+> 중** — prod orchestrator/ai-learning/prod-dev-sync 배포 완료, V22 컬럼 prod 적용 완료,
+> 150명 규모 페르소나 프로필 재생성 배치 진행 중(§7) · **마지막 갱신**: 2026-09-05
 >
 > 초기 작업 지시는 각 에이전트에게 gitignore 대상 경로로 직접 전달됐다. 이 파일은 그 계약의
 > **git 추적 요약본**이다 — 전달용 원본이 사라져도 트랙 목적과 결정 사항은 이 파일에 남는다.
@@ -32,7 +34,9 @@ V21까지의 `personas` 스키마는 `archetype`·`tier`·`voice_profile`(JSON)�
 ## 3. 결정 10개 요약
 
 1. **정체성 축 신설**: `personas`에 `age_years`(23~49) · `gender`(M/F) · `marital`
-   (SINGLE/DATING/ENGAGED/MARRIED) · `married_years` · `has_kids` · `job_type`(8종) ·
+   (SINGLE/DATING/ENGAGED/MARRIED) · `married_years` · `has_kids` · `job_type`(9종:
+   CORP_LARGE/CORP_MID/STARTUP/PUBLIC/PROFESSIONAL/SELF_EMPLOYED/FREELANCER/JOBSEEKER/
+   PARENT_LEAVE — `PersonaQuotaPlanner.assignJobTypes` 실측, V22 SQL 주석의 "8종"은 오기) ·
    `job_title` · `style_axes`(JSON) 컬럼 추가(`V22__persona_identity_axes.sql`, WP1).
    기존 `voice_profile.age`(밴드)·`gender`·`job`은 호환용으로 동시 갱신한다.
 2. **150명 쿼터 그리드 고정**: 성별 75/75, 연령대 60/60/30(23-29/30-36/37-49), 결혼
@@ -65,9 +69,9 @@ V21까지의 `personas` 스키마는 `archetype`·`tier`·`voice_profile`(JSON)�
 | Phase | 내용 | 상태 |
 |---|---|---|
 | 1 | WP1~WP4 병렬 worktree 구현 | **완료** — WP1(신원 축·쿼터), WP2(카테고리 믹스·소스 골격), WP3(`PersonaLottery` 추첨, matcher·캡슐 폐기), WP4(도구·게이트·설정·문서) 각각 구현 완료 |
-| 2 | 병합 + 최종 문서화 + 게이트 재검증 | **완료** — WP1~WP4 병합(commit `81ba5dc9`, 중복 클래스 정리). 테스트: orchestrator 403건, llm 244건, learning 108건, e2e-realbe 125건 모두 통과. dev DB에 `V22__persona_identity_axes.sql` 적용 완료. 감사에서 결함 3건 발견 — §6 |
-| 3 | dev 전수 검증 (`--classify` 전체, `--apply`, 게이트 a/b/c) | 대기 — §6 결함 수정 후 진행 |
-| 4 | prod 반영 (Fable 전용) | 대기 |
+| 2 | 병합 + 최종 문서화 + 게이트 재검증 | **완료** — WP1~WP4 병합(commit `81ba5dc9`, 중복 클래스 정리). 테스트: orchestrator 403건, llm 244건, learning 108건, e2e-realbe 125건 모두 통과. dev DB에 `V22__persona_identity_axes.sql` 적용 완료. 감사에서 결함 발견 — §6 |
+| 3 | dev 검증 — 게이트 스크립트·재생성 배치 실행, 감사 결함 수정 | **완료** — dev에서 재생성 배치를 실제로 돌리며(부분 배치, 12명) §6의 10건(계약 위반 3·미배선 3·데이터 무결성 2·게이트 집계 2)을 전부 발견·수정(commit `c1ac52f7`·`556cba48`·`dcd14138`·`2048b25a`). 코드 확인: `PersonaMaritalReader`(폴백 없음)·`SourceOverlapGuard`(solo·paired 배선)·게이트 스크립트(has_kids 캐스팅·deleted_at 필터)·`PersonaProfileRegenerator`(TransactionTemplate·`profile_rev` 마커) 전부 HEAD에서 확인됨(2026-09-05). `purge_offtarget_posts.py --classify` **전수** 실행(100건 표본만 완료, OFF_TARGET 2%)과 `--apply`는 비용 절약을 위해 범위 밖으로 보류 — Phase 4 진입의 전제조건이 아니다 |
+| 4 | prod 반영 (Fable 전용) | **진행 중** — prod `ai-user-orchestrator`/`ai-learning`/`prod-dev-sync` 재빌드 배포 완료, `V22__persona_identity_axes.sql` prod 적용 완료(Flyway 자동 적용). 150명 규모 페르소나 프로필 재생성(`POST /admin/trigger/regenerate-persona-profiles`) 배치 진행 중 — 상세 절차·안전장치는 §7 |
 
 ## 5. WP4 실측 메모 (2026-09-05, 병합 전 — §4 Phase 2 완료로 아래 두 항목은 이후 해소됨)
 
@@ -83,33 +87,78 @@ V21까지의 `personas` 스키마는 `archetype`·`tier`·`voice_profile`(JSON)�
   않았다 — WP1이 상수로 교체하기 전까지 이 파일은 컴파일되지 않는다(Phase 2 병합 시 조율 필요).
   (병합 commit `81ba5dc9`에서 `PersonaQuotaPlanner.PERSONA_COUNT`로 교체 완료 — 해소됨)
 
-## 6. 감사 발견 결함 (2026-09-05, 수정 중)
+## 6. 감사 발견 결함 (2026-09-05, 전부 수정 완료)
 
-Phase 2 병합 후 감사에서 발견돼 별도로 수정 중인 결함 3건:
+Phase 2 병합(`81ba5dc9`) 후 두 차례 감사에서 발견된 결함 **10건**. 전부 코드 레벨에서 수정됐고
+(commit `c1ac52f7`·`556cba48`·`dcd14138`·`2048b25a`), 이 갱신 시점(2026-09-05)에 각 항목을
+현재 HEAD(`402463b6`) 코드로 직접 대조해 해소를 재확인했다.
 
-1. **레거시 `/generate/post` 원문 누출** — legacy `assemblePostPrompt` 경로(`PromptAssembler`)가
-   신규 `personaCard` 대신 원문 소스 텍스트를 그대로 흘려보내는 경로가 남아 있다.
-2. **human-reply `PersonaCard` 미배선** — `ReplyGenRequest`(`ai-user/llm/.../dto/ReplyGenRequest.java`)에
-   `personaCard` 필드가 없다. `voiceProfile` 전체 JSON만 실려 human-reply 경로는 계약4(400자 카드로
-   교체)를 아직 못 받았다.
-3. **`PersonaMaritalReader` 컬럼 미독해** — `personas.marital`(V22) 컬럼을 우선 읽고 없으면
-   `voice_profile.marital`로 폴백하도록 설계됐으나(`PersonaMaritalReader.read()`), 실제 호출 경로에서
-   컬럼값이 온전히 전달되지 않는 사례가 감사에서 확인됐다.
+### 계약 위반 3건 (commit `c1ac52f7`)
 
-세 건 모두 다른 에이전트가 코드 레벨에서 수정 중이다. 이 문서는 감사 시점 기준 사실만 기록하며,
-수정 완료 여부는 다음 갱신에서 반영한다.
+1. **`PersonaMaritalReader` 컬럼 미독해** — `personas.marital`(V22) 컬럼을 우선 읽고 없으면
+   `voice_profile.marital`로 폴백하도록 설계됐으나, 실제로는 `isMarried()`가 항상 `false`를
+   반환해 MARRIED 카테고리 작성자 추첨이 0명이 되고 COUPLE의 미혼 제한도 무력화됐다.
+   **수정**: 폴백을 없애고 컬럼 하나만 SSOT로 삼는다 — 현재 `PersonaMaritalReader.read()`는
+   `p.getMarital()`만 읽고 값이 없으면 `SINGLE`(V22 컬럼 기본값)로 취급한다(코드 확인 완료).
+2. **레거시 `/generate/post` 원문 누출** — legacy 경로(`ActionExecutor.executePost` →
+   `PromptAssembler`)가 크롤 원문 800자를 프롬프트에 그대로 실었다. **수정**: PLAN 경로와
+   동일하게 골격 추출(`llmClient.extractSkeleton`)로 바꾸고, 추출 실패 시 원문 폴백 없이 그
+   글 생성 자체를 건너뛴다(코드 확인 완료 — `ActionExecutor` 439~452행).
+3. **human-reply/tick 생성 `PersonaCard` 미사용** — 신원 축이 프롬프트에 실리지 않았다.
+   **수정**: `GenDto`·llm 워커 DTO(`ReplyGenRequest`·`CommentGenRequest`)에 `personaCard`
+   필드를 추가하고 `HumanReplyBatchService`·`PlanPersonaMapper`·`ActionExecutor`가 배선(코드
+   확인 완료).
 
-> **참고(§7 작성 중 확인)**: 위 3번(`PersonaMaritalReader` 컬럼 미독해)은 commit `c1ac52f7`
-> (`fix(ai-user): 감사에서 드러난 계약 위반 3건과 미배선 3건을 고친다`)에서 이미 해결됐다 —
-> 현재 HEAD의 `PersonaMaritalReader.java`는 `personas.marital` 컬럼만 읽고 폴백이 없다
-> (직접 코드 확인, 2026-09-05). §4·§6 상태 갱신은 이 문서의 다른 작업자 담당이라 여기서는
-> 건드리지 않고, §7의 사실관계에만 반영한다.
+### 미배선 3건 (commit `c1ac52f7`, 실제 배선 완성은 `556cba48`)
 
-## 7. Phase 4 prod 배포 절차 (2026-09-05 작성 — 계획 단계, prod 미실행)
+4. **`SourceOverlapGuard` 게시 직전 미호출** — 클래스·단위테스트만 있고 실제 호출부가
+   없었다. **수정**: `AiPostBundleService`(solo)·`PairedPostScheduler`(paired) 게시 직전에
+   배선(코드 확인 완료). 레거시 `/generate/post`(`ActionExecutor`)에는 여전히 배선돼 있지
+   않다 — 이 경로는 골격만 프롬프트에 싣는 방어만 있고 게시 직전 원문 대조는 없다(§7 절차에
+   포함되지 않은 잔여 갭, 아래 "미해결" 참고).
+5. **`b_side_viable=false` 골격의 paired→solo 강등 미동작** — 필드 자체가 세팅되지 않아 죽은
+   방어였다. **수정**: `PairedPostScheduler.isBSideViable()`이 골격의 `b_side_viable` 키를
+   읽어 실제로 슬롯을 solo 홀딩으로 강등한다(코드 확인 완료). `556cba48`에서 앞선 배선이
+   판정에만 쓰고 실제 프롬프트에는 골격을 싣지 않던 것도 함께 고쳤다.
+6. **`PersonaCardFallback` 무경고 실행** — 폴백이 조용히 신원축 없는 카드를 만들어냈다.
+   **수정**: 폴백이 실행될 때마다 `log.warn`으로 "personaCard 미수신" 경고를 남긴다(코드
+   확인 완료 — 카드 미전송 카나리아).
 
-> 이 절은 조사·계획만 담는다. 작성 시점에 prod에는 어떤 명령도 실행하지 않았고 prod DB도
-> 읽지 않았다 — 전부 코드·설정·`docker inspect`/`docker ps`(조회만) 근거다. 실행하는
-> 운영자(또는 에이전트)는 각 단계의 "성공 판정"을 실제로 확인하며 진행할 것.
+### 데이터 무결성 2건 (commit `2048b25a`)
+
+7. **감사 저장 유실** — `PersonaProfileRegenerator`가 프로필 저장과 `persona_action_log`
+   감사 기록을 트랜잭션 경계 없이 따로 저장해, 저장 예외를 `logAudit`이 삼키고 `log.warn`만
+   남긴 채 프로필만 커밋되는 사례가 있었다. **수정**: `TransactionTemplate`으로 두 저장을
+   한 트랜잭션에 묶고 예외를 그대로 던진다(코드 확인 완료).
+8. **부분 프로필의 성공 오판** — `style_axes`는 항상 채우면서 `general_style`·`lexicon`
+   등은 응답에 키가 있을 때만 덮어써, 키 누락 응답도 성공으로 셌다(dev에서 23세 여성
+   프로필에 구버전 "책임감 있고 현실적인 가정 남성" 문구가 남는 사례로 발견). **수정**: 필수
+   11개 키를 먼저 검증하고 하나라도 없으면 `INCOMPLETE_PROFILE`로 실패 처리. 완료 판정 자체도
+   축 유무가 아니라 `voice_profile.profile_rev="v4"` 갱신 마커로 바꿔, 오염된 상태가 재개
+   필터에서 자동으로 다시 처리 대상이 되게 했다(코드 확인 완료).
+
+### 게이트 집계 2건 (commit `dcd14138`)
+
+9. **`has_kids` 캐스팅 누락으로 JSON 집계 파괴** — `BIT(1)` 컬럼을 캐스팅 없이
+   `JSON_ARRAYAGG` 등에 넣어 raw 바이트가 박히고 JSON 전체가 깨져 게이트 a·b가 예외로
+   죽었다. **수정**: `has_kids + 0` 정수 캐스팅(코드 확인 완료 — `persona_gate_check.py`).
+10. **게이트 c 회전 집계의 `deleted_at` 필터 누락** — soft-delete된 글이 글쓰기 회전율
+    집계에 섞였다. **수정**: 글 집계 쿼리에 `deleted_at IS NULL` 추가(코드 확인 완료).
+
+이 감사 과정에서 재생성 배치 자체의 복원력 문제도 함께 발견·수정했다(세션 한도 등으로 배치가
+중간에 끊기면 남은 대상을 계속 때리던 문제) — 상세는 `docs/ai-user/70-policy/llm-call-budget.md`
+§1.5, `docs/ai-user/60-runtime/operations.md` §9.
+
+## 7. Phase 4 prod 배포 절차 (2026-09-05 작성 → 이후 실행됨)
+
+> 이 절은 원래 조사·계획만 담아 작성됐다 — 작성 시점에는 prod에 어떤 명령도 실행하지
+> 않았고 prod DB도 읽지 않았다(전부 코드·설정·`docker inspect`/`docker ps` 조회 근거).
+> **이후 이 절차가 실제로 실행됐다**: prod `ai-user-orchestrator`/`ai-learning`/
+> `prod-dev-sync` 재빌드 배포 완료, V22 컬럼 prod 적용 완료, 150명 규모 페르소나 프로필
+> 재생성 배치가 진행 중이다. 이 Doc-Sync 갱신은 docker·DB에 접근하지 않고 진행됐으므로
+> 아래 §7.4 각 단계의 실측 성공 판정(정확한 처리 건수·타임스탬프 등)은 실행한
+> 운영자(또는 에이전트)가 직접 확인한 값으로 갱신할 것 — 이 문서는 "절차가 실행 단계로
+> 넘어갔다"는 사실만 반영한다.
 
 ### 7.0 범위 재확인 — 이 트랙은 backend·frontend를 건드리지 않는다
 

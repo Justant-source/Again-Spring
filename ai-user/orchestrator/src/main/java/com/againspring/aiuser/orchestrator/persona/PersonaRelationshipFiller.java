@@ -22,6 +22,14 @@ import java.util.stream.Collectors;
  * WP1 — 150명 전원 관계 ≥1 보장 (00-shared.md 계약, 01-wp1-persona-data.md §6).
  * MARRIED끼리 MARRIAGE(성별 M-F, 나이차 ≤8, 같은 지역 우선) → DATING/ENGAGED끼리 COUPLE(성별 M-F)
  * → 아직 커버 안 된 나머지 전원에 FRIEND 1~2개(같은 연령대 ±5세). 기존 관계는 유지·존중한다.
+ *
+ * <p><b>재실행 안전성</b> — {@code PersonaProfileRegenerator}가 age_years·gender·marital을
+ * 덮어쓰기 때문에(축 재배정), 프로필 재생성 전에 만들어진 커버링 관계(FRIEND/COUPLE/MARRIAGE)가
+ * 재생성 후에는 나이차·성별·marital 제약을 더 이상 만족하지 않을 수 있다. 이 클래스는 매 실행마다
+ * 기존 ACTIVE 커버링 관계를 현재 페르소나 속성으로 재검증해, 더 이상 유효하지 않은 관계는
+ * {@code status=STALE}로 표시하고(삭제 아님 — 감사 가능) 커버 집합·중복 방지 목록에서 제외한다.
+ * 그 결과 같은 실행 안에서 그 페르소나에게 올바른 새 관계가 재배정된다. 커버링 대상이 아닌
+ * 관계 유형(ACQUAINTANCE·COLLEAGUE·FAMILY 등)은 건드리지 않는다.
  */
 @Slf4j
 @Component
@@ -36,23 +44,28 @@ public class PersonaRelationshipFiller {
     }
 
     private static final Set<String> COVERING_TYPES = Set.of("COUPLE", "MARRIAGE", "FRIEND");
+    private static final String STALE_STATUS = "STALE";
 
     public record FillResult(int totalActive, int coveredBefore, int coveredAfter, int created,
-                              List<String> stillUncovered) {
+                              int invalidated, List<String> stillUncovered) {
     }
 
-    /** DB에서 활성 페르소나 + 기존 관계를 읽어 부족분을 채우고 저장한다. */
+    /** DB에서 활성 페르소나 + 기존 관계를 읽어 부족분을 채우고(+ 무효화된 관계 STALE 처리) 저장한다. */
     public FillResult fillAndPersist(long seed) {
         List<Persona> active = personaRepo.findByActiveTrue();
         List<PersonaRelationship> existing = relationshipRepo.findAll();
         FillPlan planResult = plan(active, existing, seed);
-        if (!planResult.toCreate().isEmpty()) {
-            relationshipRepo.saveAll(planResult.toCreate());
+        List<PersonaRelationship> toSave = new ArrayList<>();
+        toSave.addAll(planResult.toInvalidate());
+        toSave.addAll(planResult.toCreate());
+        if (!toSave.isEmpty()) {
+            relationshipRepo.saveAll(toSave);
         }
         return planResult.result();
     }
 
-    public record FillPlan(List<PersonaRelationship> toCreate, FillResult result) {
+    public record FillPlan(List<PersonaRelationship> toCreate, List<PersonaRelationship> toInvalidate,
+                            FillResult result) {
     }
 
     /** 순수 계산부 — 단위 테스트가 DB 없이 검증할 수 있도록 분리. */
@@ -62,10 +75,24 @@ public class PersonaRelationshipFiller {
 
         Set<String> covered = new HashSet<>();
         List<Pair> existingPairs = new ArrayList<>();
+        List<PersonaRelationship> toInvalidate = new ArrayList<>();
         for (PersonaRelationship r : existing) {
+            Persona a = byId.get(r.getPersonaId());
+            Persona b = byId.get(r.getOtherId());
+            boolean bothActive = a != null && b != null;
+            boolean isCoveringActive = "ACTIVE".equals(r.getStatus()) && COVERING_TYPES.contains(r.getRelationType());
+
+            if (isCoveringActive && bothActive && !isStillValid(r.getRelationType(), a, b)) {
+                // 재생성으로 age_years/gender/marital이 바뀌어 더 이상 이 관계 유형의 제약을
+                // 만족하지 못한다 — STALE 처리하고 existingPairs/covered에서 제외해 같은 실행
+                // 안에서 올바른 관계로 재배정될 수 있게 한다.
+                r.setStatus(STALE_STATUS);
+                toInvalidate.add(r);
+                continue;
+            }
+
             existingPairs.add(new Pair(r.getPersonaId(), r.getOtherId(), r.getRelationType()));
-            if ("ACTIVE".equals(r.getStatus()) && COVERING_TYPES.contains(r.getRelationType())
-                    && byId.containsKey(r.getPersonaId()) && byId.containsKey(r.getOtherId())) {
+            if (isCoveringActive && bothActive) {
                 covered.add(r.getPersonaId());
                 covered.add(r.getOtherId());
             }
@@ -109,8 +136,30 @@ public class PersonaRelationshipFiller {
         List<String> stillUncovered = active.stream().map(Persona::getId)
                 .filter(id -> !covered.contains(id)).toList();
 
-        return new FillPlan(toCreate, new FillResult(active.size(), coveredBefore, covered.size(),
-                toCreate.size(), stillUncovered));
+        return new FillPlan(toCreate, toInvalidate, new FillResult(active.size(), coveredBefore, covered.size(),
+                toCreate.size(), toInvalidate.size(), stillUncovered));
+    }
+
+    /**
+     * 기존 커버링 관계가 현재(=최신 재생성 반영) 페르소나 속성으로도 여전히 유효한지 판정한다.
+     * MARRIAGE: 성별 M-F + 나이차 ≤8 + 양측 marital=MARRIED.
+     * COUPLE: 성별 M-F + 양측 marital ∈ {DATING, ENGAGED}.
+     * FRIEND: 나이차 ≤5 (marital 무관).
+     */
+    private static boolean isStillValid(String type, Persona a, Persona b) {
+        return switch (type) {
+            case "MARRIAGE" -> !Objects.equals(a.getGender(), b.getGender())
+                    && Math.abs(a.getAgeYears() - b.getAgeYears()) <= 8
+                    && "MARRIED".equals(a.getMarital()) && "MARRIED".equals(b.getMarital());
+            case "COUPLE" -> !Objects.equals(a.getGender(), b.getGender())
+                    && isCoupleMarital(a.getMarital()) && isCoupleMarital(b.getMarital());
+            case "FRIEND" -> Math.abs(a.getAgeYears() - b.getAgeYears()) <= 5;
+            default -> true;
+        };
+    }
+
+    private static boolean isCoupleMarital(String marital) {
+        return "DATING".equals(marital) || "ENGAGED".equals(marital);
     }
 
     private void pairByGender(List<Persona> pool, String relType, int maxAgeDiff, Random rng,

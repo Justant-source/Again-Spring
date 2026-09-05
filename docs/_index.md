@@ -109,9 +109,12 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 등급: **M**=필수 · **C**=조건부.
 
 > persona-diversity-v4(`docs/_active/persona-diversity-v4.md`) 신규 클래스(`PersonaLottery`·
-> `CategoryMixPlanner`·`SourceOverlapGuard` 등)는 이미 규칙 #12(`ai-user/orchestrator/**`)에
-> 포함되므로 별도 glob을 추가하지 않는다 — 코드가 아직 없는 구체 경로를 넣으면 이 문서 자체의
-> 린트(`code-paths-exist`)가 깨진다.
+> `CategoryMixPlanner`·`SourceOverlapGuard`·`PersonaQuotaPlanner`·`PersonaCard`·
+> `PersonaProfileRegenerator`·`PersonaRelationshipFiller` 등, 전부 `ai-user/orchestrator/`
+> 하위)는 이미 규칙 #12(`ai-user/orchestrator/**`)에 포함되므로 별도 glob을 추가하지 않는다 —
+> 코드가 아직 없는 구체 경로를 넣으면 이 문서 자체의 린트(`code-paths-exist`)가 깨진다.
+> `ai-user/tools/persona_gate_check.py`·`ai-user/tools/purge_offtarget_posts.py`는
+> `ai-user/orchestrator/**`에 속하지 않아 §5 규칙 #19·#20으로 별도 등록돼 있다.
 
 ## §6. Code → Docs 역인덱스
 

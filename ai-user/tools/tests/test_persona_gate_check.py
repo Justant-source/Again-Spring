@@ -326,6 +326,75 @@ def test_evaluate_gate_c_handles_zero_totals():
     assert result.passed is True
 
 
+# --- gate d: 관계(PersonaRelationshipFiller) ------------------------------------
+
+
+def test_evaluate_gate_d_passes_when_everyone_covered_and_no_violations():
+    stats = {
+        "total_active_personas": 150,
+        "relation_type_counts": {"COUPLE": 12, "MARRIAGE": 17, "FRIEND": 113},
+        "uncovered_count": 0,
+        "gender_age_violation_count": 0,
+        "marital_violation_count": 0,
+    }
+    result = mod.evaluate_gate_d(stats)
+    failed = [c for c in result.checks if not c["pass"]]
+    assert result.passed, f"unexpected failures: {failed}"
+    assert "COUPLE" in result.note
+
+
+def test_evaluate_gate_d_fails_on_uncovered_personas():
+    stats = {
+        "total_active_personas": 150,
+        "relation_type_counts": {"FRIEND": 10},
+        "uncovered_count": 3,
+        "gender_age_violation_count": 0,
+        "marital_violation_count": 0,
+    }
+    result = mod.evaluate_gate_d(stats)
+    assert result.passed is False
+    detail = next(c for c in result.checks if c["check"] == "uncovered_personas")
+    assert detail["pass"] is False
+    assert "count=3" in detail["detail"]
+
+
+def test_evaluate_gate_d_fails_on_gender_age_violations():
+    """2026-09-05 dev 실측: 재생성 전 60건 시드 관계에 이미 성별동일 COUPLE/MARRIAGE·
+    나이차>5 FRIEND가 섞여 있었다(fill 트리거는 기존 관계를 손대지 않아 남는다)."""
+    stats = {
+        "total_active_personas": 150,
+        "relation_type_counts": {"COUPLE": 12, "MARRIAGE": 17, "FRIEND": 113},
+        "uncovered_count": 0,
+        "gender_age_violation_count": 13,
+        "marital_violation_count": 0,
+    }
+    result = mod.evaluate_gate_d(stats)
+    assert result.passed is False
+    detail = next(c for c in result.checks if c["check"] == "gender_age_violations")
+    assert detail["pass"] is False
+    assert "count=13" in detail["detail"]
+
+
+def test_evaluate_gate_d_fails_on_marital_consistency_violations():
+    stats = {
+        "total_active_personas": 150,
+        "relation_type_counts": {"COUPLE": 12, "MARRIAGE": 17, "FRIEND": 113},
+        "uncovered_count": 0,
+        "gender_age_violation_count": 0,
+        "marital_violation_count": 7,
+    }
+    result = mod.evaluate_gate_d(stats)
+    assert result.passed is False
+    detail = next(c for c in result.checks if c["check"] == "marital_consistency_violations")
+    assert detail["pass"] is False
+    assert "count=7" in detail["detail"]
+
+
+def test_evaluate_gate_d_defaults_missing_keys_to_zero():
+    result = mod.evaluate_gate_d({})
+    assert result.passed is True
+
+
 # --- V22 컬럼 가드 ---------------------------------------------------------------
 
 

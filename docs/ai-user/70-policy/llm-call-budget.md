@@ -19,17 +19,19 @@ ASM/WaggleBot은 사연·variant 텍스트를 **다시 LLM으로 쓰지 않는�
 
 ```
 claim source (no LLM)
-  → (2026-09 persona-diversity-v4, 예정) POST /v2/extract-skeleton  Haiku, claim당 +1회
+  → (2026-09 persona-diversity-v4, WP2, 배선 완료) POST /v2/extract-skeleton  Haiku, 재구성 모드 claim당 +1회
   → AI_POST micro-batch[0]     항상 1회 (본문 + 첫 댓글 슬라이스)
   → HUMAN_POST micro-batch[1+]  댓글 수 < ready-min-items(기본 6)일 때만
   → (llm-ai-user 내부) SelfCritique  결정론 FAIL일 때만 +1 (짧은 rewrite)
   → SoftProofread /generate/proofread  오탈자 휴리스틱일 때만 +1
 ```
 
-> **persona-diversity-v4 (예정, Phase 2에서 확인 필요)**: 소스 골격 추출(`/v2/extract-skeleton`,
-> 계약 7)이 글 1건당 Haiku 호출을 +1 추가한다. 대신 모든 생성 요청이 `voiceProfile` 전체 JSON
-> 대신 400자 `PersonaCard`(계약 4)를 보내 프롬프트 입력 토큰이 줄어든다 — 순 토큰 증감은 미측정,
-> Phase 2 병합 후 실측 필요.
+> **persona-diversity-v4 (WP1~WP4 병합·감사 결함 수정 완료)**: 소스 골격 추출(`/v2/extract-skeleton`,
+> 계약 7)이 재구성 모드(claim이 실제 크롤 원본을 갖는 경우)에서 글 1건당 Haiku 호출을 +1
+> 추가한다 — solo(`PlanSourceStoryResolver`)·paired(`PairedPostScheduler`)·레거시
+> `/generate/post`(`ActionExecutor`) 세 경로 모두 해당. 대신 모든 생성 요청이 `voiceProfile`
+> 전체 JSON 대신 400자 `PersonaCard`(계약 4)를 보내 프롬프트 입력 토큰이 줄어든다 — 순 토큰
+> 증감은 아직 실측되지 않았다.
 
 발행 시점에 댓글이 READY 하한 미만이면 `persistAndFinalize`가 댓글만 `HUMAN_POST` **1회** 더 부를 수 있다(하한 미달이어도 글은 버린다).
 
@@ -74,6 +76,31 @@ claim source (no LLM)
 캐시가 걸린 스키마 모드보다 캐시 없는 프롬프트 모드가 11배 작다 — 그동안 캐시에 얹혀 있던 4만 토큰대가 앱 프롬프트가 아니라 CLI 도구 정의였다는 증거. 파스 실패 시 스키마 강제가 없어 글+댓글 번들 전체가 유실되므로 실패율은 `[LLMSTATS] retryReason=PARSE_FAIL` + §6 서킷브레이커·§Phase4 텔레그램 알림으로 감시한다.
 
 롤백: `LLM_STRUCTURED_PROMPT_MODE=false` + 워커(`llm-ai-user`) 재빌드·재기동.
+
+---
+
+## 1.5 페르소나 프로필 재생성 (1회성 배치, persona-diversity-v4)
+
+`POST /admin/trigger/regenerate-persona-profiles`(orchestrator) → `POST /generate/persona-profile`
+(llm 워커, `PersonaProfileController`/`PersonaProfileService`, 모델 = 글과 같은 `claudePostModel`
+Sonnet)은 **매 tick이 아니라 페르소나 1명당 평생 1회**(재생성 완료 시 `voice_profile.profile_rev`
+마커가 찍혀 재개 필터가 다음부터 건너뜀) 도는 별도 배치다. §1 솔로 글 호출 예산에는 포함되지
+않는다.
+
+- **호출 수**: 운영 대상 150명 전원 재생성 시 Sonnet **150콜**(1인 1콜, 재시도 제외). 실패한
+  일부 id만 `only=<id1,id2,...>`로 좁혀 재호출할 수 있다 — 재시도는 `.claude/rules/llm-safety.md`
+  §4 상한(최대 3회)을 따른다.
+- **비용 절감 장치**: `dryRun=true`는 LLM을 전혀 부르지 않고 `PersonaQuotaPlanner` 분포만
+  반환한다(쿼터 검증용). `force=false`(기본)면 `style_axes`가 이미 있는 페르소나는 재호출하지
+  않는다.
+- **중단·재개 (2026-09-05 추가)**: `PersonaProfileRegenerator`는 llm-error-signatures.json
+  기반 오류 시그니처(세션 한도·인증 오류 등)를 감지하거나 **연속 5회**(`DEFAULT_MAX_CONSECUTIVE_
+  FAILURES`) 실패하면 배치를 즉시 멈춘다 — 남은 대상을 한도 소진 상태로 계속 때리지 않는다.
+  응답에 `processed`·`remaining`·`haltedReason`을 실어 진척을 볼 수 있다.
+- **완료 판정**: `style_axes IS NOT NULL` 같은 축 유무가 아니라 `voice_profile.profile_rev`
+  마커(현재 값 `"v4"`)로 판정한다 — 트랜잭션 중단으로 축만 채워지고 감사가 유실된 페르소나가
+  "완료"로 오판되는 것을 막는다(§6 `docs/_active/persona-diversity-v4.md` 데이터 무결성 결함 참고).
+  필수 11개 키 중 하나라도 응답에 없으면 `INCOMPLETE_PROFILE`로 실패 처리하고 마커를 찍지 않는다.
 
 ---
 

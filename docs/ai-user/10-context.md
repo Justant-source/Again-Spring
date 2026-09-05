@@ -50,8 +50,8 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 | Wave | 내용 | 진입 문서 |
 |---|---|---|
 | WP1 / WP1B | 코퍼스·register를 **NATEPAN/BLIND**로 단일화, 인기 앵커 voice 정화 | [history.md](history.md), [learning.md](30-components/learning.md) |
-| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) — **2026-09 persona-diversity-v4로 폐기 예정**(캡슐/matcher는 신규 정체성 축·`PersonaCard`로 대체, 상세: `docs/_active/persona-diversity-v4.md`) |
-| WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](30-components/orchestrator.md), [operations.md](60-runtime/operations.md) — **2026-09 persona-diversity-v4로 폐기 예정**(선택 알고리즘이 계약 6 가중 추첨으로 교체) |
+| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) — **2026-09 persona-diversity-v4로 폐기됨**(`PersonaCapsuleSearchService`·`PersonaMatcherService`·`engine/PersonaSelector`·`service/match/**`·`service/capsule/**`·`PersonaAutoProvisionService` 코드에서 삭제 완료, 신규 정체성 축·`PersonaCard`·`PersonaLottery`로 대체, 상세: `docs/_active/persona-diversity-v4.md`) |
+| WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](30-components/orchestrator.md), [operations.md](60-runtime/operations.md) — **2026-09 persona-diversity-v4로 폐기됨**(선택 알고리즘이 `PersonaLottery` 가중 비복원 추첨으로 교체 완료) |
 | WP4 | micro-batch(4~6) 생성 · `parsePlan` 하한 이동 · `ThreadQualityGate` READY | [thread-planning.md](60-runtime/thread-planning.md), [llm.md](30-components/llm.md) |
 | WP5 | human reply 0~3 responders · 예산 · idempotency · 관심 pool · `hr_*` admin SSOT | [thread-planning.md](60-runtime/thread-planning.md) |
 

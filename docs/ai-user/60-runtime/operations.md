@@ -92,9 +92,10 @@ docker exec -it againspring-mariadb-prod mariadb \
 
 - `target_posts + target_comments + target_replies + target_votes + target_likes`
 - 위 합계 × `1.1` → `ai_user_runtime.daily_global_cap`
-- 목표가 모두 0이면 `AI_USER_DAILY_GLOBAL_CAP`(코드 기본 `200`) fallback — 이전에는 이미 죽어있던
-  `AI_USER_PERSONA_TARGET * 20`으로 잘못 기술돼 있었다(2026-09 persona-diversity-v4 WP4 정정,
-  실제 fallback 계산 경로는 Phase 2에서 재확인 필요)
+- 목표가 모두 0이면 `AI_USER_DAILY_GLOBAL_CAP`(코드 기본 `200` —
+  `OrchestratorProperties.dailyGlobalCap`/`AiUserRuntime.dailyGlobalCap`) fallback — 이전에는
+  이미 죽어있던 `AI_USER_PERSONA_TARGET * 20`으로 잘못 기술돼 있었다(2026-09 persona-diversity-v4
+  WP4 정정, 병합 후 코드로 재확인 완료)
 
 ## 5. 로그 포인트
 
@@ -512,17 +513,35 @@ python3 ai-user/tools/purge_offtarget_posts.py --env-file env/.env.dev --apply o
   "내 딸"·"우리 엄마"라 자칭하는 40대 이상 모친 화자 글. 전수 실행(`--apply` 없이 `--classify`
   전체)은 아직 하지 않았다(비용 절약 지시).
 
-### `persona_gate_check.py` — 게이트 a(분포)·b(다양성)·c(회전)
+### `persona_gate_check.py` — 게이트 a(분포)·b(다양성)·c(회전)·d(관계)
 
 ```bash
 python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate a
 python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate b
 python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate c --days 7
+python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate d
 ```
 
 - 게이트 a·b는 `personas` 테이블에 `V22__persona_identity_axes.sql`(WP1)이 적용돼
   `age_years`·`gender`·`marital`·`married_years`·`has_kids`·`style_axes` 컬럼이 있어야
   동작한다. 없으면 "V22 컬럼이 없다(미적용)" 메시지와 함께 **종료 코드 2**로 즉시 중단한다
-  (2026-09-05 dev에서 실측 확인 — 아직 V22 미적용).
-- 게이트 c(글쓰기 회전, 최근 N일)는 참고용이며 배포 게이트가 아니다 — 항상 종료 코드 0.
+  (2026-09-05 dev에서 이 실패 경로를 실측 확인한 뒤 dev에 V22를 적용했다 — orchestrator가
+  기동 시 Flyway로 자동 적용하므로 prod도 재기동 시 같은 경로로 적용된다).
+- 게이트 c(글쓰기 회전, 최근 N일)는 참고용이며 배포 게이트가 아니다 — 항상 종료 코드 0. 글
+  집계 쿼리는 `deleted_at IS NULL`을 반드시 걸어야 한다(2026-09-05 감사에서 이 필터 누락으로
+  soft-delete된 글이 회전율에 섞이는 버그를 발견·수정 — `docs/_active/persona-diversity-v4.md`
+  §6 게이트 집계 결함).
+- 게이트 d(관계)는 `PersonaRelationshipFiller` 실행 결과를 검증한다. 기준은 관계를 하나도
+  갖지 못한 활성 페르소나 0명, 성별·나이 제약 위반 0건, `marital`과 관계 유형의 정합성 위반
+  0건이다(SINGLE인데 MARRIAGE 관계 등). 2026-09-05 dev 실측에서 위반 20건이 나왔는데 전부
+  이번 트랙이 만든 것이 아니라 **기존 시드 60건에 원래 섞여 있던 것**이었다(동성 COUPLE·
+  나이차 초과). 관계 부여는 재생성으로 `marital`이 확정된 뒤에 실행해야 의미가 있다 —
+  전원 기본값 `SINGLE` 상태에서 돌리면 MARRIAGE·COUPLE 관계가 하나도 생기지 않는다.
+- has_kids(`BIT(1)`) 등 정수 캐스팅이 필요한 컬럼을 캐스팅 없이 `JSON_ARRAYAGG` 등 JSON 집계에
+  넣으면 raw 바이트가 그대로 박혀 JSON 자체가 깨지고 게이트 a·b가 예외로 죽는다(같은 감사에서
+  발견·수정) — 새 컬럼을 게이트 집계에 추가할 때 동일하게 정수 캐스팅할 것.
 - 종료 코드: `0`=PASS, `1`=게이트 a/b FAIL, `2`=V22 미적용.
+- **재생성 배치**(`POST /admin/trigger/regenerate-persona-profiles`)는 세션 한도·인증 오류
+  시그니처 또는 연속 5회 실패를 만나면 자동으로 멈춘다(`processed`/`remaining`/`haltedReason`
+  응답 필드로 진척 확인). 완료 판정은 `voice_profile.profile_rev="v4"` 마커다 — 상세:
+  [llm-call-budget.md](../70-policy/llm-call-budget.md) §1.5.

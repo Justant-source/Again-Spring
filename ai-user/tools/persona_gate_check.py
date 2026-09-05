@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""persona-diversity-v4 게이트 a(분포)·b(다양성)·c(회전) 검증 스크립트.
+"""persona-diversity-v4 게이트 a(분포)·b(다양성)·c(회전)·d(관계) 검증 스크립트.
 
 계약 출처: `.request/persona-diversity-v4/00-shared.md`(계약 1~2~3),
-`.request/persona-diversity-v4/04-wp4-cleanup-gates.md`(게이트 정의).
+`.request/persona-diversity-v4/04-wp4-cleanup-gates.md`(게이트 정의),
+`.request/persona-diversity-v4/01-wp1-persona-data.md` §6(`PersonaRelationshipFiller`).
 
 Usage:
   python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate a
   python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate b
   python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate c --days 7
+  python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate d
   python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate all --json
 
-종료 코드: 0=PASS, 1=FAIL(a·b만 배포 게이트), 2=personas에 V22 컬럼 없음(아직 미적용).
+종료 코드: 0=PASS, 1=FAIL(a·b·d가 배포 게이트), 2=personas에 V22 컬럼 없음(아직 미적용).
 게이트 c는 참고용 — 항상 0 반환(집계만 출력).
+게이트 d는 `PersonaRelationshipFiller`(fill-persona-relationships 트리거)가 만든/유지한
+`persona_relationships`를 검증한다: 관계 0개 페르소나 = 0명, 성별·나이 제약 위반 = 0건,
+marital-관계유형 정합성 위반 = 0건. 프로필 재생성(marital/age_years/gender 축 재배정) 완료
+전에 채점하면 MARRIAGE/COUPLE이 아직 없어 오탐이 날 수 있다 — 재생성 완료 후 채점할 것.
 """
 
 from __future__ import annotations
@@ -74,6 +80,10 @@ MAX_PAIRWISE_JACCARD = 0.10
 GATE_C_MIN_POSTING_SHARE = 0.90
 GATE_C_MAX_TOP10_SHARE = 0.25
 GATE_C_MIN_COMMENTS = 30
+
+# 게이트 d(관계) — PersonaRelationshipFiller가 다루는 커버링 관계 유형(01-wp1-persona-data.md §6).
+COVERING_RELATION_TYPES = ("COUPLE", "MARRIAGE", "FRIEND")
+COUPLE_MARITAL_VALUES = ("DATING", "ENGAGED")
 
 
 @dataclass
@@ -475,6 +485,39 @@ def evaluate_gate_c(stats: dict[str, Any]) -> GateResult:
     return result
 
 
+def evaluate_gate_d(data: dict[str, Any]) -> GateResult:
+    """게이트 d(관계) — `PersonaRelationshipFiller` 결과 검증(01-wp1-persona-data.md §6).
+
+    data 키: total_active_personas(int), relation_type_counts(dict[str,int] — COUPLE/MARRIAGE/
+    FRIEND의 ACTIVE 건수, 참고용), uncovered_count(int — COUPLE|MARRIAGE|FRIEND ACTIVE 관계가
+    하나도 없는 활성 페르소나 수), gender_age_violation_count(int — MARRIAGE 성별동일 또는
+    나이차>8 / COUPLE 성별동일 / FRIEND 나이차>5인 ACTIVE 관계 수), marital_violation_count
+    (int — MARRIAGE인데 당사자 중 비MARRIED가 있거나 COUPLE인데 당사자 중 DATING/ENGAGED가
+    아닌 사람이 있는 ACTIVE 관계 수).
+    """
+    result = GateResult(gate="d", passed=True)
+    result.note = f"관계 유형별(ACTIVE): {data.get('relation_type_counts', {})}"
+
+    result.add(
+        "uncovered_personas",
+        data.get("uncovered_count", 0) == 0,
+        f"count={data.get('uncovered_count', 0)} (COUPLE|MARRIAGE|FRIEND ACTIVE 관계가 0개인 활성 페르소나)",
+    )
+    result.add(
+        "gender_age_violations",
+        data.get("gender_age_violation_count", 0) == 0,
+        f"count={data.get('gender_age_violation_count', 0)} "
+        "(MARRIAGE 성별동일·나이차>8 / COUPLE 성별동일 / FRIEND 나이차>5)",
+    )
+    result.add(
+        "marital_consistency_violations",
+        data.get("marital_violation_count", 0) == 0,
+        f"count={data.get('marital_violation_count', 0)} "
+        "(MARRIAGE 당사자에 비MARRIED 포함 / COUPLE 당사자에 비DATING·ENGAGED 포함)",
+    )
+    return result
+
+
 # --- gate c 집계 (DB 필요) ----------------------------------------------------
 
 
@@ -519,6 +562,61 @@ def fetch_gate_c_stats(target: DbTarget, days: int) -> dict[str, Any]:
         "posting_personas": posting,
         "top10_post_share": top10_share,
         "comment_counts_by_persona": comment_counts,
+    }
+
+
+def fetch_gate_d_stats(target: DbTarget) -> dict[str, Any]:
+    """게이트 d 원시 집계 — `persona_relationships` × `personas` 조인. `--raw` 필수(§ 위 주석 참고)."""
+    total_sql = "SELECT COUNT(*) FROM personas WHERE active = 1;"
+    total = int(run_mariadb_sql(target, total_sql).strip() or 0)
+
+    types_in = ",".join(f"'{t}'" for t in COVERING_RELATION_TYPES)
+
+    type_counts_sql = (
+        "SELECT JSON_OBJECTAGG(relation_type, cnt) FROM ("
+        f"SELECT relation_type, COUNT(*) AS cnt FROM persona_relationships "
+        f"WHERE status = 'ACTIVE' AND relation_type IN ({types_in}) "
+        "GROUP BY relation_type"
+        ") t;"
+    )
+    raw_types = run_mariadb_sql(target, type_counts_sql).strip()
+    relation_type_counts = json.loads(raw_types) if raw_types and raw_types not in ("NULL", "\\N") else {}
+
+    uncovered_sql = (
+        "SELECT COUNT(*) FROM personas p WHERE p.active = 1 AND NOT EXISTS ("
+        "SELECT 1 FROM persona_relationships r WHERE r.status = 'ACTIVE' "
+        f"AND r.relation_type IN ({types_in}) "
+        "AND (r.persona_id = p.id OR r.other_id = p.id));"
+    )
+    uncovered_count = int(run_mariadb_sql(target, uncovered_sql).strip() or 0)
+
+    gender_age_sql = (
+        "SELECT COUNT(*) FROM persona_relationships r "
+        "JOIN personas a ON a.id = r.persona_id JOIN personas b ON b.id = r.other_id "
+        "WHERE r.status = 'ACTIVE' AND ("
+        "(r.relation_type = 'MARRIAGE' AND (a.gender = b.gender OR ABS(a.age_years - b.age_years) > 8)) "
+        "OR (r.relation_type = 'COUPLE' AND a.gender = b.gender) "
+        "OR (r.relation_type = 'FRIEND' AND ABS(a.age_years - b.age_years) > 5));"
+    )
+    gender_age_violation_count = int(run_mariadb_sql(target, gender_age_sql).strip() or 0)
+
+    couple_marital_in = ",".join(f"'{m}'" for m in COUPLE_MARITAL_VALUES)
+    marital_sql = (
+        "SELECT COUNT(*) FROM persona_relationships r "
+        "JOIN personas a ON a.id = r.persona_id JOIN personas b ON b.id = r.other_id "
+        "WHERE r.status = 'ACTIVE' AND ("
+        "(r.relation_type = 'MARRIAGE' AND (a.marital <> 'MARRIED' OR b.marital <> 'MARRIED')) "
+        f"OR (r.relation_type = 'COUPLE' AND (a.marital NOT IN ({couple_marital_in}) "
+        f"OR b.marital NOT IN ({couple_marital_in}))));"
+    )
+    marital_violation_count = int(run_mariadb_sql(target, marital_sql).strip() or 0)
+
+    return {
+        "total_active_personas": total,
+        "relation_type_counts": relation_type_counts,
+        "uncovered_count": uncovered_count,
+        "gender_age_violation_count": gender_age_violation_count,
+        "marital_violation_count": marital_violation_count,
     }
 
 
@@ -583,9 +681,12 @@ def print_result(result: GateResult, as_json: bool) -> None:
 
 
 def run_gate(gate: str, target: DbTarget, args: argparse.Namespace) -> GateResult:
-    if gate in ("a", "b"):
+    if gate in ("a", "b", "d"):
+        # d도 age_years/gender/marital(V22 컬럼)에 의존한다 — 재생성 전이면 오탐이 나므로 동일 가드.
         existing_columns = fetch_existing_columns(target)
         assert_v22_applied(existing_columns)
+        if gate == "d":
+            return evaluate_gate_d(fetch_gate_d_stats(target))
         rows = fetch_persona_rows(target)
         if gate == "a":
             return evaluate_gate_a(rows)
@@ -604,7 +705,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--db-user", default=None)
     parser.add_argument("--db-password", default=None)
     parser.add_argument("--db-name", default=None)
-    parser.add_argument("--gate", choices=["a", "b", "c", "all"], required=True)
+    parser.add_argument("--gate", choices=["a", "b", "c", "d", "all"], required=True)
     parser.add_argument("--days", type=int, default=7, help="gate c 집계 기간(일)")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
@@ -615,7 +716,7 @@ def main(argv: list[str] | None = None) -> int:
     env_values = load_dotenv(ROOT / args.env_file)
     target = build_db_target(args, env_values)
 
-    gates = ["a", "b", "c"] if args.gate == "all" else [args.gate]
+    gates = ["a", "b", "c", "d"] if args.gate == "all" else [args.gate]
     overall_rc = 0
     for gate in gates:
         try:
