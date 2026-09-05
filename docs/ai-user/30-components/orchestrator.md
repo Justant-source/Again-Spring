@@ -54,6 +54,12 @@ directness/affect/humor/stance/length/speech/emoticon/spelling/linebreak/profani
 
 ## Capsule search (WP2)
 
+> **미사용 예정 (2026-09 persona-diversity-v4, Phase 2 확인 필요)**: 아래 캡슐 검색/matcher는
+> 신규 정체성 축(`personas.age_years`/`gender`/`marital`/`style_axes`)과 계약 6 가중 추첨으로
+> 대체될 예정이다. 연관 테이블 3개 — `persona_semantic_capsules`(V11)·`persona_match_audits`
+> (V12)·`persona_fact_assertions`(V10) — 도 폐기 대상 후보다. 실제 코드 삭제/폐기 시점과
+> 범위는 WP1~WP3 병합 후 Fable이 확정한다. 상세: `docs/_active/persona-diversity-v4.md`.
+
 - 입력: 검색 텍스트(또는 category+topics), `topK`, optional register(`NATEPAN`|`BLIND`)
 - 경로: learning embed → `persona_semantic_capsules` cosine top rows → persona 집계
 - fallback: 활성 페르소나 `interests` (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER)
@@ -280,6 +286,33 @@ PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모
 
 > 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 동일 replan 계약([architecture.md](./architecture.md) · [thread-planning.md](../60-runtime/thread-planning.md)).
 
+## 페르소나 스키마 · 선택 알고리즘 (2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)
+
+전체 계약: `docs/_active/persona-diversity-v4.md`. `personas`(Flyway `V22__persona_identity_axes.sql`,
+WP1)에 정체성 축이 추가된다:
+
+| 컬럼 | 값 | 비고 |
+|---|---|---|
+| `age_years` | 23~49 | |
+| `gender` | `M`\|`F` | |
+| `marital` | `SINGLE`\|`DATING`\|`ENGAGED`\|`MARRIED` | |
+| `married_years` | 0~24, `≤ age_years−25` | MARRIED만 |
+| `has_kids` | bool | MARRIED만 1 가능 |
+| `job_type` | 8종(`CORP_LARGE`·`CORP_MID`·`STARTUP`·`PUBLIC`·`PROFESSIONAL`·`SELF_EMPLOYED`·`FREELANCER`·`JOBSEEKER`·`PARENT_LEAVE`) | |
+| `job_title` | LLM 생성 문자열 | |
+| `style_axes` | JSON, 10축(directness·affect·humor·stance·length·speech·emoticon·spelling·linebreak·profanity) | 축별 균등 분포 강제 |
+| `last_post_at` / `last_comment_at` | | 선택 가중치 계산용, WP3 갱신 |
+
+150명 쿼터(성별 75/75·연령대 60/60/30·결혼 미혼60/기혼90·기혼 중 자녀45·tier
+HEAVY20/REGULAR80/LIGHT50·voice_type NATEPAN75/BLIND75)는 `python3 ai-user/tools/persona_gate_check.py
+--gate a`로 검증한다(±3 허용). `PersonaCard.render(Persona)`(400자 이내)가 `voiceProfile` 전체
+JSON을 대체해 모든 생성 요청의 `personaCard` 필드로 들어간다.
+
+**선택 알고리즘**: 작성자·댓글자 선택은 하드 필터(카테고리별 시점 제한, `active=1`, 자기 글
+댓글 금지) 통과자 중 `weight = tierW × (1 + hoursSinceLast/24)^1.5`
+(HEAVY 3.0 / REGULAR 1.5 / LIGHT 1.0) 가중 비복원 추첨이다 — 위 "Persona matcher (WP3 / W4-B)"의
+score 기반 matcher를 대체한다. `personaId` 기준 결정론 정렬 금지.
+
 ## history와 life state
 
 현재 orchestrator는 persona tree가 아니라 DB에 직접 쓴다.
@@ -307,6 +340,10 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 - `POST /admin/trigger/update-cap`
 - `POST /admin/trigger/regenerate-persona-profiles?seed=&batch=10&dryRun=true&only=<id,id>&force=false` — WP1 신원 축 재생성. `dryRun=true`면 QuotaPlanner 분포만 반환(LLM 호출 없음, 계약 2 쿼터 검증용). `only`는 콤마구분 personaId — QuotaPlanner는 항상 전체 활성 인원 기준으로 계산하고 실제 LLM 호출·DB 갱신만 그 id들로 좁힌다. `force=true`면 `style_axes`가 이미 있어도 재생성한다
 - `POST /admin/trigger/fill-persona-relationships?seed=` — WP1 150명 관계 ≥1 보장(기존 관계 유지)
+
+> **(2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)** WP1~WP3가 admin 트리거를
+> 2개 추가하고 2개 삭제할 예정이라고 알려왔으나, 이 worktree(WP4)에는 아직 병합되지 않아
+> 정확한 트리거 이름을 확인할 수 없다. Phase 2 병합 후 이 목록을 다시 대조한다.
 
 ### test
 
@@ -394,7 +431,6 @@ curl http://localhost:8096/admin/metrics/llm-today | jq '.stats | to_entries[] |
 
 | 설정 | 코드 기본 | compose dev | compose prod |
 |---|---|---|---|
-| `AI_USER_PERSONA_TARGET` | `10` | `50` | `50` |
 | `AI_USER_DAILY_GLOBAL_CAP` | `200` | `200` | `500` |
 | `AI_LEARNING_ENABLED` | `false` | `true` | `true` |
 | `AI_USER_ML_ENABLED` | `false` | `false` | `false` |

@@ -25,3 +25,4 @@
 | 파일 | 트랙 | 상태 |
 |---|---|---|
 | [`sibom-character.md`](./sibom-character.md) | 시봄이 캐릭터 리파인 + 모션 + 31~60장 확장 | 진행 중 |
+| [`persona-diversity-v4.md`](./persona-diversity-v4.md) | AI-user 페르소나 정체성 축·쿼터·게이트 재구성 | 진행 중 |

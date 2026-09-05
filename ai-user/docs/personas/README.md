@@ -4,6 +4,40 @@
 **버전**: 2.0  
 **관리자**: Claude Code (Agent)
 
+> **2026-09 persona-diversity-v4 갱신**: 페르소나는 100명이 아니라 **150명**이다(계약:
+> `docs/_active/persona-diversity-v4.md`, `V22__persona_identity_axes.sql`). 아래 문서 본문의
+> "100명"·"50명"·정치성향 축·12종 voice 타입 서술은 **이 갱신 이전 스냅샷**이며 최신화되지
+> 않았다 — voice_type은 현재 `NATEPAN`/`BLIND` 두 종류만 유지되고, 정체성은 정치성향 대신
+> 아래 신규 축으로 표현된다. 최신 사실은 코드(`personas` 테이블) 또는
+> `docs/_active/persona-diversity-v4.md`를 우선한다.
+>
+> **신규 정체성 축** (`personas` 컬럼, `profile.yml`의 `identity:` 블록에도 반영):
+>
+> ```yaml
+> identity:
+>   age_years: 34          # 23~49
+>   gender: M              # M | F
+>   marital: MARRIED       # SINGLE | DATING | ENGAGED | MARRIED
+>   married_years: 6       # MARRIED만, married_years <= age_years - 25
+>   has_kids: true         # MARRIED만 true 가능
+>   job_type: CORP_MID     # CORP_LARGE·CORP_MID·STARTUP·PUBLIC·PROFESSIONAL·SELF_EMPLOYED·FREELANCER·JOBSEEKER·PARENT_LEAVE
+>   job_title: "중견 제조업 구매팀 5년차 대리"
+> style_axes:
+>   directness: BLUNT      # BLUNT | SOFT
+>   affect: ANALYTIC       # EMOTIONAL | ANALYTIC
+>   humor: SERIOUS         # JOKER | SERIOUS
+>   stance: DEFENSIVE      # OFFENSIVE | DEFENSIVE
+>   length: SHORT          # LONG | SHORT
+>   speech: BANMAL         # BANMAL | JONDAE | MIXED
+>   emoticon: LOW          # NONE | LOW | HIGH
+>   spelling: CLEAN        # CLEAN | SLOPPY
+>   linebreak: CHOPPED     # WALL | CHOPPED
+>   profanity: NONE        # NONE | MILD | HEAVY
+> ```
+>
+> 150명 쿼터·`PersonaCard` 400자 요약 포맷·게이트 a/b/c 검증은
+> `docs/ai-user/60-runtime/operations.md` §9 참고.
+
 ---
 
 ## 0. 2026-09-05 갱신 — persona-diversity-v4 (WP1): 150명 + 신원 축

@@ -1,0 +1,251 @@
+"""persona_gate_check.py 단위 테스트 — DB 없이 픽스처 dict/list만으로 판정 함수 검증."""
+
+from __future__ import annotations
+
+import itertools
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import persona_gate_check as mod  # noqa: E402
+
+
+# --- fixture 생성기: 계약 2 쿼터를 정확히 만족하는 150명 -----------------------
+
+
+def _build_compliant_personas() -> list[dict]:
+    rows: list[dict] = []
+    idx = 0
+
+    # (age_band, band_size, married_count) — 계약 2
+    band_plan = [("23-29", 60, 15), ("30-36", 60, 45), ("37-49", 30, 30)]
+    age_by_band = {"23-29": list(range(23, 30)), "30-36": list(range(30, 37)), "37-49": list(range(37, 50))}
+
+    married_flags: list[bool] = []
+    ages: list[int] = []
+    for band, size, married_count in band_plan:
+        cyc = itertools.cycle(age_by_band[band])
+        for i in range(size):
+            ages.append(next(cyc))
+            married_flags.append(i < married_count)
+
+    genders = ["M"] * 75 + ["F"] * 75
+    tiers = ["HEAVY"] * 20 + ["REGULAR"] * 80 + ["LIGHT"] * 50
+    voice_types = ["NATEPAN"] * 75 + ["BLIND"] * 75
+
+    married_indices = [i for i, m in enumerate(married_flags) if m]
+    kids_indices = set(married_indices[:45])  # married 90 중 45명 has_kids
+
+    for i in range(150):
+        marital = "MARRIED" if married_flags[i] else "SINGLE"
+        has_kids = i in kids_indices
+        rows.append(
+            {
+                "id": f"persona_{i:03d}",
+                "age_years": ages[i],
+                "gender": genders[i],
+                "marital": marital,
+                "married_years": None,  # 단순화: null은 항상 위반 0건
+                "has_kids": has_kids,
+                "tier": tiers[i],
+                "voice_profile": json.dumps({"voice_type": voice_types[i]}),
+                "style_axes": None,
+                "idx": idx,
+            }
+        )
+        idx += 1
+    return rows
+
+
+def test_evaluate_gate_a_passes_on_compliant_fixture():
+    rows = _build_compliant_personas()
+    result = mod.evaluate_gate_a(rows)
+    failed = [c for c in result.checks if not c["pass"]]
+    assert result.passed, f"unexpected failures: {failed}"
+
+
+def test_evaluate_gate_a_fails_on_gender_skew():
+    rows = _build_compliant_personas()
+    # 성별 쏠림: 앞 20명을 전부 M으로 바꿔 오차 ±3 초과 유도
+    for row in rows[75:95]:
+        row["gender"] = "M"
+    result = mod.evaluate_gate_a(rows)
+    assert result.passed is False
+    names = {c["check"] for c in result.checks if not c["pass"]}
+    assert "gender:M" in names
+
+
+def test_evaluate_gate_a_flags_married_years_violation():
+    rows = _build_compliant_personas()
+    rows[0]["marital"] = "MARRIED"
+    rows[0]["age_years"] = 30
+    rows[0]["married_years"] = 10  # 30-25=5 < 10 → 위반
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "married_years_violations")
+    assert detail["pass"] is False
+    assert "persona_000" in detail["detail"]
+
+
+def test_evaluate_gate_a_flags_has_kids_without_married():
+    rows = _build_compliant_personas()
+    single_row = next(r for r in rows if r["marital"] == "SINGLE")
+    single_row["has_kids"] = True
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "has_kids_requires_married")
+    assert detail["pass"] is False
+
+
+def test_evaluate_gate_a_flags_age_out_of_range():
+    rows = _build_compliant_personas()
+    rows[0]["age_years"] = 55
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "age_range_violations")
+    assert detail["pass"] is False
+
+
+def test_evaluate_gate_a_empty_rows_fails_persona_count():
+    result = mod.evaluate_gate_a([])
+    assert result.passed is False
+
+
+# --- gate b -------------------------------------------------------------------
+
+
+def _balanced_style_axes(n: int = 150) -> list[dict]:
+    axes_cycles = {axis: itertools.cycle(opts) for axis, opts in mod.STYLE_AXES_OPTIONS.items()}
+    rows = []
+    for _ in range(n):
+        rows.append({axis: next(cyc) for axis, cyc in axes_cycles.items()})
+    return rows
+
+
+DISTINCT_SENTENCES = [
+    "야근 끝나고 집에 오니 새벽 두 시라 그냥 씻지도 않고 뻗었다",
+    "주말에 애들 데리고 놀이공원 갔는데 줄이 너무 길어서 두 개밖에 못 탔음",
+    "팀장이 또 남 탓하는 거 보고 진짜 정 떨어졌다 이직 알아봐야 하나",
+    "여자친구랑 싸운 이유가 결국 카톡 답장 속도 때문이라니 어이없다",
+    "부모님이 명절마다 결혼 얘기 꺼내는 거 이제 지친다 그만 좀 하셨으면",
+    "친구가 갑자기 돈 빌려달라는데 어떻게 거절해야 할지 모르겠다",
+    "회식 자리에서 부장님이 옛날 얘기 또 시작해서 다들 눈치만 봤다",
+    "시댁 갔다가 하루종일 설거지만 하고 온 것 같다 진이 다 빠진다",
+    "재택근무 첫 주인데 집중이 하나도 안 되고 냉장고만 들락날락한다",
+    "동기가 먼저 승진해서 축하는 했지만 솔직히 마음이 복잡하다",
+]
+
+
+def test_evaluate_gate_b_passes_with_balanced_fixture():
+    data = {
+        "signature_phrases": [f"phrase_{i}" for i in range(150)],
+        "reply_style": [f"reply_{i}" for i in range(130)],
+        "comment_style": [f"comment_{i}" for i in range(130)],
+        "general_style": DISTINCT_SENTENCES,
+        "style_axes": _balanced_style_axes(150),
+    }
+    result = mod.evaluate_gate_b(data)
+    failed = [c for c in result.checks if not c["pass"]]
+    assert result.passed, f"unexpected failures: {failed}"
+
+
+def test_evaluate_gate_b_fails_on_low_signature_phrase_diversity():
+    data = {
+        "signature_phrases": ["결론부터"] * 150,  # 고유값 1개뿐
+        "reply_style": [f"reply_{i}" for i in range(130)],
+        "comment_style": [f"comment_{i}" for i in range(130)],
+        "general_style": [f"문장 {i}" for i in range(10)],
+        "style_axes": _balanced_style_axes(150),
+    }
+    result = mod.evaluate_gate_b(data)
+    assert result.passed is False
+    detail = next(c for c in result.checks if c["check"] == "signature_phrases_unique")
+    assert detail["pass"] is False
+
+
+def test_evaluate_gate_b_fails_on_near_duplicate_general_style():
+    data = {
+        "signature_phrases": [f"phrase_{i}" for i in range(150)],
+        "reply_style": [f"reply_{i}" for i in range(130)],
+        "comment_style": [f"comment_{i}" for i in range(130)],
+        "general_style": [
+            "야근하고 집에 오면 진짜 아무것도 하기 싫고 그냥 눕고 싶다",
+            "야근하고 집에 오면 진짜 아무것도 하기 싫고 그냥 눕고 싶어요",  # 거의 동일
+        ],
+        "style_axes": _balanced_style_axes(150),
+    }
+    result = mod.evaluate_gate_b(data)
+    assert result.passed is False
+    detail = next(c for c in result.checks if c["check"] == "general_style_pairwise_jaccard")
+    assert detail["pass"] is False
+
+
+def test_char_ngrams_and_jaccard_basic():
+    a = mod.char_ngrams("abcdefgh")
+    b = mod.char_ngrams("abcdefgh")
+    assert mod.jaccard(a, b) == 1.0
+    c = mod.char_ngrams("zzzzzzzz")
+    assert mod.jaccard(a, c) == 0.0
+
+
+# --- gate c: 참고용, 항상 PASS 취급 --------------------------------------------
+
+
+def test_evaluate_gate_c_always_passes_but_reports_raw_numbers():
+    stats = {
+        "total_active_personas": 150,
+        "posting_personas": 100,  # 66.7% — 90% 미만이라도 gate c는 배포 게이트가 아님
+        "top10_post_share": 0.40,  # 25% 초과
+        "comment_counts_by_persona": {"p1": 5, "p2": 40},
+    }
+    result = mod.evaluate_gate_c(stats)
+    assert result.passed is True  # 참고용, 항상 PASS
+    posting = next(c for c in result.checks if c["check"] == "posting_persona_share")
+    assert "raw_pass=False" in posting["detail"]
+    top10 = next(c for c in result.checks if c["check"] == "top10_post_share")
+    assert "raw_pass=False" in top10["detail"]
+
+
+def test_evaluate_gate_c_handles_zero_totals():
+    stats = {"total_active_personas": 0, "posting_personas": 0, "top10_post_share": 0.0, "comment_counts_by_persona": {}}
+    result = mod.evaluate_gate_c(stats)
+    assert result.passed is True
+
+
+# --- V22 컬럼 가드 ---------------------------------------------------------------
+
+
+def test_assert_v22_applied_raises_when_missing():
+    try:
+        mod.assert_v22_applied({"id", "tier", "voice_profile"})
+        assert False, "should have raised"
+    except mod.MissingV22ColumnsError as exc:
+        assert "age_years" in str(exc)
+
+
+def test_assert_v22_applied_passes_when_present():
+    mod.assert_v22_applied(mod.REQUIRED_V22_COLUMNS | {"id", "tier"})  # no raise
+
+
+# --- helpers --------------------------------------------------------------------
+
+
+def test_age_band_boundaries():
+    assert mod.age_band(23) == "23-29"
+    assert mod.age_band(29) == "23-29"
+    assert mod.age_band(30) == "30-36"
+    assert mod.age_band(36) == "30-36"
+    assert mod.age_band(37) == "37-49"
+    assert mod.age_band(49) == "37-49"
+    assert mod.age_band(50) == "OUT_OF_RANGE"
+    assert mod.age_band(22) == "OUT_OF_RANGE"
+
+
+def test_marital_group():
+    assert mod.marital_group("MARRIED") == "MARRIED"
+    for m in ("SINGLE", "DATING", "ENGAGED"):
+        assert mod.marital_group(m) == "SINGLE_GROUP"
+
+
+def test_infer_env_name():
+    assert mod.infer_env_name("env/.env.dev") == "dev"
+    assert mod.infer_env_name("env/.env.prod") == "prod"

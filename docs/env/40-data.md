@@ -137,7 +137,6 @@ last_updated: 2026-09-01
 | `TELEGRAM_ENV_FILE` | ai-user compose의 Telegram credential file 경로 override | 기본값=`/home/justant/.config/again-spring-watchdog/telegram.env`; 다른 host 경로일 때만 설정 |
 | `AI_USER_SEED_ENABLED` | seed loader 활성화 | `true` |
 | `AI_USER_REPETITION_THRESHOLD` | 반복 가드 임계값 | `0.45` |
-| `AI_USER_PERSONA_TARGET` | admin 목표가 0일 때 fallback 총량 | `50` |
 | `AI_USER_FORCE_ACTIVE` | 강제 활성 모드 | `false` |
 | `AI_USER_FAMILY_PLAZA_ENABLED` | AI 생성에 FAMILY 광장 포함 여부 (false = OTHER로 흡수). 사용자 검색/글쓰기는 여전히 FAMILY 지원 | `false` |
 | `PAIRED_POST_ENABLED` | 양면 사연(작성자+상대방) 생성. prod 기본 true | `true`(prod) / `false`(dev 휴면) |

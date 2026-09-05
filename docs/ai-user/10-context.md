@@ -38,6 +38,11 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - human reply 예산·responder 수 등은 admin **댓글 생성량 설정**(`ai_user_generation_config.hr_*`, V91)이 SSOT다.
 - **사람 반응 입력 경계 (2026-08-14)**: backend 댓글 outbox는 `syntheticAuthor`를 반드시 기록한다. orchestrator는 이 값이 **명시적으로 `false`인 실제 사람 댓글/답글만** `ai_human_interaction_inbox`에 넣는다. `true` 또는 누락 이벤트는 fail-closed로 제외해 AI-user 댓글이 다음 30분 batch의 입력이 되는 재귀 루프를 막는다.
 - **Source dedup (2026-08-05 · 가드 강화 2026-08-10 · 카테고리 스코프 2026-08-12 · fill 재시도 2026-08-20)**: AI_POST primary = popular crawl claim(선호 Blind70/Natepan30, soft-reserve, **`source_url` 가족** 영구 제외, **plaza `category`로 example_bank 필터**). empty claim은 슬롯을 비운 채 끝내지 않고 **페르소나/광장/소스(blind↔natepan) 재시도**. 같은 원본 LLM 재시도 금지. 새벽 N 미달은 Telegram. crawl ingest는 `GET_LOCK`. `StoryTwinGuard` 14일 twin 차단. crawl budget 불변.
+- **페르소나 정체성 축 + 선택 회전 (2026-09, persona-diversity-v4)**: `personas`에 연령(23~49)·
+  성별·결혼·자녀·직업 축과 `style_axes`(10개 문체 축)가 추가되고, 프롬프트는 `voiceProfile`
+  전체 JSON 대신 400자 `PersonaCard`를 쓴다. 작성자·댓글자 선택은 `tierW × (1 +
+  hoursSinceLast/24)^1.5` 가중 비복원 추첨으로 바뀐다. 150명 쿼터·게이트 검증 상세:
+  `docs/_active/persona-diversity-v4.md`.
 - **크롤 원문 커뮤니티명 정규화 (2026-08-14)**: 외부 크롤의 제목·본문은 `example_bank` 적재 전 특정 커뮤니티명(예: 네이트판·블라인드)을 `온라인/인터넷 커뮤니티` 등 범용 표현으로 바꾼다. 내부 provenance인 `source`·`source_url`은 유지한다. 기존 데이터·연결된 재구성 글은 prod SoT를 읽기 전용으로 확인하는 `ai-user/tools/sanitize_crawled_community_references.py` dry-run 후 정리한다.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)
@@ -45,8 +50,8 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 | Wave | 내용 | 진입 문서 |
 |---|---|---|
 | WP1 / WP1B | 코퍼스·register를 **NATEPAN/BLIND**로 단일화, 인기 앵커 voice 정화 | [history.md](history.md), [learning.md](30-components/learning.md) |
-| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) |
-| WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](30-components/orchestrator.md), [operations.md](60-runtime/operations.md) |
+| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) — **2026-09 persona-diversity-v4로 폐기 예정**(캡슐/matcher는 신규 정체성 축·`PersonaCard`로 대체, 상세: `docs/_active/persona-diversity-v4.md`) |
+| WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](30-components/orchestrator.md), [operations.md](60-runtime/operations.md) — **2026-09 persona-diversity-v4로 폐기 예정**(선택 알고리즘이 계약 6 가중 추첨으로 교체) |
 | WP4 | micro-batch(4~6) 생성 · `parsePlan` 하한 이동 · `ThreadQualityGate` READY | [thread-planning.md](60-runtime/thread-planning.md), [llm.md](30-components/llm.md) |
 | WP5 | human reply 0~3 responders · 예산 · idempotency · 관심 pool · `hr_*` admin SSOT | [thread-planning.md](60-runtime/thread-planning.md) |
 

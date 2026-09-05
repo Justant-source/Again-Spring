@@ -15,8 +15,10 @@ last_updated: 2026-08-31
 
 target 값과 실제 디렉토리 수는 다를 수 있다.
 
-- 코드 기본 `AI_USER_PERSONA_TARGET = 10`
-- dev/prod compose override `AI_USER_PERSONA_TARGET = 50`
+- `AI_USER_PERSONA_TARGET`는 2026-09 persona-diversity-v4에서 제거됐다(참조 코드 0건인 죽은
+  설정이었다 — compose 기본 50, `OrchestratorProperties.personaTarget` 기본 10으로 서로
+  달랐고 `application.yml` 바인딩도 없었다). `AiUserSeedLoader`의 `PersonaFactory.ensureCount(...)`
+  호출은 상수 `PERSONA_COUNT = 150`을 직접 참조한다(계약: `docs/_active/persona-diversity-v4.md`).
 - 기존 디렉토리는 자동 삭제되지 않는다
 
 ## 디렉토리 구조

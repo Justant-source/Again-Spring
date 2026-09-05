@@ -19,11 +19,17 @@ ASM/WaggleBot은 사연·variant 텍스트를 **다시 LLM으로 쓰지 않는�
 
 ```
 claim source (no LLM)
+  → (2026-09 persona-diversity-v4, 예정) POST /v2/extract-skeleton  Haiku, claim당 +1회
   → AI_POST micro-batch[0]     항상 1회 (본문 + 첫 댓글 슬라이스)
   → HUMAN_POST micro-batch[1+]  댓글 수 < ready-min-items(기본 6)일 때만
   → (llm-ai-user 내부) SelfCritique  결정론 FAIL일 때만 +1 (짧은 rewrite)
   → SoftProofread /generate/proofread  오탈자 휴리스틱일 때만 +1
 ```
+
+> **persona-diversity-v4 (예정, Phase 2에서 확인 필요)**: 소스 골격 추출(`/v2/extract-skeleton`,
+> 계약 7)이 글 1건당 Haiku 호출을 +1 추가한다. 대신 모든 생성 요청이 `voiceProfile` 전체 JSON
+> 대신 400자 `PersonaCard`(계약 4)를 보내 프롬프트 입력 토큰이 줄어든다 — 순 토큰 증감은 미측정,
+> Phase 2 병합 후 실측 필요.
 
 발행 시점에 댓글이 READY 하한 미만이면 `persistAndFinalize`가 댓글만 `HUMAN_POST` **1회** 더 부를 수 있다(하한 미달이어도 글은 버린다).
 

@@ -221,6 +221,13 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
   로더를 거쳐 `docs/shared/policies/llm-error-signatures.json` SSOT를 읽는다(2026-09-03 리팩터,
   기존 `_looks_like_llm_error`/`LLM_ERROR_SIGNATURES` 하드코딩 목록 폐기). 판정 결과가
   `voice_profile`에 섞이지 않게 막는 동작 자체는 그대로다 — 상세: `.claude/rules/llm-safety.md` §2.
+- **(2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)** `persona_strengthener.py`는
+  신규 정체성 축(`age_years`·`gender`·`marital`·`style_axes`)을 **덮어쓰지 않는다** — 강화
+  대상은 `voice_profile`의 문체 필드(`lexicon`·`reply_style`·`comment_style`·`general_style`)로
+  한정하고, `personas` 테이블의 정체성 컬럼은 WP1 시더/팩토리만 쓴다. 표절 방어
+  `services/ngram_guard.py`(위 §)와 동일한 n-gram 겹침 로직이 orchestrator 쪽에도 Java로
+  포팅되어(`docs/_active/persona-diversity-v4.md` 계약 3, 게이트 b 8-gram Jaccard) 런타임
+  생성 단계에서도 검사한다 — 이 문서의 Python 구현과 Java 포팅본은 별도 유지보수 대상이다.
 
 ### `lexicon`/`general_style`은 이제 오케스트레이터 전용 (persona-diversity-v4 / WP1, 2026-09-05)
 

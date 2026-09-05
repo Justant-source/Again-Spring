@@ -103,8 +103,15 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | 16 | `backend/src/main/java/com/againspring/llm/prompt/PromptLoader.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 17 | `backend/src/main/java/com/againspring/llm/remote/RemoteLlmProvider.java` | `docs/backend/30-components/llm-bridge.md` | M |
 | 18 | `backend/src/main/java/com/againspring/marketing/**` | `docs/shared/marketing/70-policy/justant-bot-x-ops.md` | M |
+| 19 | `ai-user/tools/persona_gate_check.py` | `docs/ai-user/60-runtime/operations.md` | M |
+| 20 | `ai-user/tools/purge_offtarget_posts.py` | `docs/ai-user/60-runtime/operations.md` | M |
 
 등급: **M**=필수 · **C**=조건부.
+
+> persona-diversity-v4(`docs/_active/persona-diversity-v4.md`) 신규 클래스(`PersonaLottery`·
+> `CategoryMixPlanner`·`SourceOverlapGuard` 등)는 이미 규칙 #12(`ai-user/orchestrator/**`)에
+> 포함되므로 별도 glob을 추가하지 않는다 — 코드가 아직 없는 구체 경로를 넣으면 이 문서 자체의
+> 린트(`code-paths-exist`)가 깨진다.
 
 ## §6. Code → Docs 역인덱스
 

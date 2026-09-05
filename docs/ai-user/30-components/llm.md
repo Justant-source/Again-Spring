@@ -20,8 +20,14 @@
 | `POST` | `/v2/generate/paired-phase2` | 양면 사연 **logical Call2** (`PAIRED_PHASE2`): 상대방(B) body + phase2 댓글(작성자+상대+공개 최상위 댓글 최대 5–8) |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |
+| `POST` | `/v2/extract-skeleton` | **(2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)** 크롤 원문에서 category·역할·사건·claim을 일반화 추출(계약 7, Haiku). 고유명사·금액·날짜는 일반화, 원문 문장 그대로 담지 않음 |
+| `POST` | `/generate/persona-profile` | **(2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)** `job_title` 등 LLM 생성 필드를 채우는 페르소나 프로필 생성 |
 
 `8092` 포트는 compose 내부 네트워크 전용이다. dev/prod 모두 host port publish가 없다.
+
+> **persona-diversity-v4 (예정)**: AI_POST·PAIRED·HUMAN_POST·human-reply 요청 필드가
+> `voiceProfile`(전체 JSON) 대신 `personaCard`(문자열, 400자 이내 `PersonaCard.render(Persona)`
+> 출력, 계약 4)로 바뀐다. 상세: `docs/_active/persona-diversity-v4.md`.
 
 ## PLAN 모드 bridge
 

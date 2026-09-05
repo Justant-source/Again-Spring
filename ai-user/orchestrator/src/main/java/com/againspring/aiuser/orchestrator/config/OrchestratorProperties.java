@@ -23,7 +23,6 @@ public class OrchestratorProperties {
     private String internalToken = "";
     private String backendBaseUrl = "";
     private String llmAiUserUrl = "http://againspring-llm-ai-user:8092";
-    private int personaTarget = 10;
     private String personasDir = "/app/personas";
     private boolean forceActive = false;  // 시간대 무관 강제 활성 (dev 테스트용)
     /** FAMILY 광장 AI 생성 활성화 (false = OTHER로 흡수). */

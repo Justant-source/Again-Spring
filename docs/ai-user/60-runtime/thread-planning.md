@@ -24,6 +24,32 @@
 >
 > **FAMILY 광장 라우팅 (2026-08-22~)**: prod corpus에 가족 갈등 사연이 실제로 부족해 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)로 꺼져 있다. 꺼지면 페르소나의 최상위 interest가 FAMILY여도 OTHER로 재배치된다. 사용자 대면(검색·카테고리·라벨)은 변화 없음. 코퍼스가 늘어나면 환경변수 하나로 복구.
 
+## persona-diversity-v4 — 소스 골격·카테고리 비율·캐스트 추첨 (예정 — Phase 2 확인 필요)
+
+상세 계약: `docs/_active/persona-diversity-v4.md`. 아래는 병합 전 초안 요약이며, 실제 클래스명·
+경로는 Phase 2 병합 후 확정한다.
+
+- **소스 골격 추출**: claim source(크롤 원문)를 그대로 프롬프트에 넣지 않고, `llm-ai-user`
+  `POST /v2/extract-skeleton`(Haiku)이 먼저 `category`·`author_role`·`counterpart_role`·
+  `relationship`·`incident`·`sequence`(3~5 사건 단위)·`stakes`·`author_claim`·
+  `counterpart_claim`·`emotion`·`gray_zone`·`b_side_viable`로 일반화한다. 고유명사·지명·금액·
+  날짜는 일반화하고 원문 문장을 그대로 담지 않는다.
+- **카테고리 비율 + 시점 제한**(기존 `romanticShare` 대체):
+
+  | 카테고리 | 비율 | 작성자(A) 하드 필터 | B(상대방) 시점 |
+  |---|---|---|---|
+  | WORK | 35% | 전원 | 금지 |
+  | COUPLE | 25% | `marital != MARRIED` | 허용 |
+  | FRIEND | 15% | 전원 | 허용 |
+  | FAMILY | 15% | 전원(시부모·처가는 MARRIED만) | 금지 |
+  | MARRIED | 10% | `marital == MARRIED` | 허용 |
+
+  양면(paired) 글은 B 허용 카테고리에서만 생성한다.
+- **작성자·댓글자 캐스트 추첨**: 하드 필터(위 표 + `active=1` + 자기 글 댓글 금지) 통과자 중
+  `weight = tierW × (1 + hoursSinceLast/24)^1.5`(HEAVY 3.0 / REGULAR 1.5 / LIGHT 1.0,
+  `hoursSinceLast`는 `last_post_at`/`last_comment_at` 기준, NULL이면 720)로 가중 비복원
+  추첨한다. `personaId` 기준 결정론 정렬은 금지 — 매 호출 회전이 계약이다.
+
 ## 구성과 경계
 
 <!-- last-verified: 2026-08-31 -->

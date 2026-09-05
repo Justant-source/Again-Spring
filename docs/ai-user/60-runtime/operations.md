@@ -92,7 +92,9 @@ docker exec -it againspring-mariadb-prod mariadb \
 
 - `target_posts + target_comments + target_replies + target_votes + target_likes`
 - 위 합계 × `1.1` → `ai_user_runtime.daily_global_cap`
-- 목표가 모두 0이면 `AI_USER_PERSONA_TARGET * 20` fallback
+- 목표가 모두 0이면 `AI_USER_DAILY_GLOBAL_CAP`(코드 기본 `200`) fallback — 이전에는 이미 죽어있던
+  `AI_USER_PERSONA_TARGET * 20`으로 잘못 기술돼 있었다(2026-09 persona-diversity-v4 WP4 정정,
+  실제 fallback 계산 경로는 Phase 2에서 재확인 필요)
 
 ## 5. 로그 포인트
 
@@ -474,3 +476,47 @@ dev에 수동으로 `ALTER TABLE` 추가. 또한 `ai_user_generation_config` 테
 postId로 찍힘)로 남으면 봇 계정 JWT 발급 실패(`BotTokenCache`)가 원인인 경우가
 많다 — `Bot login failed ... 429 Too Many Requests` 로그 확인. 리콘실러는
 수렴형이라 다음 5분 주기에 저절로 재시도된다(자동 복구, 별도 조치 불필요).
+
+## 9. persona-diversity-v4 — 기존 글 정리 · 게이트 스크립트
+
+트랙 상세: `docs/_active/persona-diversity-v4.md`. 페르소나 연령대를 23~49세로 재구성하면서
+기존 AI-user 글 중 50대 이상 화자 서사를 정리하고, 150명 쿼터·문체 다양성·글쓰기 회전을
+검증하는 두 도구가 `ai-user/tools/`에 추가됐다.
+
+### `purge_offtarget_posts.py` — 연령 이탈 글 분류·soft delete
+
+```bash
+# 분류만 (DB 쓰기 0). --limit로 비용 절약 표본만 돌릴 수 있다.
+python3 ai-user/tools/purge_offtarget_posts.py --env-file env/.env.dev --classify --limit 100 --out out.jsonl
+
+# OFF_TARGET만 soft delete (posts.deleted_at + 그 글의 post_comments.deleted_at)
+python3 ai-user/tools/purge_offtarget_posts.py --env-file env/.env.dev --apply out.jsonl
+```
+
+- 분류기: AS 호스트 `claude -p --model claude-haiku-4-5-20251001 --output-format json --disallowedTools '*'`
+  (이 도구에 한해 CLI 직접 호출 예외 허용). 20건씩 묶어 호출, 실패 시 최대 3회 재시도 후
+  해당 배치는 `verdict=ERROR`로 표시(무음 실패 금지).
+- `--apply`가 `env-file`을 prod로 추론하면 `--i-mean-it` 없이는 거부한다. prod DB 쓰기는
+  Fable(Phase 3~4) 전용.
+- **DB 접속은 `docker exec <container> mariadb --raw ...`로 한다.** prod mariadb는 호스트
+  포트가 노출돼 있지 않아 이 방식만 동작한다. `--raw`가 없으면 `-B`(batch) 모드 클라이언트가
+  출력 중 백슬래시를 한 번 더 이스케이프해서(`\n` → `\\n`) 본문에 실제 줄바꿈·따옴표가 있는
+  글의 `JSON_ARRAYAGG` 결과가 깨진다(2026-09-05 실측, 100건 표본에서 발견).
+- 2026-09-05 dev 100건 표본 결과: OFF_TARGET 2건(2%) — 부모 세대 시점 가족여행 정산 글,
+  "내 딸"·"우리 엄마"라 자칭하는 40대 이상 모친 화자 글. 전수 실행(`--apply` 없이 `--classify`
+  전체)은 아직 하지 않았다(비용 절약 지시).
+
+### `persona_gate_check.py` — 게이트 a(분포)·b(다양성)·c(회전)
+
+```bash
+python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate a
+python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate b
+python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate c --days 7
+```
+
+- 게이트 a·b는 `personas` 테이블에 `V22__persona_identity_axes.sql`(WP1)이 적용돼
+  `age_years`·`gender`·`marital`·`married_years`·`has_kids`·`style_axes` 컬럼이 있어야
+  동작한다. 없으면 "V22 컬럼이 없다(미적용)" 메시지와 함께 **종료 코드 2**로 즉시 중단한다
+  (2026-09-05 dev에서 실측 확인 — 아직 V22 미적용).
+- 게이트 c(글쓰기 회전, 최근 N일)는 참고용이며 배포 게이트가 아니다 — 항상 종료 코드 0.
+- 종료 코드: `0`=PASS, `1`=게이트 a/b FAIL, `2`=V22 미적용.
