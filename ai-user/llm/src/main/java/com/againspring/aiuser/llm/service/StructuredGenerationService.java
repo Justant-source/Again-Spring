@@ -1426,7 +1426,15 @@ public class StructuredGenerationService {
     }
     private static double koreanRatio(String v) { long k=v.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count(); long letters=v.chars().filter(Character::isLetter).count(); return letters == 0 ? 1 : (double) k / letters; }
     private static boolean blank(String s) { return s == null || s.isBlank(); }
-    private static String clean(String s) { return s == null ? "" : s.replace('<','＜').replace('>','＞').replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "").substring(0, Math.min(s.length(), 5000)); }
+    private static String clean(String s) {
+        if (s == null) return "";
+        // 잘라내기는 반드시 변환 "후" 문자열 기준으로 한다. 원본 길이로 자르면 제어문자가
+        // 제거된 만큼 짧아진 문자열의 범위를 넘어 StringIndexOutOfBounds가 난다 —
+        // clean()은 크롤 텍스트에 적용되는 인젝션 방어라, 원문에 제어문자가 하나만 있어도
+        // 생성 전체가 예외로 죽었다(2026-09-05 발견).
+        String t = s.replace('<', '＜').replace('>', '＞').replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", "");
+        return t.length() <= 5000 ? t : t.substring(0, 5000);
+    }
     /**
      * Crawled third-party text reaches the prompt through sourceContext. Jackson escapes it
      * structurally, but the project's prompt-injection defense is {@code clean()} (control-char
@@ -1505,7 +1513,10 @@ public class StructuredGenerationService {
             if (!blank(p.getNickname())) responder.put("nickname", p.getNickname());
             if (!blank(p.getFormality())) responder.put("formality", p.getFormality());
             if (!blank(p.getPersonaCard())) {
-                responder.put("personaCard", p.getPersonaCard());
+                // personaCard는 voiceProfile.lexicon.signature_phrases 경로로 크롤 코퍼스에서
+                // 파생될 수 있는 신뢰 경계 밖 텍스트다 — personaCardBlock/personaCardList와 동일하게
+                // clean()(프롬프트 인젝션 방어)을 거친다.
+                responder.put("personaCard", clean(p.getPersonaCard()));
             } else {
                 // Include only essential voiceProfile fields, not the full structure
                 Map<String, Object> voice = p.getVoiceProfile();

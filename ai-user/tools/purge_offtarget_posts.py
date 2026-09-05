@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import stat
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -40,6 +43,13 @@ CONTAINERS = {
     "dev": "againspring-mariadb-dev",
     "prod": "againspring-mariadb-prod",
 }
+
+# prod 판정은 env_name(=--env-file 파일명 추정, 사용자 의도 라벨일 뿐)이 아니라 여기 값으로 한다.
+# --db-container/--db-name은 --env-file과 독립적으로 덮어쓸 수 있어(env_name만 보면 우회 가능,
+# 2026-09-05 보안 리뷰 실증: --env-file env/.env.dev --db-container againspring-mariadb-prod),
+# 실제 쓰기 대상인 container·database를 직접 본다.
+PROD_CONTAINERS = {"againspring-mariadb-prod"}
+PROD_DATABASES = {"againspring_prod"}
 
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_BATCH_SIZE = 20
@@ -109,34 +119,84 @@ def build_db_target(args: argparse.Namespace, env_values: dict[str, str]) -> DbT
     )
 
 
+def is_prod_target(target: DbTarget) -> bool:
+    """실제 쓰기/조회 대상이 prod인지 판정한다. target.env_name(파일명 추정 라벨)은 보지 않는다 —
+    --db-container/--db-name으로 독립적으로 덮어써질 수 있어 그것만 보면 가드를 우회당한다."""
+    return target.container in PROD_CONTAINERS or target.database in PROD_DATABASES
+
+
+def describe_target(target: DbTarget) -> str:
+    """실행 시작 시 어느 환경을 실제로 건드리는지 출력하기 위한 문자열. 자격증명(user/password)은
+    포함하지 않는다."""
+    prod_marker = " [PROD]" if is_prod_target(target) else ""
+    mismatch = ""
+    if (target.env_name == "prod") != is_prod_target(target):
+        mismatch = (
+            " ⚠️ env-name(추정)과 실제 대상(container/database) 판정이 불일치한다 — "
+            "--db-container/--db-name override 확인할 것"
+        )
+    return (
+        f"env-name(추정)={target.env_name} container={target.container} "
+        f"database={target.database}{prod_marker}{mismatch}"
+    )
+
+
+def _mysql_pwd_env_file(password: str) -> str:
+    """`docker exec --env-file`에 넘길 임시 파일 하나를 만들어 경로를 반환한다.
+
+    비밀번호를 `-p<password>`처럼 argv에 두면 호스트 `ps auxww`와 `docker top <container>`
+    양쪽에 프로세스가 살아있는 동안 평문으로 남는다(2026-09 보안 리뷰). `docker exec -e
+    MYSQL_PWD=...` 형태로 바꿔도 그 값 자체가 이 `docker` 클라이언트 프로세스의 argv에
+    그대로 남아 호스트 `ps auxww`에서 여전히 보인다 — `-e`는 근본 해결이 아니다.
+    `--env-file=<path>`는 argv에 **파일 경로만** 남기고 값 자체는 파일에서만 읽으므로
+    ps/docker top 어느 쪽에도 노출되지 않는다. 파일은 0600으로 만들고 호출 직후 삭제한다.
+    """
+    fd, path = tempfile.mkstemp(prefix="mysql-pwd-")
+    try:
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(fd, "w") as f:
+            f.write(f"MYSQL_PWD={password}\n")
+    except BaseException:
+        os.close(fd)
+        os.unlink(path)
+        raise
+    return path
+
+
 def run_mariadb_sql(target: DbTarget, sql: str) -> str:
     """docker exec로 mariadb 클라이언트를 호출한다 (prod는 호스트 포트가 없어 이 방식만 동작).
 
     `--raw`(`-r`) 필수: 이게 없으면 -B(batch) 모드 클라이언트가 출력 중 백슬래시를
     한 번 더 이스케이프해서(`\\n` → `\\\\n`) JSON_OBJECT가 만든 유효한 JSON 문자열
     (본문에 실제 줄바꿈·따옴표가 포함된 글)을 깨뜨린다(2026-09-05 실측, char 3695 파싱 실패).
+
+    비밀번호는 argv(`-p<password>`)로 넘기지 않는다 — `_mysql_pwd_env_file` 참고.
     """
-    result = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "-i",
-            target.container,
-            "mariadb",
-            "--raw",
-            "-u",
-            target.user,
-            f"-p{target.password}",
-            target.database,
-            "-N",
-            "-B",
-            "-e",
-            sql,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    pwd_file = _mysql_pwd_env_file(target.password)
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                f"--env-file={pwd_file}",
+                target.container,
+                "mariadb",
+                "--raw",
+                "-u",
+                target.user,
+                target.database,
+                "-N",
+                "-B",
+                "-e",
+                sql,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    finally:
+        os.unlink(pwd_file)
     if result.returncode != 0:
         raise RuntimeError(f"mariadb 실행 실패({target.container}): {result.stderr[:800]}")
     return result.stdout
@@ -339,6 +399,7 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
 def cmd_classify(args: argparse.Namespace) -> int:
     env_values = load_dotenv(ROOT / args.env_file)
     target = build_db_target(args, env_values)
+    print(f"[target] {describe_target(target)}", file=sys.stderr)
     posts = fetch_synthetic_posts(target, args.limit)
     print(f"[info] 대상 글 {len(posts)}건 ({target.env_name}, container={target.container})", file=sys.stderr)
     if not posts:
@@ -366,10 +427,11 @@ def cmd_classify(args: argparse.Namespace) -> int:
 def cmd_apply(args: argparse.Namespace) -> int:
     env_values = load_dotenv(ROOT / args.env_file)
     target = build_db_target(args, env_values)
-    if target.env_name == "prod" and not args.i_mean_it:
+    print(f"[target] {describe_target(target)}", file=sys.stderr)
+    if is_prod_target(target) and not args.i_mean_it:
         print(
             "[refused] prod DB에 --apply를 실행하려면 --i-mean-it 플래그가 필요하다. "
-            "(prod DB 쓰기는 Fable Phase 3~4 전용)",
+            f"(실제 대상: container={target.container} database={target.database})",
             file=sys.stderr,
         )
         return 1

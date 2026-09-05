@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * WP1 — {@code POST /generate/persona-profile} 전용 생성 서비스 (01-wp1-persona-data.md §4).
@@ -166,27 +167,23 @@ public class PersonaProfileService {
 
     // ── 파싱 + 검증 ──────────────────────────────────────────────────────
 
+    /**
+     * {@link JsonExtractorUtil}(코드펜스 {@code startsWith}/{@code endsWith} 앵커링)로 통일한다.
+     * 이전 구현은 {@code indexOf("```json")}/{@code lastIndexOf("```")} 전역 검색이라, JSON 값
+     * 안에 백틱 3개가 우연히 들어가면 경계를 잘못 잡을 수 있었다 — {@link SkeletonExtractionService}가
+     * 쓰는 같은 유틸로 두 서비스의 파싱 동작을 맞춘다.
+     */
     private Map<String, Object> parseJson(String raw) {
-        String text = raw != null ? raw.trim() : "";
-        if (text.contains("```json")) {
-            int s = text.indexOf("```json") + 7;
-            int e = text.lastIndexOf("```");
-            if (e > s) text = text.substring(s, e).trim();
-        } else if (text.contains("```")) {
-            int s = text.indexOf("```") + 3;
-            int e = text.lastIndexOf("```");
-            if (e > s) {
-                String candidate = text.substring(s, e).trim();
-                if (candidate.startsWith("{")) text = candidate;
-            }
+        JsonNode node;
+        try {
+            node = JsonExtractorUtil.extract(raw);
+        } catch (RuntimeException e) {
+            throw new StructuredGenerationException("persona-profile response is not JSON: " + e.getMessage());
         }
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start < 0 || end <= start) {
-            throw new StructuredGenerationException("persona-profile response is not JSON");
+        if (!node.isObject()) {
+            throw new StructuredGenerationException("persona-profile response is not a JSON object");
         }
         try {
-            JsonNode node = JSON.readTree(text.substring(start, end + 1));
             return JSON.convertValue(node, Map.class);
         } catch (Exception e) {
             throw new StructuredGenerationException("persona-profile JSON parse failed: " + e.getMessage());
@@ -224,6 +221,58 @@ public class PersonaProfileService {
             resp.put("example_comments", comments.subList(0, 5));
         }
 
+        // writing_quirks.mobile_typos — 프롬프트가 boolean을 요구한다(persona_profile.md:16).
+        Object writingQuirksObj = resp.get("writing_quirks");
+        if (!(writingQuirksObj instanceof Map)) {
+            throw new StructuredGenerationException("writing_quirks must be an object");
+        }
+        Map<String, Object> writingQuirks = (Map<String, Object>) writingQuirksObj;
+        if (!(writingQuirks.get("mobile_typos") instanceof Boolean)) {
+            throw new StructuredGenerationException("writing_quirks.mobile_typos must be a boolean");
+        }
+
+        // hot_buttons.triggers / soft_spots — 문자열 배열(persona_profile.md:17).
+        Object hotButtonsObj = resp.get("hot_buttons");
+        if (!(hotButtonsObj instanceof Map)) {
+            throw new StructuredGenerationException("hot_buttons must be an object");
+        }
+        Map<String, Object> hotButtons = (Map<String, Object>) hotButtonsObj;
+        requireStringArray(hotButtons.get("triggers"), "hot_buttons.triggers");
+        requireStringArray(hotButtons.get("soft_spots"), "hot_buttons.soft_spots");
+
+        // reactions.agree / disagree / curious — 문자열 배열(persona_profile.md:18).
+        Object reactionsObj = resp.get("reactions");
+        if (!(reactionsObj instanceof Map)) {
+            throw new StructuredGenerationException("reactions must be an object");
+        }
+        Map<String, Object> reactions = (Map<String, Object>) reactionsObj;
+        requireStringArray(reactions.get("agree"), "reactions.agree");
+        requireStringArray(reactions.get("disagree"), "reactions.disagree");
+        requireStringArray(reactions.get("curious"), "reactions.curious");
+
+        // example_post_openers / example_replies — 문자열 배열(persona_profile.md:19,21).
+        requireStringArray(resp.get("example_post_openers"), "example_post_openers");
+        requireStringArray(resp.get("example_replies"), "example_replies");
+
+        // interests — {"WORK":0~1,"COUPLE":0~1,"MARRIED":0~1,"FRIEND":0~1,"FAMILY":0~1} 5키 숫자 맵
+        // (persona_profile.md:22). "취미 목록"으로 오독해 ["독서","영화"] 같은 배열이 올 수 있다.
+        Object interestsObj = resp.get("interests");
+        if (!(interestsObj instanceof Map)) {
+            throw new StructuredGenerationException("interests must be an object, not " + typeName(interestsObj));
+        }
+        Map<String, Object> interests = (Map<String, Object>) interestsObj;
+        Set<String> requiredInterestKeys = Set.of("WORK", "COUPLE", "MARRIED", "FRIEND", "FAMILY");
+        if (!interests.keySet().equals(requiredInterestKeys)) {
+            throw new StructuredGenerationException("interests must have exactly keys " + requiredInterestKeys
+                    + " but was " + interests.keySet());
+        }
+        for (Map.Entry<String, Object> e : interests.entrySet()) {
+            Object v = e.getValue();
+            if (!(v instanceof Number n) || n.doubleValue() < 0.0 || n.doubleValue() > 1.0) {
+                throw new StructuredGenerationException("interests." + e.getKey() + " must be a number in [0,1]");
+            }
+        }
+
         String allText = collectAllText(resp);
         LlmErrorSignatures sig = LlmErrorSignatures.get();
         String lower = allText.toLowerCase(Locale.ROOT);
@@ -236,6 +285,18 @@ public class PersonaProfileService {
         if (sig.hasInsufficientKorean(allText)) {
             throw new StructuredGenerationException("persona-profile response has insufficient Korean ratio");
         }
+    }
+
+    /** {@code field}가 비어있지 않은 문자열 배열인지 검사한다. 아니면 기존 실패 계약대로 거부한다. */
+    private static void requireStringArray(Object value, String field) {
+        if (!(value instanceof List<?> list) || list.isEmpty()
+                || list.stream().anyMatch(v -> !(v instanceof String s) || s.isBlank())) {
+            throw new StructuredGenerationException(field + " must be a non-empty array of strings");
+        }
+    }
+
+    private static String typeName(Object v) {
+        return v == null ? "null" : v.getClass().getSimpleName();
     }
 
     /** 모든 문자열 값(중첩 포함)을 이어붙여 시그니처·언어 가드 검사용 텍스트를 만든다. */

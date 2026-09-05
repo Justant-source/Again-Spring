@@ -13,11 +13,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * persona-diversity-v4 WP2 — 크롤 원본에서 "뼈대"(계약 7)만 뽑아내는 1회성 Haiku 호출.
- * 실패(파싱 실패·필수 키 누락·sequence 3개 미만)는 예외가 아니라
+ * 실패(파싱 실패·필수 키 누락·sequence 3개 미만·오류/거절 시그니처 검출)는 예외가 아니라
  * {@link SkeletonExtractResponse#failure(String)}로 흡수한다 — 컨트롤러는 항상 200을 반환한다.
+ * {@link PersonaProfileService#validate}와 동일하게 {@link LlmErrorSignatures}로 오류/거절/프롬프트
+ * 누출/한글 비율 검사를 거친다(절대 규칙 #7) — 시그니처 목록에 없는 완곡한 거부가 골격 필드에
+ * 채워져 {@code ok:true}로 통과하면 plan·paired phase1/2 프롬프트에 그대로 실리기 때문이다.
  */
 @Slf4j
 @Service
@@ -104,6 +108,20 @@ public class SkeletonExtractionService {
             return SkeletonExtractResponse.failure("sequence has fewer than " + MIN_SEQUENCE + " items");
         }
 
+        String allText = collectAllText(category, authorRole, counterpartRole, relationship, incident,
+                sequence, stakes, authorClaim, counterpartClaim, emotion, grayZone);
+        LlmErrorSignatures sig = LlmErrorSignatures.get();
+        String lower = allText.toLowerCase(Locale.ROOT);
+        if (sig.containsSignature(lower)) {
+            return SkeletonExtractResponse.failure("skeleton response matches error/refusal signature");
+        }
+        if (sig.hasPromptLeak(allText)) {
+            return SkeletonExtractResponse.failure("skeleton response contains prompt-leak pattern");
+        }
+        if (sig.hasInsufficientKorean(allText)) {
+            return SkeletonExtractResponse.failure("skeleton response has insufficient Korean ratio");
+        }
+
         return SkeletonExtractResponse.builder()
                 .ok(true)
                 .category(category)
@@ -140,4 +158,18 @@ public class SkeletonExtractionService {
     }
 
     private static boolean blank(String s) { return s == null || s.isBlank(); }
+
+    /** 골격의 모든 텍스트 필드(역할·사건·주장 등)를 이어붙여 시그니처·언어 가드 검사용 텍스트를 만든다. */
+    private static String collectAllText(String category, String authorRole, String counterpartRole,
+                                          String relationship, String incident, List<String> sequence,
+                                          String stakes, String authorClaim, String counterpartClaim,
+                                          String emotion, String grayZone) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : List.of(category, authorRole, counterpartRole, relationship, incident,
+                stakes, authorClaim, counterpartClaim, emotion, grayZone)) {
+            sb.append(s).append('\n');
+        }
+        for (String s : sequence) sb.append(s).append('\n');
+        return sb.toString();
+    }
 }

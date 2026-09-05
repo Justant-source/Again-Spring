@@ -195,3 +195,51 @@ def test_classify_all_happy_path(monkeypatch):
     assert rows == [
         {"id": "post_a", "title": "t", "author_persona": "n", "verdict": "OFF_TARGET", "reason": "환갑"}
     ]
+
+
+# --- 2026-09-05 보안 리뷰 회귀 ---------------------------------------------
+# prod 가드가 --env-file 파일명(env_name)이 아니라 실제 쓰기 대상(container/database)을
+# 보는지 확인한다. 파일명만 보던 시절엔 --db-container로 우회할 수 있었다.
+
+def _target(env_name, container, database):
+    from purge_offtarget_posts import DbTarget
+    return DbTarget(env_name=env_name, container=container, user="u",
+                    password="p", database=database)
+
+
+def test_prod_guard_follows_container_not_env_filename():
+    from purge_offtarget_posts import is_prod_target
+    # dev 환경 파일 + prod 컨테이너 = prod로 판정돼야 한다(우회 차단)
+    assert is_prod_target(_target("dev", "againspring-mariadb-prod", "againspring_dev"))
+    # dev 환경 파일 + prod DB 이름도 마찬가지
+    assert is_prod_target(_target("dev", "againspring-mariadb-dev", "againspring_prod"))
+    # 순수 dev는 통과
+    assert not is_prod_target(_target("dev", "againspring-mariadb-dev", "againspring_dev"))
+
+
+def test_describe_target_warns_on_env_name_mismatch():
+    from purge_offtarget_posts import describe_target
+    msg = describe_target(_target("dev", "againspring-mariadb-prod", "againspring_dev"))
+    assert "[PROD]" in msg
+    assert "불일치" in msg
+    assert "p" not in msg.split("password")[0] or "password" not in msg  # 자격증명 미노출
+
+
+def test_password_never_reaches_argv():
+    """`docker exec --env-file=<path>` 방식이라 비밀번호 문자열이 인자 목록에 없어야 한다."""
+    import subprocess
+    from unittest import mock
+    import purge_offtarget_posts as m
+    captured = {}
+
+    def fake_run(cmd, **kw):
+        captured["cmd"] = list(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    with mock.patch.object(m.subprocess, "run", fake_run):
+        m.run_mariadb_sql(_target("dev", "c", "d"), "SELECT 1")
+
+    joined = " ".join(captured["cmd"])
+    assert "-pp" not in joined
+    assert "MYSQL_PWD=p" not in joined
+    assert any(a.startswith("--env-file=") for a in captured["cmd"])

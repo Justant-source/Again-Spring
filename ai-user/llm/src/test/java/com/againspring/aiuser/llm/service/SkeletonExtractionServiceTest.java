@@ -91,6 +91,34 @@ class SkeletonExtractionServiceTest {
         assertTrue(resp.getReason().toLowerCase().contains("sequence"));
     }
 
+    /**
+     * 리뷰 결함 #1 — parse()가 필수 키 non-blank·sequence≥3만 보고 오류/거절 시그니처를
+     * 검사하지 않아, 완곡한 한글 거부 응답이 골격 필드에 채워지면 ok:true로 통과했다.
+     * incident 필드에 시그니처 SSOT(docs/shared/policies/llm-error-signatures.json)에
+     * 등록된 거절 문구를 넣어 ok:false로 거부되는지 잠근다.
+     */
+    @Test
+    void refusalSignatureInIncidentFieldYieldsOkFalse() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        when(pool.executeSyncTask(anyString(), isNull(), anyLong(), anyString())).thenReturn("""
+                {"category":"WORK","author_role":"3년차 대리","counterpart_role":"직속 팀장",
+                 "relationship":"직장 상사-부하","incident":"이 요청은 도와드릴 수 없습니다",
+                 "sequence":["기획안을 냈다","팀장이 회의에서 발표했다","임원이 팀장을 칭찬했다"],
+                 "stakes":"고과·이직 여부","author_claim":"내가 낸 안이다","counterpart_claim":"팀 성과다",
+                 "emotion":"억울함","gray_zone":"작성자도 사전에 공유 안 한 점","b_side_viable":false}
+                """);
+        SkeletonExtractionService service = new SkeletonExtractionService(pool);
+        SkeletonExtractRequest req = new SkeletonExtractRequest();
+        req.setCategory("WORK");
+        req.setTitle("t");
+        req.setContent("c");
+
+        SkeletonExtractResponse resp = service.extract(req, "corr-6");
+
+        assertFalse(resp.isOk());
+        assertTrue(resp.getReason().toLowerCase().contains("signature"));
+    }
+
     @Test
     void unparsableResponseYieldsOkFalse() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);

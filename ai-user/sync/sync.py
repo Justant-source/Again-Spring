@@ -13,6 +13,13 @@ Prod DB -> dev DB 동기화 서비스.
   신규 컬럼(age_years 등)이 prod에 아직 없을 때도, 두 DB에 공통인 옛 컬럼(voice_profile 등)만
   으로 이미 발생한다. posts/comments의 author_id FK는 dev 자체 시드 personas 행으로 충족되어
   personas를 안 옮겨도 깨지지 않는다.
+- `persona_relationships`도 같은 이유로 동기화 대상에서 제외한다(2026-09, 마이그레이션·learning
+  리뷰): 관계 유형은 양쪽 페르소나의 `marital`(MARRIAGE=양측 MARRIED, COUPLE=양측
+  DATING/ENGAGED)을 전제로 배정된다. personas가 dev/prod 독립 진화로 갈라지는 이상,
+  관계 테이블만 prod 값으로 덮어쓰면 dev에서 미혼으로 재생성된 두 페르소나가 결혼 관계로
+  묶여버려 `PairedPostScheduler`가 그 쌍으로 결혼 카테고리 양면 글을 만든다.
+  `PersonaRelationshipFiller`는 admin 트리거 전용이라 스케줄러에 물려 있지 않고, 이 어긋남을
+  자동으로 치유하지 않는다.
 """
 
 from __future__ import annotations
@@ -202,7 +209,8 @@ COMMENTS_SPEC = TableSpec("post_comments", ("id",), time_columns=("updated_at", 
 SYNC_TABLES: tuple[TableSpec, ...] = (
     USERS_SPEC,
     # PERSONAS_SPEC 제외 — 위 모듈 docstring/PERSONAS_SPEC 주석 참고 (2026-09, persona-diversity-v4)
-    TableSpec("persona_relationships", ("id",), mode="full"),
+    # persona_relationships도 제외 — 관계 유형이 양쪽 marital을 전제하므로, personas가 독립
+    # 진화하는 이상 관계만 prod에서 덮어쓰면 dev에서 미혼 쌍이 결혼 관계로 묶인다(모듈 docstring).
     TableSpec("persona_seen_posts", ("persona_id", "post_id"), time_columns=("seen_at",)),
     TableSpec("persona_action_log", ("id",), time_columns=("created_at",)),
     TableSpec("persona_history_entries", ("id",), time_columns=("created_at",)),

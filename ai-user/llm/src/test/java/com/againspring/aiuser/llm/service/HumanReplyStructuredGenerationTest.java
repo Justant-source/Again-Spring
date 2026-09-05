@@ -98,6 +98,36 @@ class HumanReplyStructuredGenerationTest {
         service.createHumanReplies(replyRequest(), "corr-prompt");
     }
 
+    /**
+     * personaCardBlock/personaCardList는 이미 {@code clean()}(프롬프트 인젝션 방어: 제어문자 제거 +
+     * 꺾쇠 전각치환)을 거치는데 대댓글 경로의 slimResponders만 카드를 그대로 실었다(리뷰 결함 #2).
+     * candidateResponders에 실리는 personaCard가 무해화되는지 잠근다.
+     */
+    @Test
+    void slimResponders_sanitizesControlCharsAndAngleBracketsInPersonaCard() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        String bel = String.valueOf((char) 7); // BEL — \p{Cntrl}에 해당하는 제어문자
+        ThreadPlanRequest.Persona malicious = persona("mal");
+        malicious.setPersonaCard("<script>alert(1)</script>" + bel + "제어문자 포함");
+        HumanReplyBatchRequest.Item item = item(1L, List.of("mal"));
+        item.setCandidateResponders(List.of(malicious));
+        HumanReplyBatchRequest req = new HumanReplyBatchRequest();
+        req.setProvider("CODEX");
+        req.setItems(List.of(item));
+
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.HUMAN_REPLIES))).thenAnswer(inv -> {
+            String prompt = inv.getArgument(0);
+            assertTrue(prompt.contains("＜script＞"), "angle brackets must be fullwidth-escaped");
+            assertTrue(!prompt.contains("<script>"), "raw angle brackets must not reach the prompt");
+            assertTrue(!prompt.contains(bel), "control chars must be stripped");
+            return "{\"replies\":[]}";
+        });
+
+        service.createHumanReplies(req, "corr-clean");
+    }
+
     private static StructuredGenerationService configured(LlmWorkerPool pool) {
         LlmParseFailureSampler sampler = org.mockito.Mockito.mock(LlmParseFailureSampler.class);
         StructuredSchemaCatalog schemaCatalog = org.mockito.Mockito.mock(StructuredSchemaCatalog.class);

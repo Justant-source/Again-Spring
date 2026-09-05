@@ -18,6 +18,14 @@ def test_personas_is_not_synced():
     assert "personas" not in names
 
 
+def test_persona_relationships_is_not_synced():
+    """관계 유형은 양쪽 marital을 전제한다. personas가 dev/prod 독립 진화하는 이상 관계만
+    prod에서 덮어쓰면 dev에서 미혼 쌍이 결혼 관계로 묶여 결혼 카테고리 양면 글이 생긴다.
+    PersonaRelationshipFiller는 admin 트리거 전용이라 자동 치유되지 않는다(2026-09)."""
+    names = {spec.name for spec in sync.SYNC_TABLES} | {spec.name for spec in sync.CONTENT_TABLES}
+    assert "persona_relationships" not in names
+
+
 def test_personas_companion_sync_removed_from_content_cycle():
     import inspect
 

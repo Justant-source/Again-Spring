@@ -183,4 +183,129 @@ class PersonaProfileServiceTest {
 
         assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-7"));
     }
+
+    // ── 리뷰 결함 #3 — interests 등 형태 검사 ────────────────────────────
+
+    /**
+     * interests는 프롬프트(persona_profile.md:22)가 {"WORK":0~1,...} 5키 가중치 맵을 요구하는데
+     * "취미 목록"으로 오독해 모델이 배열을 줄 수 있다. 지금까지는 그대로 통과해 다운스트림에서
+     * 조용한 타입 불일치가 됐다.
+     */
+    @Test
+    void generate_interestsAsArrayInsteadOfMap_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("interests", List.of("독서", "영화"));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-8"));
+    }
+
+    @Test
+    void generate_interestsMissingRequiredKey_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("interests", Map.of("WORK", 0.9, "COUPLE", 0.2, "MARRIED", 0.6, "FRIEND", 0.4));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-9"));
+    }
+
+    @Test
+    void generate_interestsValueOutOfRange_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("interests", Map.of("WORK", 1.5, "COUPLE", 0.2, "MARRIED", 0.6, "FRIEND", 0.4, "FAMILY", 0.7));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-10"));
+    }
+
+    @Test
+    void generate_mobileTyposNotBoolean_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("writing_quirks", Map.of("spelling_level", "정확", "consistent_errors", List.of(), "mobile_typos", "yes"));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-11"));
+    }
+
+    @Test
+    void generate_hotButtonsTriggersNotStringArray_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("hot_buttons", Map.of("triggers", "회사 갑질",
+                "soft_spots", List.of("가족", "동료"), "upvote_when", "구체적 사건이 있을 때"));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-12"));
+    }
+
+    @Test
+    void generate_reactionsAgreeNotStringArray_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("reactions", Map.of("agree", List.of(), "disagree", List.of("그건 아니지"),
+                "curious", List.of("그래서 어떻게 됐음")));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-13"));
+    }
+
+    @Test
+    void generate_examplePostOpenersNotStringArray_throws() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> broken = new LinkedHashMap<>(validResponseMap());
+        broken.put("example_post_openers", List.of(1, 2, 3));
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(broken));
+        PersonaProfileService service = configuredService(pool);
+
+        assertThrows(StructuredGenerationException.class, () -> service.generate(req(), "corr-14"));
+    }
+
+    // ── 리뷰 결함 #4 — JsonExtractorUtil 통일 ────────────────────────────
+
+    /**
+     * 이전 구현은 text.indexOf("```json")/lastIndexOf("```") 전역 검색이라, 실제 코드펜스 없이
+     * 온전한 JSON 응답인데 문자열 값 안에 우연히 "```json"·"```"이 들어 있으면 그 지점에서
+     * 잘못 잘라내 파싱에 실패했다(응답 앞부분이 통째로 날아가 '{'를 못 찾음).
+     * JsonExtractorUtil로 통일한 뒤에는 Attempt1(직접 파싱)이 먼저 성공해 이 케이스를 그대로 살린다.
+     */
+    @Test
+    void generate_valueContainingBacktickFenceMarkers_stillParsesFullObject() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        Map<String, Object> tricky = new LinkedHashMap<>(validResponseMap());
+        tricky.put("job_title", "인용 예시: ```json 형식으로 써주세요 ``` 이런 식");
+        when(pool.executeSyncTask(anyString(), anyString(), anyLong(), anyString())).thenReturn(toJson(tricky));
+        PersonaProfileService service = configuredService(pool);
+
+        Map<String, Object> result = service.generate(req(), "corr-15");
+
+        assertEquals("인용 예시: ```json 형식으로 써주세요 ``` 이런 식", result.get("job_title"));
+        assertTrue(result.containsKey("interests"));
+    }
+
+    @Test
+    void parseJson_recoversFullObjectDespiteEmbeddedBacktickFenceMarkers() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        PersonaProfileService service = configuredService(pool);
+        // 이전 구현: indexOf("```json")가 "a" 값 안의 문구를 fence-open으로 오인하고,
+        // lastIndexOf("```")가 "b" 값 안의 문구를 fence-close로 오인해 그 사이(선두 '{' 포함)를
+        // 통째로 잘라내 파싱이 실패했다(start<0 → "response is not JSON").
+        String raw = "{\"a\":\"aaa ```json bbb\",\"b\":\"ccc ``` ddd\"}";
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = (Map<String, Object>)
+                ReflectionTestUtils.invokeMethod(service, "parseJson", raw);
+
+        assertEquals("aaa ```json bbb", parsed.get("a"));
+        assertEquals("ccc ``` ddd", parsed.get("b"));
+    }
 }

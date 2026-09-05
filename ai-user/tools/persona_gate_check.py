@@ -25,8 +25,11 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import os
+import stat
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,19 +154,43 @@ def build_db_target(args: argparse.Namespace, env_values: dict[str, str]) -> DbT
     )
 
 
+def _mysql_pwd_env_file(password: str) -> str:
+    """`docker exec --env-file`에 넘길 임시 파일을 만들고 경로를 반환한다.
+
+    `-p<password>`는 호스트 `ps auxww`와 `docker top`에 평문으로 남는다. `-e MYSQL_PWD=`도
+    값이 docker 클라이언트 argv에 남아 같은 문제가 있다. `--env-file`은 argv에 경로만 남긴다.
+    파일은 0600으로 만들고 호출 직후 지운다(purge_offtarget_posts와 동일 방식)."""
+    fd, path = tempfile.mkstemp(prefix="mysql-pwd-")
+    try:
+        os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(fd, "w") as f:
+            f.write(f"MYSQL_PWD={password}\n")
+    except BaseException:
+        os.close(fd)
+        os.unlink(path)
+        raise
+    return path
+
+
 def run_mariadb_sql(target: DbTarget, sql: str) -> str:
     """`--raw` 필수 — batch 모드의 이중 백슬래시 이스케이프가 JSON_ARRAYAGG 결과를
-    깨뜨리는 걸 막는다(purge_offtarget_posts.run_mariadb_sql 참고, 2026-09-05 실측)."""
-    result = subprocess.run(
-        [
-            "docker", "exec", "-i", target.container,
-            "mariadb", "--raw", "-u", target.user, f"-p{target.password}", target.database,
-            "-N", "-B", "-e", sql,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    깨뜨리는 걸 막는다(purge_offtarget_posts.run_mariadb_sql 참고, 2026-09-05 실측).
+
+    비밀번호는 argv로 넘기지 않는다 — `_mysql_pwd_env_file` 참고."""
+    pwd_file = _mysql_pwd_env_file(target.password)
+    try:
+        result = subprocess.run(
+            [
+                "docker", "exec", "-i", f"--env-file={pwd_file}", target.container,
+                "mariadb", "--raw", "-u", target.user, target.database,
+                "-N", "-B", "-e", sql,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    finally:
+        os.unlink(pwd_file)
     if result.returncode != 0:
         raise RuntimeError(f"mariadb 실행 실패({target.container}): {result.stderr[:800]}")
     return result.stdout
@@ -719,6 +746,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     env_values = load_dotenv(ROOT / args.env_file)
     target = build_db_target(args, env_values)
+    # 어느 환경을 실제로 읽는지 밝힌다 — --db-container/--db-name은 --env-file과 독립적으로
+    # 덮어쓸 수 있어, 파일명만 보고 dev라고 믿으면 prod 데이터로 게이트를 판정하게 된다.
+    print(f"[target] container={target.container} database={target.database}", file=sys.stderr)
 
     gates = ["a", "b", "c", "d"] if args.gate == "all" else [args.gate]
     overall_rc = 0
