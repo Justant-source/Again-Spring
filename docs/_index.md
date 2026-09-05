@@ -14,7 +14,7 @@ last_updated: 2026-09-02
 |---|---|---|---|---|---|---|
 | 10-context | `10-context.md` 🏛 | `10-context.md` | `10-context.md` 🏛 | `10-context.md` | `10-context.md` | `10-context.md` |
 | 20-containers | — | — | `20-containers.md` 🏛 | `20-containers.md` | `20-containers/` (3) | `20-containers.md` |
-| 30-components | `30-components/` (3) | `30-components/` (4) | — | `30-components/` (4) | — | `30-components.md` |
+| 30-components | `30-components/` (3) | `30-components/` (4) | — | `30-components/` (5) | — | `30-components.md` |
 | 40-data | `40-data.md` | — | — | `40-data/` (1) | `40-data.md` | `40-data/` (2) |
 | 50-api | `50-api.md` 🏛 | — | `50-api/` (6) 🏛 | — | — | `50-api.md` |
 | 60-runtime | `60-runtime/` (3) | `60-runtime/` (6) | `60-runtime.md` | `60-runtime/` (3) | `60-runtime/` (4) | `60-runtime.md` |
@@ -48,6 +48,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 | BE DB 스키마 | `docs/backend/40-data.md` | — | `backend/src/main/resources/db/migration/` |
 | LLM 브릿지 | `docs/backend/30-components/llm-bridge.md` | `docs/ai-user/30-components/llm.md` | `backend/src/main/java/com/againspring/llm/` |
 | AI 유저 생성·오케스트레이션 | `docs/ai-user/10-context.md` | `docs/ai-user/30-components/orchestrator.md` | `ai-user/orchestrator/` |
+| AI 유저 페르소나 신원 축·쿼터 계약 | `docs/ai-user/30-components/persona-identity-contract.md` | `ai-user/docs/personas/README.md` | `ai-user/orchestrator/.../persona/` |
 | AI 유저 학습 | `docs/ai-user/30-components/learning.md` | `docs/ai-user/70-policy/llm-call-budget.md` | `ai-user/learning/` |
 | API 명세 | `docs/shared/50-api/rest-spec.md` | — | `backend/src/main/java/com/againspring/api/` |
 | 정책 (인증·권한) | `docs/shared/70-policy/auth.md` | `docs/shared/70-policy/user-permissions.md` | `docs/shared/policies/user-permissions.json` |
@@ -115,6 +116,10 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 > 코드가 아직 없는 구체 경로를 넣으면 이 문서 자체의 린트(`code-paths-exist`)가 깨진다.
 > `ai-user/tools/persona_gate_check.py`·`ai-user/tools/purge_offtarget_posts.py`는
 > `ai-user/orchestrator/**`에 속하지 않아 §5 규칙 #19·#20으로 별도 등록돼 있다.
+> 이 트랙의 신원 축·쿼터·문체 축·`PersonaCard`·카테고리 비율·추첨 가중치·소스 골격 JSON 계약
+> 원문은 원래 gitignore 대상 작업 지시 경로에만 있었으나
+> `docs/ai-user/30-components/persona-identity-contract.md`로 승격돼 트랙 완료 여부와 무관하게
+> 남는다 — `docs/_active/persona-diversity-v4.md`는 트랙 완료 시 삭제되지만 이 문서는 남는다.
 
 ## §6. Code → Docs 역인덱스
 

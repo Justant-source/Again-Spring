@@ -579,3 +579,54 @@ env/scripts/resume-persona-profile-regen.sh --dry-run --env dev --seed 1        
 - 리셋 시각 파서는 `env/scripts/lib/session-reset-time.sh`에 독립 함수로 분리돼 있고,
   `env/scripts/lib/test-session-reset-time.sh`로 두 실제 문구 + 분 포함 변형 + 자정/정오 경계값 +
   파싱 실패 케이스를 검증한다(`bash env/scripts/lib/test-session-reset-time.sh`).
+
+### `finalize-persona-profile-regen.sh` — 재생성 완료 후 마무리 러너
+
+150명 재생성(`resume-persona-profile-regen.sh`로 완료)이 끝난 뒤에는 순서가 중요한 여러
+검증·쓰기 단계를 사람이 하나씩 쳐야 했다. `env/scripts/finalize-persona-profile-regen.sh`가
+그 순서를 하나로 묶는다 — 새 판정 로직을 만들지 않고 기존 `persona_gate_check.py`와
+`fill-persona-relationships` 트리거를 순서대로 호출할 뿐이다.
+
+```bash
+env/scripts/finalize-persona-profile-regen.sh --env dev --relationship-seed 20260905
+env/scripts/finalize-persona-profile-regen.sh --env prod --relationship-seed 20260905 --i-mean-it
+env/scripts/finalize-persona-profile-regen.sh --dry-run --env prod --relationship-seed 1 --i-mean-it
+```
+
+순서(뒤 단계는 앞 단계 완료를 전제):
+
+1. **재생성 완료 확인** — `personas.style_axes IS NOT NULL AND voice_profile.profile_rev='v5'`인
+   활성 페르소나 수가 `PersonaQuotaPlanner.PERSONA_COUNT`(150)와 같은가를 직접 COUNT 쿼리로
+   확인한다. 미달이면 **여기서 전체 중단**(게이트도 관계 부여도 실행하지 않음) — 실패 시 볼 곳:
+   `env/scripts/resume-persona-profile-regen.sh`로 재개하거나
+   `env/logs/resume-persona-profile-regen.log`의 최근 `haltedReason`.
+2. **게이트 a(분포)·b(다양성)** — `persona_gate_check.py --gate a`/`--gate b --json`을 호출해
+   `passed`와 실패 체크 목록을 파싱한다. 둘 중 하나라도 FAIL(exit 1) 또는 V22 미적용(exit 2)이면
+   **3)~5) 전부 중단**한다 — 관계 부여는 dev/prod DB 쓰기라, 분포가 틀린 채로 진행하지 않는다.
+3. **관계 부여** — `POST /admin/trigger/fill-persona-relationships?seed=<--relationship-seed>`
+   (`PersonaRelationshipFiller`, 기존 관계 유지, coverage만 채움). 이 단계의 성공 판정은
+   "응답에 `status:error`가 없는가"뿐이다 — 관계 내용의 정합성은 4)가 판정한다.
+4. **게이트 d(관계)** — `persona_gate_check.py --gate d`. FAIL이어도 5)는 계속 진행하지만
+   (5)는 순수 조회라 막을 이유가 없다) 스크립트 전체 종료 코드에는 반영한다. 기존 시드에
+   섞여 있던 위반(동성 COUPLE·나이차 초과 등, 위 문단 참고)은 관계 재부여로 저절로 고쳐지지
+   않을 수 있다는 점을 실패 시 안내 문구로 출력한다.
+5. **게이트 c(회전, 참고용)** — `persona_gate_check.py --gate c --days <--gate-c-days, 기본 7>`.
+   항상 실행하고 항상 진행·종료 코드에 영향을 주지 않는다 — 오늘 값은 7일 운영 후 재실행해
+   비교할 기준선일 뿐이다.
+6. **요약 표 출력** — 5단계 각각의 상태(PASS/FAIL/OK/INFO)와 상세를 표로 정리해 로그와
+   stdout에 남긴다.
+
+- `--dry-run`은 DB 조회·트리거 호출을 전혀 하지 않고(컨테이너 실행 여부 확인조차 생략)
+  내장 픽스처(150/150 정상 분포·무위반 관계·게이트 c 정상치)로 전체 흐름만 시연한다 —
+  `resume-persona-profile-regen.sh --dry-run`과 동일한 안전 설계.
+- 컨테이너 이름은 재개 스크립트와 동일한 규칙이다 — **prod는 `-prod` 접미사가 붙지 않는다**
+  (`againspring-ai-user-orchestrator`), dev만 `-dev`(`againspring-ai-user-orchestrator-dev`).
+  DB 컨테이너는 `persona_gate_check.py`의 `CONTAINERS` 매핑과 동일(`againspring-mariadb-dev`/
+  `-prod`).
+- 텔레그램 알림은 `ops-watchdog.sh`/`resume-persona-profile-regen.sh`와 동일한 자격 파일
+  (`~/.config/again-spring-watchdog/telegram.env`)과 `send_telegram` 함수를 재사용한다.
+- 종료 코드: `0`=전 단계 성공(게이트 c 제외), `1`=1)/2)에서 중단됐거나 3)/4)가 실패, `2`=인자
+  오류(`--env prod`에 `--i-mean-it` 누락 등).
+- `PROFILE_REV`(현재 `v5`)는 `PersonaProfileRegenerator.CURRENT_PROFILE_REV` /
+  `persona_gate_check.py`의 `CURRENT_PROFILE_REV`와 동기화해야 한다 — 축 배정 알고리즘이
+  바뀌어 리비전이 오르면 세 곳 모두 같이 올릴 것.

@@ -272,3 +272,23 @@ MARRIED 포함)만큼 그날 밤 예약글 목표치가 미달되는 것 — 데
    백업으로 복원한다: `docker exec -i againspring-mariadb-prod mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE" < /home/justant/backups/prod-aiuser-<timestamp>.sql` —
    **이건 prod 전체 데이터를 백업 시점으로 되돌리는 파괴적 작업이라 사용자의 명시 승인
    없이는 절대 실행하지 않는다.**
+
+## 8. 완료 시 삭제 체크리스트
+
+`docs/_active/` 규약(`.claude/rules/skill-ops.md` §4, `docs/_active/README.md`)에 따라 이 파일은
+트랙이 완전히 끝나면 삭제한다. **2026-09-05 기준 아직 삭제하지 않는다** — §7.4의 prod 재생성
+배치가 진행 중이고, 관계 부여(`fill-persona-relationships`)와 게이트 a/b 최종 확인이 prod에서
+아직 끝나지 않았다. 아래 항목이 전부 끝나면 삭제한다:
+
+- [ ] §7.4 8단계 게이트 a·b가 prod에서 둘 다 PASS(종료 코드 0)로 확인됨
+- [ ] `POST /admin/trigger/fill-persona-relationships`가 prod 150명 전원 관계 ≥1을 보장한 것을 확인함
+- [ ] §7.4 9단계 kill switch가 정상 OFF로 복원됨(`generationAllowed=true`)
+- [ ] §7.4 11·12단계(새벽 배치·05:30 sync)가 최소 1회 정상 완료된 것을 로그로 확인함
+- [ ] §7.3 MARRIED 슬롯 구멍이 재생성 이후 실제로 해소됐는지(그날 밤 배치 로그에 MARRIED 슬롯
+      성공 라인이 있는지) 확인함
+- [ ] `docs/ai-user/history.md`의 "persona-diversity-v4" 절 **상태** 문단을 최종 결과(정확한
+      처리 건수·게이트 수치 등)로 갱신함
+- [ ] 위 항목이 전부 끝나면 이 파일(`docs/_active/persona-diversity-v4.md`)을 삭제하고
+      `docs/_active/README.md`의 "현재 트랙" 표에서 이 행을 제거함 — 계약 원문은
+      `docs/ai-user/30-components/persona-identity-contract.md`에 이미 승격돼 있으므로 삭제해도
+      유실되지 않는다

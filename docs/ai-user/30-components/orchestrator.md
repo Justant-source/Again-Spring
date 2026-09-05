@@ -280,7 +280,7 @@ PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모
 
 ## 페르소나 스키마 · 선택 알고리즘 (2026-09 persona-diversity-v4, WP1~WP4 병합 완료·2026-09-05)
 
-전체 계약: `docs/_active/persona-diversity-v4.md`. `personas`(Flyway `V22__persona_identity_axes.sql`,
+전체 계약: [persona-identity-contract.md](persona-identity-contract.md) (트랙 진행 상태는 `docs/_active/persona-diversity-v4.md`, 트랙 종료 시 삭제됨). `personas`(Flyway `V22__persona_identity_axes.sql`,
 WP1)에 정체성 축이 추가된다:
 
 | 컬럼 | 값 | 비고 |

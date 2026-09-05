@@ -109,3 +109,46 @@
 ## 2026-09-03 결함 1·2 prod 반영 (사용자 명시 지시)
 
 `scripts/deploy.sh prod --i-mean-it` PASS(백업 `prod-20260903-180527.sql`, health/verify PASS=2/FAIL=0) → `env/rebuild-stacks.sh ai-user`로 공유 스택(llm-ai-user·ai-learning·`ai-user-orchestrator`[prod]·`prod-dev-sync`) 재기동. `ai-user-orchestrator-dev`는 profile 게이트라 무영향(계속 가동). prod 로그 `[EnvironmentGuard] env=PROD db=againspring-mariadb-prod backend=againspring-backend-prod` 확인. `AI_USER_INTERNAL_TOKEN`을 `.env.ai-user`·`.env.prod`에 동일 값으로 배선(둘 다 gitignored, 미커밋) — `repairBotUserAccounts: upserted=100 passwordSynced=150`, 실패 0건으로 orchestrator→backend 내부 API 인증이 prod에서도 성립함을 실측. `llm-ai-user`는 prod에서도 hikari/datasource 로그 0건(무상태 확인), `/v1/providers/status` 내부 조회로 4개 provider 전부 UP. orchestrator·backend-prod 재기동 후 ERROR 로그 0건. `ai_user_orch` 전용 DB 계정(Task 4.5 SQL)은 prod에 아직 미생성 — 필요 시 별도 요청.
+
+## persona-diversity-v4 (2026-09-05, Phase 1~3 완료 — Phase 4 prod 반영 진행 중)
+
+**문제**: 150명 페르소나가 `lexicon` 3종·`reply_style` 2종만 공유해 말투가 사실상 동일했다
+(`persona_strengthener.py`가 `voice_type`으로 SELECT 후 `voice_profile`을 일괄 덮어써 개별화를
+지워버린 게 직접 원인). 30일간 글 0건인 페르소나가 52%, 상위 10명이 전체 글의 46%를 썼다(활동
+쏠림). 연령이 10대~60대로 퍼져 있어 실제 타겟(20~40대)과 어긋났다(과거 글에 정년·손주·환갑
+서사가 섞여 있었던 게 증상). 크롤 원문이 프롬프트에 그대로 들어가는 경로도 남아 있었다(레거시
+`/generate/post`, 원문 800자를 그대로 실음).
+
+**조치** (WP1~WP4 병렬 worktree, Phase 2 병합 commit `81ba5dc9`):
+
+- 신원 축 10종 컬럼 신설(`V22__persona_identity_axes.sql`): `age_years`(23~49)·`gender`·`marital`·
+  `married_years`·`has_kids`·`job_type`(9종)·`job_title`·`style_axes`(JSON 10축: directness·affect·
+  humor·stance·length·speech·emoticon·spelling·linebreak·profanity)·`last_post_at`·`last_comment_at`.
+  150명 쿼터를 축별로 결정론적으로 배정(`PersonaQuotaPlanner`, 성별 75:75·연령대 60:60:30·결혼
+  60:90 등, 오차 ±3을 게이트 a로 검증) — 전체 계약은
+  [`persona-identity-contract.md`](./30-components/persona-identity-contract.md).
+- 150명 전원 프로필을 LLM(`PersonaProfileRegenerator` → llm 워커 `/generate/persona-profile`)으로
+  재생성. 필수 11개 키 검증 + `voice_profile.profile_rev="v4"` 갱신 마커로 완료 판정.
+- 크롤 원문을 그대로 프롬프트에 싣던 경로를 골격 추출로 교체(`POST /v2/extract-skeleton`, Haiku) —
+  고유명사·금액·날짜를 일반화하고 원문 문장을 담지 않는다. 추출 실패 시 원문 폴백 없이 생성을
+  건너뛴다.
+- `PersonaCard`(400자 요약)로 프롬프트 페이로드를 통일 — AI_POST·PAIRED·HUMAN_POST·human-reply
+  전부 `voiceProfile` 전체 JSON 대신 이 카드 하나(`personaCard` 필드)를 쓴다.
+- 페르소나 선택을 `PersonaLottery`(tier×LRU 가중 비복원 추첨, `weight = tierW × (1 +
+  hoursSinceLast/24)^1.5`)로 통일하고, 벡터 검색 기반 `PersonaCapsuleSearchService`와 hard
+  filter+score `PersonaMatcherService`(+`PersonaSelector`·`service/match/**`·`service/capsule/**`)를
+  코드에서 완전히 삭제했다(commit `66fbc529`).
+- 카테고리 비율(WORK 35%·COUPLE 25%·FRIEND 15%·FAMILY 15%·MARRIED 10%)과 상대방(B) 시점 제한
+  (WORK·FAMILY는 B시점 금지, COUPLE은 `marital != MARRIED`만 작성자)을 `CategoryMixPlanner`로
+  강제해 기존 `romanticShare` 설정을 대체했다.
+
+**감사 발견·수정 10건** (Phase 3, commit `c1ac52f7`·`556cba48`·`dcd14138`·`2048b25a`): marital
+컬럼 미독해로 MARRIED 작성자 추첨이 0명이 되던 계약 위반, `SourceOverlapGuard`·`PersonaCard`
+미배선, 프로필 저장과 감사 로그가 트랜잭션 밖에서 따로 커밋되던 데이터 무결성 결함, `has_kids
+BIT(1)` 캐스팅 누락으로 게이트 JSON 집계가 깨지던 결함 등. 상세는
+[`persona-diversity-v4.md`](../_active/persona-diversity-v4.md) §6.
+
+**상태(2026-09-05)**: prod `ai-user-orchestrator`/`ai-learning`/`prod-dev-sync` 재빌드 배포 완료,
+V22 컬럼 prod 적용 완료(Flyway 자동), 150명 프로필 재생성 배치가 진행 중이다. 관계 부여
+(`PersonaRelationshipFiller`)와 게이트 최종 확인은 미완료 — 트랙이 완전히 끝나면
+`docs/_active/persona-diversity-v4.md`를 삭제하고 이 항목을 갱신한다.
