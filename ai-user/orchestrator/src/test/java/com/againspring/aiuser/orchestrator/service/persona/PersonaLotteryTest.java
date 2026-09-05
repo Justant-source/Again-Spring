@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.service.persona;
 
+import com.againspring.aiuser.orchestrator.service.threadplan.CategoryMixPlanner;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import org.junit.jupiter.api.Test;
 

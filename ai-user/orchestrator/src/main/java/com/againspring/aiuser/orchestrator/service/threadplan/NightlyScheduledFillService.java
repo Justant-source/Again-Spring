@@ -8,7 +8,7 @@ import com.againspring.aiuser.orchestrator.notification.ScheduledPostTelegramNot
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
-import com.againspring.aiuser.orchestrator.service.persona.CategoryMixPlanner;
+import com.againspring.aiuser.orchestrator.service.threadplan.CategoryMixPlanner;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

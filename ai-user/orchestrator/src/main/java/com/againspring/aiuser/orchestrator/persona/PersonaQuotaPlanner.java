@@ -24,6 +24,10 @@ import java.util.stream.Collectors;
 @Component
 public class PersonaQuotaPlanner {
 
+    /** 운영 페르소나 총원. 죽은 설정 AI_USER_PERSONA_TARGET을 대체한다. */
+    public static final int PERSONA_COUNT = 150;
+
+
     public record IdentityAxes(
             int ageYears,
             String gender,

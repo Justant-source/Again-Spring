@@ -64,7 +64,7 @@ public class AiUserSeedLoader {
                 repairBotUserAccounts();
                 // 앵커 시드 스킵해도 PersonaFactory는 항상 실행 (부족분 생성)
                 try {
-                    personaFactory.ensureCount(props.getPersonaTarget());
+                    personaFactory.ensureCount(com.againspring.aiuser.orchestrator.persona.PersonaQuotaPlanner.PERSONA_COUNT);
                 } catch (Exception e) {
                     log.warn("PersonaFactory.ensureCount failed (non-critical): {}", e.getMessage());
                 }
@@ -162,7 +162,7 @@ public class AiUserSeedLoader {
 
         // LLM으로 부족분 페르소나 생성
         try {
-            personaFactory.ensureCount(props.getPersonaTarget());
+            personaFactory.ensureCount(com.againspring.aiuser.orchestrator.persona.PersonaQuotaPlanner.PERSONA_COUNT);
         } catch (Exception e) {
             log.warn("PersonaFactory.ensureCount failed (non-critical): {}", e.getMessage());
         }

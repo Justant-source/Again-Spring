@@ -15,7 +15,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
-import com.againspring.aiuser.orchestrator.service.persona.CategoryMixPlanner;
+import com.againspring.aiuser.orchestrator.service.threadplan.CategoryMixPlanner;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;

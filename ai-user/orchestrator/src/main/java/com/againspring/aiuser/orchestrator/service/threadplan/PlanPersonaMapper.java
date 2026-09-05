@@ -1,7 +1,7 @@
 package com.againspring.aiuser.orchestrator.service.threadplan;
 
 import com.againspring.aiuser.orchestrator.domain.Persona;
-import com.againspring.aiuser.orchestrator.service.persona.PersonaCard;
+import com.againspring.aiuser.orchestrator.persona.PersonaCard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
