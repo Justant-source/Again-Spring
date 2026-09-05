@@ -17,6 +17,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Generates a whole candidate tree before any item becomes publishable.  This is deliberately
@@ -71,6 +73,7 @@ public class ThreadPlanGenerationService {
     private final LlmGenerationGateService llmGenerationGateService;
     private final JdbcTemplate jdbcTemplate;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final PersonaLottery personaLottery;
 
     @Transactional
     public void generateRequestedPlans() {
@@ -345,13 +348,29 @@ public class ThreadPlanGenerationService {
 
     String resolveProviderForTest(String sourceType, AiUserGenerationConfig config) { return resolveProvider(sourceType, config); }
 
+    /** 글 작성자 페르소나 id — 댓글 캐스트 추첨에서 제외한다(자기 글에 자기 댓글 금지). */
+    private java.util.Optional<String> storyAuthorPersonaId(String postId) {
+        if (postId == null || postId.isBlank()) return java.util.Optional.empty();
+        try {
+            String authorId = jdbcTemplate.queryForObject(
+                    "SELECT author_id FROM posts WHERE id = ?", String.class, postId);
+            return java.util.Optional.ofNullable(authorId).filter(id -> !id.isBlank());
+        } catch (Exception e) {
+            log.debug("storyAuthorPersonaId lookup failed for post {}: {}", postId, e.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
     private PlanRequestBuilt planRequest(AiThreadPlan plan, String provider, String model, int maxTopLevel, int maxReplies) {
-        // Full active pool for rotation (no fixed limit(24)) — but a single request's cast is
-        // capped+shuffled so the prompt stays under Claude's 200K-token budget (2026-08-01 outage:
-        // sending all 150 personas' voice_profile ≈ 306K tokens, 173/173 REQUESTED plans FAILED).
+        // WP3 계약 6: 댓글 캐스트 = 가중 비복원 추첨(글 작성자 제외). 매 호출마다 다시 뽑으므로
+        // 회전(WP1의 원래 의도)은 유지되고, 특정 몇 명이 고정 상위 슬라이스를 독점하지 않는다.
         List<Persona> active = personaRepository.findByActiveTrue();
-        List<Persona> cast = PlanPersonaMapper.capCastPool(active, properties.getThreadPlan().getPlanPersonaCastMax());
-        List<Map<String, Object>> personas = planPersonaMapper.mapCast(cast);
+        Set<String> exclude = storyAuthorPersonaId(plan.getPostId())
+                .map(java.util.Set::of).orElseGet(java.util.Set::of);
+        List<Persona> drawnCommenters = personaLottery.drawCommenters(
+                active, plan.getSourceCategory(), exclude, properties.getThreadPlan().getPlanPersonaCastMax(),
+                ThreadLocalRandom.current());
+        List<Map<String, Object>> personas = planPersonaMapper.mapCast(drawnCommenters);
         Set<String> castIds = planPersonaMapper.castIds(personas);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("kind", "AI_POST".equals(plan.getSourceType()) ? "AI_POST" : "HUMAN_POST");
@@ -539,15 +558,22 @@ public class ThreadPlanGenerationService {
     }
 
     /** Best-effort PLAN_CAST seed into ai_post_interested_personas; never fails READY. */
+    /**
+     * WP3: interested pool 시드는 실제로 게시된 plan cast(quality.keptItems)가 아니라 별도
+     * 가중 추첨 결과를 쓴다 — plan cast를 그대로 시드하면 사람 답글 후보 풀이 이미 뽑힌 댓글
+     * 캐스트로 자기강화(self-reinforcement)되어 회전이 죽는다(00-shared.md §5).
+     */
     private void seedInterestedPersonasBestEffort(String planId, ThreadQualityGate.QualityResult quality) {
         try {
             AiThreadPlan plan = planRepository.findById(planId).orElse(null);
             if (plan == null || plan.getPostId() == null || plan.getPostId().isBlank()) return;
+            Set<String> exclude = storyAuthorPersonaId(plan.getPostId())
+                    .map(Set::of).orElseGet(Set::of);
+            List<Persona> drawn = personaLottery.drawCommenters(
+                    personaRepository.findByActiveTrue(), plan.getSourceCategory(), exclude, 8,
+                    ThreadLocalRandom.current());
             Set<String> cast = new LinkedHashSet<>();
-            for (Map<String, Object> row : quality.keptItems()) {
-                String personaId = text(row.get("personaId"));
-                if (!personaId.isBlank()) cast.add(personaId);
-            }
+            for (Persona p : drawn) cast.add(p.getId());
             interestedPersonaSeeder.seedFromPlanCast(plan.getPostId(), cast);
         } catch (Exception e) {
             log.warn("interested persona seed failed for plan {}: {}", planId, e.getMessage());

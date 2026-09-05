@@ -11,7 +11,7 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
-import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,7 +62,7 @@ class AiPostBundleServiceTest {
     @Mock private PlanPersonaMapper planPersonaMapper;
     @Mock private PlanSourceStoryResolver sourceStoryResolver;
     @Mock private StoryProfileAnalyzer storyProfileAnalyzer;
-    @Mock private PersonaMatcherService personaMatcherService;
+    @Mock private PersonaLottery personaLottery;
     @Mock private StoryTwinGuard storyTwinGuard;
     @Mock private SourceReservationSupport sourceReservationSupport;
     @Mock private com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
@@ -85,13 +86,39 @@ class AiPostBundleServiceTest {
         // wrongly cap every mega-call test down to 1 persona (see capMegaCallCastBoundsSize* below
         // for the dedicated cap-behavior tests instead).
         when(threadPlan.getPlanPersonaCastMax()).thenReturn(40);
+        // Pre-existing gap (unrelated to WP3): evaluatePlazaTopicalFit() always runs and NPEs
+        // without this stub — every generateAndHold* test was failing before WP3 too.
+        when(threadPlan.getPlazaTopicalFitGate()).thenReturn(new OrchestratorProperties.PlazaTopicalFitGate());
         scheduleSupport = new CandidateScheduleSupport(properties);
         when(storyProfileAnalyzer.analyze(any(), any(), any(), any(), any())).thenReturn(
                 new StoryProfile("갈등", "OTHER",
                         List.of(), Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                         "NATEPAN", List.of(), "", ""));
-        when(personaMatcherService.matchCommenters(any(), any(Integer.class), anyLong(), anyString()))
-                .thenReturn(List.of());
+        // WP3: PersonaLottery.drawCommenters generic fallback — filters exclude, caps at n,
+        // preserves the input pool order (deterministic enough for these unit tests; real
+        // randomness/weighting is covered by PersonaLotteryTest).
+        when(personaLottery.drawCommenters(any(), any(), any(), anyInt(), any())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            List<Persona> poolArg = (List<Persona>) inv.getArgument(0);
+            @SuppressWarnings("unchecked")
+            Set<String> exclude = (Set<String>) inv.getArgument(2);
+            int n = (int) inv.getArgument(3);
+            List<Persona> filtered = new ArrayList<>();
+            for (Persona p : poolArg) {
+                if (exclude == null || !exclude.contains(p.getId())) filtered.add(p);
+            }
+            return filtered.size() > n ? new ArrayList<>(filtered.subList(0, n)) : filtered;
+        });
+        // Generic fallback so tests that don't stub mapCast/mapAuthor for a specific subset
+        // still get a coherent map (personaId + a derived nickname/formality).
+        when(planPersonaMapper.mapCast(any())).thenAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            List<Persona> list = (List<Persona>) inv.getArgument(0);
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Persona p : list) out.add(defaultPersonaMap(p));
+            return out;
+        });
+        when(planPersonaMapper.mapAuthor(any())).thenAnswer(inv -> defaultPersonaMap(inv.getArgument(0)));
         when(storyTwinGuard.loadRecentAiPosts()).thenReturn(List.of());
         when(storyTwinGuard.twinReason(anyString(), anyString(), any())).thenReturn(Optional.empty());
         when(sourceReservationSupport.provenanceWithReservation(any(), anyString())).thenAnswer(inv -> {
@@ -113,7 +140,7 @@ class AiPostBundleServiceTest {
                 configRepository, properties, personaRepository, llmClient, backendBot,
                 safetyGuard, planService, planGenerationService, scheduledPostRepository,
                 scheduleSupport, new ObjectMapper(), planPersonaMapper, sourceStoryResolver,
-                storyProfileAnalyzer, personaMatcherService, storyTwinGuard, sourceReservationSupport,
+                storyProfileAnalyzer, personaLottery, storyTwinGuard, sourceReservationSupport,
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
                 mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker, notifier, plazaTopicalFitGate,
                 promptTemplateCache);
@@ -133,12 +160,6 @@ class AiPostBundleServiceTest {
                 "nickname", "밤하늘여행",
                 "formality", "polite",
                 "voiceProfile", Map.of("formality", "polite", "voice_type", "NATEPAN"));
-        Map<String, Object> otherMap = Map.of(
-                "personaId", "ai-user-2",
-                "nickname", "커피중독",
-                "formality", "casual",
-                "voiceProfile", Map.of("formality", "casual"));
-        when(planPersonaMapper.mapCast(any())).thenReturn(List.of(authorMap, otherMap));
         when(planPersonaMapper.castIds(any())).thenReturn(Set.of("ai-user-1", "ai-user-2"));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(authorMap);
 
@@ -208,9 +229,6 @@ class AiPostBundleServiceTest {
         when(personaRepository.findByActiveTrue()).thenReturn(List.of(author, other));
         Map<String, Object> authorMap = Map.of("personaId", author.getId(), "nickname", "밤하늘여행",
                 "formality", "polite", "voiceProfile", Map.of("formality", "polite"));
-        Map<String, Object> otherMap = Map.of("personaId", other.getId(), "nickname", "커피중독",
-                "formality", "casual", "voiceProfile", Map.of("formality", "casual"));
-        when(planPersonaMapper.mapCast(any())).thenReturn(List.of(authorMap, otherMap));
         when(planPersonaMapper.castIds(any())).thenReturn(Set.of(author.getId(), other.getId()));
         when(planPersonaMapper.mapAuthor(author)).thenReturn(authorMap);
         when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY"), any()))
@@ -303,8 +321,13 @@ class AiPostBundleServiceTest {
         assertThat(held.get().getBody()).isEqualTo("육아 갈등 본문입니다.\n어제 일이 됐어 그냥 넘어가려고 했는데");
     }
 
+    /**
+     * WP3: comment cast is always author + up to 11 lottery-drawn commenters (00-shared.md 계약
+     * 6), regardless of active pool size or mega-call vs micro-batch — replaces the pre-WP3
+     * "full active pool, no fixed cap" mega-call behavior.
+     */
     @Test
-    void generateBundleIncludesFullActivePoolWithoutLimit24WhenMicroBatchDisabled() {
+    void generateBundleCapsCommentCastAtElevenRegardlessOfActivePoolSize() {
         when(threadPlan.isMicroBatchEnabled()).thenReturn(false);
         Persona author = persona("ai-user-1", "casual", null);
         List<Persona> pool = new ArrayList<>();
@@ -344,7 +367,7 @@ class AiPostBundleServiceTest {
         verify(llmClient).generateThreadPlan(reqCaptor.capture());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> personas = (List<Map<String, Object>>) reqCaptor.getValue().get("personas");
-        assertThat(personas).hasSize(30);
+        assertThat(personas).hasSize(12);
     }
 
     @Test
@@ -512,6 +535,17 @@ class AiPostBundleServiceTest {
         assertThat(slices.get(0)).hasSize(5);
         assertThat(slices.get(1)).hasSize(5);
         assertThat(slices.get(2)).hasSize(1);
+    }
+
+    private static Map<String, Object> defaultPersonaMap(Persona p) {
+        Object formality = p.getVoiceProfile() != null
+                ? p.getVoiceProfile().getOrDefault("formality", "casual") : "casual";
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("personaId", p.getId());
+        m.put("nickname", "nick-" + p.getId());
+        m.put("formality", formality);
+        m.put("voiceProfile", p.getVoiceProfile() == null ? Map.of() : p.getVoiceProfile());
+        return m;
     }
 
     private static Persona persona(String id, String formality, String ignored) {

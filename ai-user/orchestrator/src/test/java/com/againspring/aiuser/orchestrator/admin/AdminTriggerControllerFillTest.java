@@ -8,13 +8,9 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
-import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
 import com.againspring.aiuser.orchestrator.service.gate.EffectiveGatesService;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
-import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
-import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
-import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
 import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
 import com.againspring.aiuser.orchestrator.service.threadplan.NightlyScheduledFillService;
@@ -54,10 +50,6 @@ class AdminTriggerControllerFillTest {
     @Mock private PlanEngagementDispatcher engagementDispatcher;
     @Mock private ViewDispatcher viewDispatcher;
     @Mock private HumanReplyTtlCleanupService humanReplyTtlCleanupService;
-    @Mock private PersonaCapsuleService personaCapsuleService;
-    @Mock private PersonaMatcherService personaMatcherService;
-    @Mock private PersonaAutoProvisionService personaAutoProvisionService;
-    @Mock private StoryProfileAnalyzer storyProfileAnalyzer;
     @Mock private ThreadPlanGenerationService threadPlanGenerationService;
     @Mock private LlmGenerationGateService llmGenerationGateService;
     @Mock private EffectiveGatesService effectiveGatesService;
@@ -72,8 +64,7 @@ class AdminTriggerControllerFillTest {
         controller = new AdminTriggerController(
                 pairedPostScheduler, runtimeRepo, personaRepo, actionExecutor, jdbcTemplate,
                 properties, nightlyScheduledFillService, scheduledPostRepository, engagementDispatcher,
-                viewDispatcher, humanReplyTtlCleanupService, personaCapsuleService, personaMatcherService,
-                personaAutoProvisionService, storyProfileAnalyzer, threadPlanGenerationService,
+                viewDispatcher, humanReplyTtlCleanupService, threadPlanGenerationService,
                 llmGenerationGateService, effectiveGatesService, scheduledPostPublisher,
                 personaProfileRegenerator, personaRelationshipFiller);
     }

@@ -64,7 +64,8 @@ class ThreadPlanGenerationServiceTest {
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
                 mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
                 mock(org.springframework.jdbc.core.JdbcTemplate.class),
-                promptTemplateCache
+                promptTemplateCache,
+                new com.againspring.aiuser.orchestrator.service.persona.PersonaLottery()
         );
     }
 

@@ -8,6 +8,8 @@ import com.againspring.aiuser.orchestrator.notification.ScheduledPostTelegramNot
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
+import com.againspring.aiuser.orchestrator.service.persona.CategoryMixPlanner;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,7 @@ public class NightlyScheduledFillService {
     private final OrchestratorProperties properties;
     private final ScheduledPostTelegramNotifier telegramNotifier;
     private final AiUserMlClient aiUserMlClient;
+    private final PersonaLottery personaLottery;
 
     public record FillResult(
             int target,
@@ -173,6 +176,9 @@ public class NightlyScheduledFillService {
         int soloSaved = 0;
         int skipped = 0;
 
+        // WP3 계약 5: 카테고리는 CategoryMixPlanner가 슬롯 단위로 고정 배정한다(voice_type 조건
+        // 삭제). 작성자는 계약 6 가중 추첨(PersonaLottery)으로 뽑는다.
+        List<CategoryMixPlanner.Slot> categorySlots = CategoryMixPlanner.plan(need, rng);
         for (int i = 0; i < need; i++) {
             if (!budget.hasRemaining()) {
                 failures.add(unfilled("LLM cap reached before slot " + i, sources.get(i)));
@@ -180,7 +186,8 @@ public class NightlyScheduledFillService {
             }
             String preferred = sources.get(i);
             Instant slot = slots.get(i);
-            SlotSave save = tryFillOneSlot(i, preferred, slot, pool, rng, budget, emptyPlazaSources,
+            String category = i < categorySlots.size() ? categorySlots.get(i).category() : CategoryMixPlanner.WORK;
+            SlotSave save = tryFillOneSlot(i, preferred, category, slot, pool, rng, budget, emptyPlazaSources,
                     skipExampleIds, failures, skipSourceClaim);
             attempted += save.attempted();
             skipped += save.skipped();
@@ -241,82 +248,83 @@ public class NightlyScheduledFillService {
         return empty;
     }
 
-    private SlotSave tryFillOneSlot(int slotIndex, String preferredSource, Instant slot, List<Persona> pool,
-                                    Random rng, LlmCallBudget budget, Set<String> emptyPlazaSources,
-                                    Set<Long> skipExampleIds, List<NightlySlotFailure> failures,
-                                    boolean skipSourceClaim) {
+    /**
+     * WP3: 슬롯 카테고리는 고정(CategoryMixPlanner)이다. 소스(blind/natepan)는 콘텐츠 claim
+     * 용도로만 재시도하고, 작성자는 소스가 아니라 카테고리 기준 가중 추첨(계약 6)으로 뽑는다 —
+     * 같은 슬롯에서 실패 시 최대 3회 다른 추첨자로 재시도한다.
+     */
+    private SlotSave tryFillOneSlot(int slotIndex, String preferredSource, String category, Instant slot,
+                                    List<Persona> pool, Random rng, LlmCallBudget budget,
+                                    Set<String> emptyPlazaSources, Set<Long> skipExampleIds,
+                                    List<NightlySlotFailure> failures, boolean skipSourceClaim) {
         int attempted = 0;
         int skipped = 0;
         List<String> sourceOrder = sourceRetryOrder(preferredSource);
         for (String source : sourceOrder) {
             if (!budget.hasRemaining()) break;
-            List<Persona> candidates = new ArrayList<>();
-            for (Persona p : pool) {
-                if (SourceMixPlanner.matchesVoice(p,
-                        SourceMixPlanner.voiceTypeForSource(source).orElse(""))) {
-                    candidates.add(p);
-                }
-            }
-            if (candidates.isEmpty()) {
-                log.warn("[nightly-fill] no persona for source={} slot={}", source, slotIndex);
+            String emptyKey = source + "|" + category;
+            if (emptyPlazaSources.contains(emptyKey)) {
+                skipped++;
+                log.info("[nightly-fill] SKIP_NO_INVENTORY slot={} source={} plaza={}",
+                        slotIndex, source, category);
                 continue;
             }
-            java.util.Collections.shuffle(candidates, rng);
-            for (Persona persona : candidates) {
-                if (!budget.hasRemaining()) break;
-                for (String plaza : PlazaGrounding.retryOrderWithFamilyControl(persona, properties.isFamilyPlazaGenerationEnabled())) {
-                    String emptyKey = source + "|" + plaza;
-                    if (emptyPlazaSources.contains(emptyKey)) {
-                        skipped++;
-                        log.info("[nightly-fill] SKIP_NO_INVENTORY slot={} source={} plaza={}",
-                                slotIndex, source, plaza);
-                        continue;
+            List<Persona> tried = new ArrayList<>();
+            for (int authorAttempt = 0; authorAttempt < 3 && budget.hasRemaining(); authorAttempt++) {
+                List<Persona> candidatePool = new ArrayList<>(pool);
+                candidatePool.removeAll(tried);
+                List<Persona> drawn = personaLottery.drawAuthors(candidatePool, category, 1, rng);
+                if (drawn.isEmpty()) {
+                    log.warn("[nightly-fill] no eligible persona for category={} slot={}", category, slotIndex);
+                    break;
+                }
+                Persona persona = drawn.get(0);
+                tried.add(persona);
+                int inner = 0;
+                while (budget.hasRemaining() && inner < 8) {
+                    inner++;
+                    String corrId = "nightly-hold-" + persona.getId() + "-s" + slotIndex + "-a" + attempted;
+                    HoldResult result = skipSourceClaim
+                            ? aiPostBundleService.generateAndHoldResult(
+                                    persona, category, null, corrId, slot, source, skipExampleIds, true)
+                            : aiPostBundleService.generateAndHoldResult(
+                                    persona, category, null, corrId, slot, source, skipExampleIds);
+                    attempted++;
+                    log.info("[nightly-fill] attempt slot={} {}", slotIndex, result.detailedReason());
+                    if (result.outcome() == HoldResult.Outcome.CLAIM_EMPTY) {
+                        emptyPlazaSources.add(emptyKey);
+                        failures.add(NightlySlotFailure.fromHold("solo", result));
+                        break;
                     }
-                    int inner = 0;
-                    while (budget.hasRemaining() && inner < 8) {
-                        inner++;
-                        String corrId = "nightly-hold-" + persona.getId() + "-s" + slotIndex + "-a" + attempted;
-                        HoldResult result = skipSourceClaim
-                                ? aiPostBundleService.generateAndHoldResult(
-                                        persona, plaza, null, corrId, slot, source, skipExampleIds, true)
-                                : aiPostBundleService.generateAndHoldResult(
-                                        persona, plaza, null, corrId, slot, source, skipExampleIds);
-                        attempted++;
-                        log.info("[nightly-fill] attempt slot={} {}", slotIndex, result.detailedReason());
-                        if (result.outcome() == HoldResult.Outcome.CLAIM_EMPTY) {
-                            emptyPlazaSources.add(emptyKey);
-                            failures.add(NightlySlotFailure.fromHold("solo", result));
-                            break;
-                        }
-                        if (result.outcome() == HoldResult.Outcome.SAME_EXAMPLE) {
-                            if (result.exampleId() != null) {
-                                skipExampleIds.add(result.exampleId());
-                            }
-                            failures.add(NightlySlotFailure.fromHold("solo", result));
-                            continue;
-                        }
-                        if (result.outcome() == HoldResult.Outcome.GENERATION_SKIPPED) {
-                            failures.add(NightlySlotFailure.fromHold("solo", result));
-                            if (result.detail() != null && result.detail().contains("provider is OFF")) {
-                                return new SlotSave(attempted, null, result, skipped);
-                            }
-                            break;
-                        }
-                        if (result.llmInvoked()) {
-                            budget.consume();
-                        }
-                        if (result.exampleId() != null
-                                && result.outcome() != HoldResult.Outcome.SAVED) {
+                    if (result.outcome() == HoldResult.Outcome.SAME_EXAMPLE) {
+                        if (result.exampleId() != null) {
                             skipExampleIds.add(result.exampleId());
                         }
-                        if (result.outcome() == HoldResult.Outcome.SAVED) {
-                            pool.remove(persona);
-                            Optional<AiScheduledPost> row = result.saved();
-                            return new SlotSave(attempted, row.map(AiScheduledPost::getId).orElse(null), result, skipped);
-                        }
                         failures.add(NightlySlotFailure.fromHold("solo", result));
+                        continue;
                     }
+                    if (result.outcome() == HoldResult.Outcome.GENERATION_SKIPPED) {
+                        failures.add(NightlySlotFailure.fromHold("solo", result));
+                        if (result.detail() != null && result.detail().contains("provider is OFF")) {
+                            return new SlotSave(attempted, null, result, skipped);
+                        }
+                        break;
+                    }
+                    if (result.llmInvoked()) {
+                        budget.consume();
+                    }
+                    if (result.exampleId() != null
+                            && result.outcome() != HoldResult.Outcome.SAVED) {
+                        skipExampleIds.add(result.exampleId());
+                    }
+                    if (result.outcome() == HoldResult.Outcome.SAVED) {
+                        pool.remove(persona);
+                        Optional<AiScheduledPost> row = result.saved();
+                        return new SlotSave(attempted, row.map(AiScheduledPost::getId).orElse(null), result, skipped);
+                    }
+                    failures.add(NightlySlotFailure.fromHold("solo", result));
                 }
+                if (emptyPlazaSources.contains(emptyKey)) break;
             }
         }
         return new SlotSave(attempted, null, null, skipped);

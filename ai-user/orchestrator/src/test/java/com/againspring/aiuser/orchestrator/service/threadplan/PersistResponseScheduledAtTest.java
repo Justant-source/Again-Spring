@@ -64,7 +64,8 @@ class PersistResponseScheduledAtTest {
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
                 mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
                 mock(org.springframework.jdbc.core.JdbcTemplate.class),
-                mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class));
+                mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class),
+                new com.againspring.aiuser.orchestrator.service.persona.PersonaLottery());
         when(properties.getThreadPlan()).thenReturn(threadPlanConfig);
         when(threadPlanConfig.getReadyMinTopLevel()).thenReturn(1);
         when(threadPlanConfig.getReadyMinItems()).thenReturn(1);
@@ -138,6 +139,10 @@ class PersistResponseScheduledAtTest {
                 .build();
         when(planRepository.findById("plan-3")).thenReturn(Optional.of(plan));
         when(personaRepository.existsById("p1")).thenReturn(true);
+        // WP3: interested-pool seed now draws from the active pool (PersonaLottery), not the
+        // kept plan cast — give it "p1" so the seedFromPlanCast(post, [p1]) assertion still holds.
+        when(personaRepository.findByActiveTrue()).thenReturn(
+                List.of(Persona.builder().id("p1").tier("REGULAR").active(true).build()));
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
         when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -267,6 +272,8 @@ class PersistResponseScheduledAtTest {
                 .build();
         when(planRepository.findById("plan-4")).thenReturn(Optional.of(plan));
         when(personaRepository.existsById("p1")).thenReturn(true);
+        when(personaRepository.findByActiveTrue()).thenReturn(
+                List.of(Persona.builder().id("p1").tier("REGULAR").active(true).build()));
         when(safetyGuard.check(any(), any())).thenReturn(ContentSafetyGuard.GuardResult.ok());
         when(itemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

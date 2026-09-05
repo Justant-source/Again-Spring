@@ -70,7 +70,8 @@ class HumanReplyBatchServiceTest {
         lenient().when(llmGate.isHeld()).thenReturn(false);
         service = new HumanReplyBatchService(
                 inbox, plans, planItems, personaRepository, interestedPersonas, llm, guard, props,
-                generationConfigSupport, configRepository, backend, jdbc, llmGate, promptTemplateCache);
+                generationConfigSupport, configRepository, backend, jdbc, llmGate, promptTemplateCache,
+                new com.againspring.aiuser.orchestrator.service.persona.PersonaLottery());
     }
 
     @Test

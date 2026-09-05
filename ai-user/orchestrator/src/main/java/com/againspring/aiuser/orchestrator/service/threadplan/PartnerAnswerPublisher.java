@@ -11,6 +11,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -52,6 +53,7 @@ public class PartnerAnswerPublisher {
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final PersonaLottery personaLottery;
 
     public void publishDue() {
         if (!properties.isEnabled()) return;
@@ -149,16 +151,17 @@ public class PartnerAnswerPublisher {
             commentCtx.add(rowMap);
         }
 
-        List<Persona> pool = PlanPersonaMapper.capCastPool(personas.findByActiveTrue(), CALL2_CAST_MAX);
-        List<Map<String, Object>> cast = planPersonaMapper.mapCast(pool);
+        // WP3 계약 6: capCastPool(랜덤 셔플) 대신 가중 비복원 추첨으로 통일. 글 작성자·파트너
+        // 둘 다 방청객(bystander) 캐스트에서 제외한다.
+        Set<String> exclude = row.getAuthorPersonaId() != null && !row.getAuthorPersonaId().isBlank()
+                ? Set.of(partner.getId(), row.getAuthorPersonaId()) : Set.of(partner.getId());
+        List<Persona> drawnCommenters = personaLottery.drawCommenters(
+                personas.findByActiveTrue(), row.getCategory(), exclude, CALL2_CAST_MAX - 1,
+                java.util.concurrent.ThreadLocalRandom.current());
         Map<String, Object> partnerMap = planPersonaMapper.mapAuthor(partner);
-        List<Map<String, Object>> personasCast = new ArrayList<>();
+        List<Map<String, Object>> personasCast = new ArrayList<>(1 + drawnCommenters.size());
         personasCast.add(partnerMap);
-        for (Map<String, Object> p : cast) {
-            if (partner.getId().equals(String.valueOf(p.getOrDefault("personaId", "")))) continue;
-            personasCast.add(p);
-            if (personasCast.size() >= CALL2_CAST_MAX) break;
-        }
+        personasCast.addAll(planPersonaMapper.mapCast(drawnCommenters));
 
         Map<String, Object> authorPost = new LinkedHashMap<>();
         if (row.getAuthorPersonaId() != null && !row.getAuthorPersonaId().isBlank()) {

@@ -6,6 +6,7 @@ import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.domain.*;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemStatus;
 import com.againspring.aiuser.orchestrator.domain.enums.ThreadPlanItemType;
@@ -58,6 +59,7 @@ public class HumanReplyBatchService {
     private final JdbcTemplate jdbc;
     private final LlmGenerationGateService llmGenerationGateService;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final PersonaLottery personaLottery;
 
     public void run() {
         AiUserGenerationConfig config = configRepository.findById(1).orElse(null);
@@ -268,27 +270,30 @@ public class HumanReplyBatchService {
         return loadCandidateResponders(postId, configRepository.findById(1).orElse(null));
     }
 
+    /**
+     * WP3 계약 6: preferred pool 안에서도 결정론 {@code findByPostIdOrderByScoreDesc} 대신
+     * {@link com.againspring.aiuser.orchestrator.service.persona.PersonaLottery} 가중 추첨을
+     * 쓴다(가중치는 {@code last_comment_at} 기준). candidateRespondersMax·hr_* admin 예산은
+     * 그대로 존중한다(추첨 결과 개수의 상한일 뿐).
+     */
     List<Map<String, Object>> loadCandidateResponders(String postId, AiUserGenerationConfig config) {
         int max = Math.max(1, candidateRespondersMax(config));
-        List<String> preferred = loadInterestedPersonaIds(postId, max);
-        if (preferred.isEmpty()) {
-            preferred = loadPlanItemPersonaIds(postId);
-        }
         List<Persona> active = personaRepository.findByActiveTrue();
         if (active.isEmpty()) return List.of();
         Map<String, Persona> byId = new LinkedHashMap<>();
         for (Persona p : active) byId.put(p.getId(), p);
-        List<Persona> pool = new ArrayList<>();
+
+        List<String> preferred = loadInterestedPersonaIds(postId);
+        if (preferred.isEmpty()) {
+            preferred = loadPlanItemPersonaIds(postId);
+        }
+        List<Persona> preferredPool = new ArrayList<>();
         for (String id : preferred) {
             Persona p = byId.get(id);
-            if (p != null) pool.add(p);
-            if (pool.size() >= max) break;
+            if (p != null) preferredPool.add(p);
         }
-        if (pool.isEmpty()) {
-            List<Persona> shuffled = new ArrayList<>(active);
-            Collections.shuffle(shuffled, ThreadLocalRandom.current());
-            pool = shuffled.subList(0, Math.min(max, shuffled.size()));
-        }
+        List<Persona> pool = personaLottery.drawCommenters(
+                preferredPool.isEmpty() ? active : preferredPool, null, Set.of(), max, ThreadLocalRandom.current());
         List<Map<String, Object>> out = new ArrayList<>(pool.size());
         for (Persona chosen : pool) {
             out.add(toResponderMap(chosen));
@@ -296,14 +301,14 @@ public class HumanReplyBatchService {
         return out;
     }
 
-    private List<String> loadInterestedPersonaIds(String postId, int max) {
+    /** 점수순이 아니라 후보 id 전체 — 순서는 {@link com.againspring.aiuser.orchestrator.service.persona.PersonaLottery}가 가중 추첨으로 정한다. */
+    private List<String> loadInterestedPersonaIds(String postId) {
         try {
-            return interestedPersonas.findByPostIdOrderByScoreDesc(postId).stream()
+            return interestedPersonas.findByPostIdOrderByIdAsc(postId).stream()
                     .map(AiPostInterestedPersona::getPersonaId)
                     .filter(Objects::nonNull)
                     .filter(id -> !id.isBlank())
                     .distinct()
-                    .limit(Math.max(1, max))
                     .toList();
         } catch (Exception e) {
             log.debug("interested pool unavailable for {} (degrade): {}", postId, e.getMessage());

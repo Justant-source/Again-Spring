@@ -15,6 +15,8 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
+import com.againspring.aiuser.orchestrator.service.persona.CategoryMixPlanner;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.CandidateScheduleSupport;
 import com.againspring.aiuser.orchestrator.service.threadplan.HoldResult;
@@ -74,6 +76,7 @@ public class PairedPostScheduler {
     private final GenerationConfigSupport generationConfigSupport;
     private final LlmGenerationGateService llmGenerationGateService;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final PersonaLottery personaLottery;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
@@ -166,21 +169,14 @@ public class PairedPostScheduler {
             return new PairHoldBatch(0, 0, List.of());
         }
 
-        EnumMap<PairBucket, Integer> mixCounts = countPairedMixToday();
         List<Instant> slots = sampleAuthorSlots(toRun, config);
+        // preferredSource stays a stylistic anchor for Call1 (blind/natepan tone hint) only —
+        // WP3부터 author 선택은 voice_type 매칭이 아니라 PersonaLottery 가중 추첨이다.
         List<String> sources = SourceMixPlanner.planSources(toRun, RNG);
-        SourceMixPlanner.MixCounts sourceMix = SourceMixPlanner.planCounts(toRun);
         Map<String, Persona> personasById = loadPersonasById(shuffled);
-        log.info("[PairedPost] Holding {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={}, romanticToday={}, friendToday={}, sourceMix blind={}/natepan={})",
-            toRun,
-            all.size(),
-            totalSyntheticToday,
-            pairedToday,
-            desiredToday,
-            mixCounts.get(PairBucket.ROMANTIC),
-            mixCounts.get(PairBucket.FRIEND),
-            sourceMix.blind(),
-            sourceMix.natepan());
+        Deque<String> categoryQueue = pairedCategoryQueue(toRun, RNG);
+        log.info("[PairedPost] Holding {} pair(s) (pool={}, totalToday={}, pairedToday={}, desiredToday={})",
+            toRun, all.size(), totalSyntheticToday, pairedToday, desiredToday);
 
         int saved = 0;
         int attempted = 0;
@@ -194,17 +190,13 @@ public class PairedPostScheduler {
                 break;
             }
             String preferredSource = sources.get(i);
-            PairBucket desiredBucket = chooseNextBucket(config, mixCounts);
-            Optional<PersonaRelationship> relOpt = takeCandidateForSourceAndBucket(
-                    shuffled, personasById, preferredSource, desiredBucket);
+            String category = categoryQueue.isEmpty() ? CategoryMixPlanner.COUPLE : categoryQueue.poll();
+            Optional<PersonaRelationship> relOpt = drawRelationshipForCategory(shuffled, personasById, category, RNG);
             if (relOpt.isEmpty()) {
-                relOpt = takeCandidateForSource(shuffled, personasById, preferredSource);
-            }
-            if (relOpt.isEmpty()) {
-                log.warn("[PairedPost] No relationship author with voice_type for source={} — skip slot {}",
-                        preferredSource, i);
-                addFailure(failures, "paired", preferredSource, "-", "-", HoldResult.Outcome.CLAIM_EMPTY,
-                        "no relationship author for source=" + preferredSource);
+                log.warn("[PairedPost] No relationship author available for category={} — skip slot {}",
+                        category, i);
+                addFailure(failures, "paired", preferredSource, category, "-", HoldResult.Outcome.CLAIM_EMPTY,
+                        "no relationship author for category=" + category);
                 continue;
             }
 
@@ -216,7 +208,6 @@ public class PairedPostScheduler {
                 if (held.saved()) {
                     saved++;
                     if (held.scheduledId() != null) scheduledIds.add(held.scheduledId());
-                    mixCounts.merge(bucketForRelationType(rel.getRelationType()), 1, Integer::sum);
                 } else {
                     addFailure(failures, "paired", preferredSource, categoryForRelationType(rel.getRelationType()),
                             rel.getPersonaId(), held.outcome(), held.detail());
@@ -229,6 +220,49 @@ public class PairedPostScheduler {
             }
         }
         return new PairHoldBatch(saved, attempted, scheduledIds);
+    }
+
+    /** WP3 계약 6: 관계 보유자 풀에서 {@code category}에 맞는 작성자를 가중 비복원 추첨한다. */
+    private Optional<PersonaRelationship> drawRelationshipForCategory(
+            List<PersonaRelationship> pool, Map<String, Persona> personasById, String category, Random rng) {
+        String relationType = relationTypeForCategory(category);
+        List<PersonaRelationship> candidates = new ArrayList<>();
+        for (PersonaRelationship r : pool) {
+            if (relationType.equalsIgnoreCase(r.getRelationType())) candidates.add(r);
+        }
+        if (candidates.isEmpty()) return Optional.empty();
+        List<Persona> authorPool = new ArrayList<>();
+        Map<String, PersonaRelationship> relByPersonaId = new LinkedHashMap<>();
+        for (PersonaRelationship r : candidates) {
+            Persona author = personasById.get(r.getPersonaId());
+            if (author == null) continue;
+            authorPool.add(author);
+            relByPersonaId.putIfAbsent(author.getId(), r);
+        }
+        List<Persona> drawn = personaLottery.drawAuthors(authorPool, category, 1, rng);
+        if (drawn.isEmpty()) return Optional.empty();
+        PersonaRelationship chosen = relByPersonaId.get(drawn.get(0).getId());
+        if (chosen != null) pool.remove(chosen);
+        return Optional.ofNullable(chosen);
+    }
+
+    /** {@link #categoryForRelationType} 역방향: MARRIED→MARRIAGE, 나머지는 카테고리명과 동일. */
+    private static String relationTypeForCategory(String category) {
+        if ("MARRIED".equalsIgnoreCase(category)) return "MARRIAGE";
+        if ("FRIEND".equalsIgnoreCase(category)) return "FRIEND";
+        return "COUPLE";
+    }
+
+    /** {@link CategoryMixPlanner} 비율대로 양면 허용 카테고리만 뽑아 최소 {@code minSize}개를 채운 큐. */
+    private static Deque<String> pairedCategoryQueue(int minSize, Random rng) {
+        Deque<String> queue = new ArrayDeque<>();
+        int guard = 0;
+        while (queue.size() < Math.max(1, minSize) && guard++ < 20) {
+            for (CategoryMixPlanner.Slot slot : CategoryMixPlanner.plan(20, rng)) {
+                if (slot.pairedAllowed()) queue.add(slot.category());
+            }
+        }
+        return queue;
     }
 
     /**
@@ -256,7 +290,7 @@ public class PairedPostScheduler {
             return HoldPairResult.fail(HoldResult.Outcome.GENERATION_SKIPPED, false, "author slot still quiet");
         }
 
-        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource);
+        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId());
         if (call1.llmInvoked() && budget != null) {
             budget.consume();
         }
@@ -312,6 +346,11 @@ public class PairedPostScheduler {
 
     Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
                                        String preferredSource) {
+        return generateCall1(author, category, corrId, slot, preferredSource, null);
+    }
+
+    Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
+                                       String preferredSource, String partnerId) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
         // Missing row = no admin switch present -> treat kill as false (fail-open only for this
         // flag; provider resolution below still falls back to yml when the row is absent).
@@ -327,17 +366,16 @@ public class PairedPostScheduler {
         }
         String model = props.getThreadPlan().getAiPostModel();
 
-        List<Persona> pool = PlanPersonaMapper.capCastPool(personaRepo.findByActiveTrue(), CALL1_CAST_MAX);
-        List<Map<String, Object>> cast = planPersonaMapper.mapCast(pool);
-        // Keep author first for voice grounding.
+        // WP3 계약 6: 캐스트 = [작성자] + 가중 비복원 추첨 댓글자 11명. 파트너는 Call2에서
+        // 등장하므로 Call1 방청객(bystander)에서 제외한다.
+        java.util.Set<String> exclude = partnerId != null && !partnerId.isBlank()
+                ? java.util.Set.of(author.getId(), partnerId) : java.util.Set.of(author.getId());
+        List<Persona> drawnCommenters = personaLottery.drawCommenters(
+                personaRepo.findByActiveTrue(), category, exclude, CALL1_CAST_MAX - 1, RNG);
         Map<String, Object> authorMap = planPersonaMapper.mapAuthor(author);
-        List<Map<String, Object>> personas = new ArrayList<>();
+        List<Map<String, Object>> personas = new ArrayList<>(1 + drawnCommenters.size());
         personas.add(authorMap);
-        for (Map<String, Object> p : cast) {
-            if (author.getId().equals(String.valueOf(p.getOrDefault("personaId", "")))) continue;
-            personas.add(p);
-            if (personas.size() >= CALL1_CAST_MAX) break;
-        }
+        personas.addAll(planPersonaMapper.mapCast(drawnCommenters));
 
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("provider", provider);
@@ -534,74 +572,6 @@ public class PairedPostScheduler {
         }
     }
 
-    private EnumMap<PairBucket, Integer> countPairedMixToday() {
-        EnumMap<PairBucket, Integer> counts = new EnumMap<>(PairBucket.class);
-        counts.put(PairBucket.ROMANTIC, 0);
-        counts.put(PairBucket.FRIEND, 0);
-
-        try {
-            List<Map<String, Object>> heldRows = jdbcTemplate.queryForList(
-                "SELECT category AS category, COUNT(*) AS cnt " +
-                "FROM ai_scheduled_posts " +
-                "WHERE origin = ? " +
-                "  AND status <> 'CANCELLED' " +
-                "  AND created_at >= ? " +
-                "  AND category IN ('COUPLE', 'MARRIED', 'FRIEND') " +
-                "GROUP BY category",
-                PairedHoldMeta.ORIGIN_PAIRED,
-                todayStartTimestamp());
-            for (Map<String, Object> row : heldRows) {
-                PairBucket bucket = bucketForCategory(Objects.toString(row.get("category"), ""));
-                int count = ((Number) row.getOrDefault("cnt", 0)).intValue();
-                counts.merge(bucket, count, Integer::sum);
-            }
-        } catch (Exception e) {
-            log.warn("[PairedPost] countPairedMixToday(held) failed: {}", e.getMessage());
-        }
-
-        if (counts.get(PairBucket.ROMANTIC) + counts.get(PairBucket.FRIEND) > 0) {
-            return counts;
-        }
-
-        try {
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT p.category AS category, COUNT(*) AS cnt " +
-                "FROM posts p " +
-                "JOIN users u ON p.author_id = u.id " +
-                "WHERE u.synthetic = 1 " +
-                "  AND p.deleted_at IS NULL " +
-                "  AND p.created_at >= ? " +
-                "  AND p.partner_answered_at IS NOT NULL " +
-                "  AND p.partner_body_published IS NOT NULL " +
-                "  AND p.category IN ('COUPLE', 'MARRIED', 'FRIEND') " +
-                "GROUP BY p.category",
-                todayStartTimestamp());
-
-            for (Map<String, Object> row : rows) {
-                PairBucket bucket = bucketForCategory(Objects.toString(row.get("category"), ""));
-                int count = ((Number) row.getOrDefault("cnt", 0)).intValue();
-                counts.merge(bucket, count, Integer::sum);
-            }
-        } catch (Exception e) {
-            log.warn("[PairedPost] countPairedMixToday(answered) failed: {}", e.getMessage());
-        }
-
-        return counts;
-    }
-
-    private PairBucket chooseNextBucket(OrchestratorProperties.PairedPost config, EnumMap<PairBucket, Integer> counts) {
-        int romanticCount = counts.getOrDefault(PairBucket.ROMANTIC, 0);
-        int friendCount = counts.getOrDefault(PairBucket.FRIEND, 0);
-        int nextTotal = romanticCount + friendCount + 1;
-
-        double romanticShare = clampShare(config.getRomanticShare());
-        double friendShare = 1.0 - romanticShare;
-
-        double romanticDeficit = (nextTotal * romanticShare) - romanticCount;
-        double friendDeficit = (nextTotal * friendShare) - friendCount;
-        return friendDeficit > romanticDeficit ? PairBucket.FRIEND : PairBucket.ROMANTIC;
-    }
-
     private Map<String, Persona> loadPersonasById(List<PersonaRelationship> relationships) {
         Set<String> ids = new LinkedHashSet<>();
         for (PersonaRelationship rel : relationships) {
@@ -613,64 +583,6 @@ public class PairedPostScheduler {
             personaRepo.findById(id).ifPresent(p -> byId.put(id, p));
         }
         return byId;
-    }
-
-    /**
-     * Prefer HEAVY author with matching voice_type in the desired romantic/friend bucket.
-     * Never returns a wrong voice_type.
-     */
-    private Optional<PersonaRelationship> takeCandidateForSourceAndBucket(
-            List<PersonaRelationship> candidates,
-            Map<String, Persona> personasById,
-            String preferredSource,
-            PairBucket bucket) {
-        return takeMatchingAuthor(candidates, personasById, preferredSource, bucket, true)
-                .or(() -> takeMatchingAuthor(candidates, personasById, preferredSource, bucket, false));
-    }
-
-    private Optional<PersonaRelationship> takeCandidateForSource(
-            List<PersonaRelationship> candidates,
-            Map<String, Persona> personasById,
-            String preferredSource) {
-        return takeMatchingAuthor(candidates, personasById, preferredSource, null, true)
-                .or(() -> takeMatchingAuthor(candidates, personasById, preferredSource, null, false));
-    }
-
-    private Optional<PersonaRelationship> takeMatchingAuthor(
-            List<PersonaRelationship> candidates,
-            Map<String, Persona> personasById,
-            String preferredSource,
-            PairBucket bucketOrNull,
-            boolean heavyOnly) {
-        Optional<String> voiceOpt = SourceMixPlanner.voiceTypeForSource(preferredSource);
-        if (voiceOpt.isEmpty()) return Optional.empty();
-        String voice = voiceOpt.get();
-
-        Iterator<PersonaRelationship> iterator = candidates.iterator();
-        while (iterator.hasNext()) {
-            PersonaRelationship rel = iterator.next();
-            if (bucketOrNull != null && bucketForRelationType(rel.getRelationType()) != bucketOrNull) {
-                continue;
-            }
-            Persona author = personasById.get(rel.getPersonaId());
-            if (author == null || !SourceMixPlanner.matchesVoice(author, voice)) {
-                continue;
-            }
-            if (heavyOnly && !"HEAVY".equals(author.getTier())) {
-                continue;
-            }
-            iterator.remove();
-            return Optional.of(rel);
-        }
-        return Optional.empty();
-    }
-
-    private PairBucket bucketForRelationType(String relationType) {
-        return "FRIEND".equalsIgnoreCase(relationType) ? PairBucket.FRIEND : PairBucket.ROMANTIC;
-    }
-
-    private PairBucket bucketForCategory(String category) {
-        return "FRIEND".equalsIgnoreCase(category) ? PairBucket.FRIEND : PairBucket.ROMANTIC;
     }
 
     private String categoryForRelationType(String relationType) {
@@ -690,10 +602,5 @@ public class PairedPostScheduler {
     private double clampShare(double share) {
         if (Double.isNaN(share)) return 0.0;
         return Math.max(0.0, Math.min(1.0, share));
-    }
-
-    private enum PairBucket {
-        ROMANTIC,
-        FRIEND
     }
 }

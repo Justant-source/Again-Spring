@@ -153,8 +153,10 @@ public class ThreadPlanPublisher {
                     jwt.get(), item.getTargetPostId(),
                     body,
                     parent, item.getIdempotencyKey());
-            if (posted.isPresent()) leases.completePosted(item.getId(), worker, posted.get());
-            else leases.releaseFailed(item.getId(), worker, "BACKEND_WRITE_FAILED", false);
+            if (posted.isPresent()) {
+                leases.completePosted(item.getId(), worker, posted.get());
+                persona.setLastCommentAt(java.time.Instant.now()); personas.save(persona); // WP3 계약 6
+            } else leases.releaseFailed(item.getId(), worker, "BACKEND_WRITE_FAILED", false);
         } catch (Exception e) {
             log.warn("Plan item publish failed id={}: {}", item.getId(), e.getMessage());
             leases.releaseFailed(item.getId(), worker, "PUBLISH_EXCEPTION", false);

@@ -18,8 +18,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.PlazaTopicalFitGate;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.safety.SoftProofread;
-import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
-import com.againspring.aiuser.orchestrator.service.match.RankedPersona;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.util.LiteralNewlineNormalizer;
@@ -40,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * PLAN-mode AI post creation boundary.
@@ -75,7 +75,7 @@ public class AiPostBundleService {
     private final PlanPersonaMapper planPersonaMapper;
     private final PlanSourceStoryResolver sourceStoryResolver;
     private final StoryProfileAnalyzer storyProfileAnalyzer;
-    private final PersonaMatcherService personaMatcherService;
+    private final PersonaLottery personaLottery;
     private final StoryTwinGuard storyTwinGuard;
     private final SourceReservationSupport sourceReservationSupport;
     private final GenerationConfigSupport generationConfigSupport;
@@ -359,23 +359,23 @@ public class AiPostBundleService {
         String model = properties.getThreadPlan().getAiPostModel();
         int pool = config == null ? 24 : Math.max(8, Math.min(30, config.getCandidatePoolSize()));
 
-        // WP3: StoryProfile once per source; reorder comment cast by matcher (author stays personas[0]).
+        // WP3: StoryProfile once per source (grounding hints stay useful even without the matcher).
         StoryProfile storyProfile = storyProfileAnalyzer.analyze(
                 source.sourceTitle(),
                 source.sourceBody(),
                 category,
                 registerHint(author, source),
                 source.sourceExampleId());
-        long exampleId = source.sourceExampleId() == null ? 0L : source.sourceExampleId();
         String corr = correlationId == null ? "ai-post-bundle" : correlationId;
 
+        // WP3 계약 6: 캐스트 = [작성자] + 가중 비복원 추첨 댓글자 11명. 매 글 추첨이므로
+        // 상위 슬라이스가 고정되지 않는다(reorderCastByMatcher/캡슐 폐기).
         List<Persona> active = personaRepository.findByActiveTrue();
-        List<Map<String, Object>> personas = reorderCastByMatcher(
-                planPersonaMapper.mapCast(active), author, storyProfile, exampleId, corr);
-        if (personas.isEmpty()) {
-            log.warn("AI post bundle skipped: no active personas corr={}", correlationId);
-            return BundleAttempt.skipped("no active personas");
-        }
+        List<Persona> drawnCommenters = personaLottery.drawCommenters(
+                active, category, Set.of(author.getId()), 11, ThreadLocalRandom.current());
+        List<Map<String, Object>> personas = new ArrayList<>(1 + drawnCommenters.size());
+        personas.add(planPersonaMapper.mapAuthor(author));
+        personas.addAll(planPersonaMapper.mapCast(drawnCommenters));
         Set<String> castIds = planPersonaMapper.castIds(personas);
 
         OrchestratorProperties.ThreadPlan tp = properties.getThreadPlan();
@@ -654,8 +654,9 @@ public class AiPostBundleService {
     }
 
     /**
-     * Matcher already ranked commenters. Keep enough for call-1 plus at most one extra
-     * slice so READY mins can be filled — do not walk the full active roster (~150 → 30 slices).
+     * Commenters already come from {@code PersonaLottery.drawCommenters} (random weighted order,
+     * not matcher-ranked). Keep enough for call-1 plus at most one extra slice so READY mins can
+     * be filled — do not walk the full active roster (~150 → 30 slices).
      */
     static List<Map<String, Object>> capCommentersForMicroBatch(
             List<Map<String, Object>> commenters, int batchSize, int readyMinItems) {
@@ -816,56 +817,6 @@ public class AiPostBundleService {
         } catch (ReflectiveOperationException ignored) {
             // Column not yet present (W1-H). Provenance is in candidates JSON.
         }
-    }
-
-    /**
-     * Author first, then matcher-ranked commenters, then remaining cast (stable).
-     * Matcher failures degrade to author-first original order.
-     */
-    List<Map<String, Object>> reorderCastByMatcher(
-            List<Map<String, Object>> cast,
-            Persona author,
-            StoryProfile profile,
-            long sourceExampleId,
-            String correlationId) {
-        List<Map<String, Object>> base = cast == null ? List.of() : new ArrayList<>(cast);
-        Map<String, Object> authorEntry = planPersonaMapper.mapAuthor(author);
-        base.removeIf(m -> author.getId().equals(String.valueOf(m.getOrDefault("personaId", ""))));
-
-        List<String> rankedIds = List.of();
-        try {
-            List<RankedPersona> ranked = personaMatcherService.matchCommenters(
-                    profile, Math.min(60, Math.max(1, base.size())), sourceExampleId, correlationId + "-cast");
-            rankedIds = ranked.stream().map(RankedPersona::personaId).toList();
-        } catch (Exception e) {
-            log.debug("cast matcher skipped corr={}: {}", correlationId, e.getMessage());
-        }
-
-        LinkedHashSet<String> seen = new LinkedHashSet<>();
-        List<Map<String, Object>> out = new ArrayList<>(base.size() + 1);
-        out.add(authorEntry);
-        seen.add(author.getId());
-
-        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
-        for (Map<String, Object> m : base) {
-            String id = String.valueOf(m.getOrDefault("personaId", ""));
-            if (!id.isBlank()) byId.put(id, m);
-        }
-        for (String id : rankedIds) {
-            if (seen.contains(id)) continue;
-            Map<String, Object> row = byId.get(id);
-            if (row != null) {
-                out.add(row);
-                seen.add(id);
-            }
-        }
-        for (Map<String, Object> m : base) {
-            String id = String.valueOf(m.getOrDefault("personaId", ""));
-            if (id.isBlank() || seen.contains(id)) continue;
-            out.add(m);
-            seen.add(id);
-        }
-        return out;
     }
 
     static Map<String, Object> storyProfileToMap(StoryProfile p) {

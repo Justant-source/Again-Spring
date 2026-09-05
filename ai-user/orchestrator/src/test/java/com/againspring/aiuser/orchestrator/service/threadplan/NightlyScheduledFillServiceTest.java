@@ -10,6 +10,7 @@ import com.againspring.aiuser.orchestrator.notification.ScheduledPostTelegramNot
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,7 +62,7 @@ class NightlyScheduledFillServiceTest {
         properties = new OrchestratorProperties();
         service = new NightlyScheduledFillService(
                 bundleService, pairedPostScheduler, personaRepository, configRepository,
-                properties, telegramNotifier, aiUserMlClient);
+                properties, telegramNotifier, aiUserMlClient, new PersonaLottery());
         when(pairedPostScheduler.tryHoldPairs(any(Integer.class), any(), any()))
                 .thenReturn(new PairedPostScheduler.PairHoldBatch(0, 0, List.of()));
         // By default, all (source, plaza) pairs have inventory (graceful degradation on ML client errors)
@@ -196,36 +197,25 @@ class NightlyScheduledFillServiceTest {
         assertThat(order).containsExactly("WORK", "COUPLE", "MARRIED", "FRIEND", "FAMILY", "OTHER");
     }
 
+    /**
+     * WP3: 카테고리는 이제 persona 관심사가 아니라 CategoryMixPlanner가 슬롯 단위로 고정
+     * 배정한다 — need=1이면 최대잔여법상 항상 최고 비율 카테고리(WORK)가 배정된다.
+     */
     @Test
     void precomputeEmptyPairsSkipsZeroInventoryPlazas() {
-        // Enable FAMILY generation for this test (tests that empty pairs are correctly precomputed)
-        properties.setFamilyPlazaGenerationEnabled(true);
-
         Persona nate = persona("p-nate", "NATEPAN");
         Instant slot = Instant.now().plusSeconds(3600);
         LlmCallBudget budget = LlmCallBudget.ofMultiplier(1, 3);
 
-        // For NATEPAN source: MARRIED has 10, FAMILY has 0, all others have 10
-        when(aiUserMlClient.getAvailableCount("natepan", "MARRIED", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("natepan", "FAMILY", 14)).thenReturn(0);
-        when(aiUserMlClient.getAvailableCount("natepan", "COUPLE", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("natepan", "WORK", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("natepan", "FRIEND", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("natepan", "OTHER", 14)).thenReturn(10);
-        // BLIND source
-        when(aiUserMlClient.getAvailableCount("blind", "MARRIED", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("blind", "FAMILY", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("blind", "COUPLE", 14)).thenReturn(10);
+        // natepan|WORK has zero inventory; blind|WORK has inventory (others default to 10 via setUp()).
+        when(aiUserMlClient.getAvailableCount("natepan", "WORK", 14)).thenReturn(0);
         when(aiUserMlClient.getAvailableCount("blind", "WORK", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("blind", "FRIEND", 14)).thenReturn(10);
-        when(aiUserMlClient.getAvailableCount("blind", "OTHER", 14)).thenReturn(10);
 
         AtomicInteger bundleCallCount = new AtomicInteger(0);
         when(bundleService.generateAndHoldResult(any(), anyString(), any(), anyString(), any(), anyString(), anySet()))
                 .thenAnswer(inv -> {
                     bundleCallCount.incrementAndGet();
                     String plaza = inv.getArgument(1);
-                    // First attempt should be on a NATEPAN plaza that has inventory (not FAMILY)
                     return HoldResult.saved(held("saved-" + bundleCallCount.get()),
                             inv.getArgument(5), plaza, "p-nate", 1L);
                 });
@@ -235,7 +225,7 @@ class NightlyScheduledFillServiceTest {
                 budget, new ArrayList<>(), new ArrayList<>(), new Random(1));
 
         assertThat(result.soloSaved()).isEqualTo(1);
-        // skipped should include the FAMILY plaza that was skipped
+        // skipped should include the empty natepan|WORK pair before falling back to blind
         assertThat(result.skipped()).isGreaterThanOrEqualTo(1);
     }
 
@@ -271,6 +261,11 @@ class NightlyScheduledFillServiceTest {
         // Set specific return values for natepan plazas (all zero), blind plazas (all 10)
         doReturn(0).when(aiUserMlClient).getAvailableCount(eq("natepan"), anyString(), anyInt());
         doReturn(10).when(aiUserMlClient).getAvailableCount(eq("blind"), anyString(), anyInt());
+        // WP3: persona selection no longer filters by voice_type, so the blind retry is now
+        // actually attempted (not silently skipped for "no matching voice persona") — succeed it.
+        when(bundleService.generateAndHoldResult(any(), anyString(), any(), anyString(), any(), anyString(), anySet()))
+                .thenAnswer(inv -> HoldResult.saved(held("saved"),
+                        inv.getArgument(5), inv.getArgument(1), "p-nate", 1L));
 
         List<NightlySlotFailure> failures = new ArrayList<>();
         NightlyScheduledFillService.FillResult result = service.fillSoloWithPlan(
@@ -279,6 +274,7 @@ class NightlyScheduledFillServiceTest {
 
         // Should have skipped all natepan plazas, retry with blind
         assertThat(result.skipped()).isGreaterThan(0);
+        assertThat(result.soloSaved()).isEqualTo(1);
         // Failures should be empty or only from other sources (not from skipped pairs)
         assertThat(failures).allMatch(f -> !f.detail().contains("SKIP_NO_INVENTORY"));
     }

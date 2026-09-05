@@ -58,8 +58,6 @@ public class OrchestratorProperties {
         private int pairsPerRun = 2;
         /** 하루 전체 synthetic post 중 paired post가 차지해야 하는 비율 (기본 20%). */
         private double targetShare = 0.20;
-        /** paired post 내부에서 COUPLE/MARRIAGE가 차지해야 하는 비율. */
-        private double romanticShare = 0.80;
         /**
          * Partner answer delay Δ after author PUBLIC (minutes). Skewed sample in
          * [min, max] with median ≈ {@link #partnerDelayMedianMinutes} — see

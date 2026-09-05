@@ -1,6 +1,7 @@
 package com.againspring.aiuser.orchestrator.service.threadplan;
 
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.service.persona.PersonaCard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -90,7 +91,9 @@ public class PlanPersonaMapper {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("personaId", p.getId());
         m.put("nickname", nickname == null || nickname.isBlank() ? p.getId() : nickname);
-        m.put("voiceProfile", voiceProfileMap(p));
+        // WP3 계약 4: voiceProfile 전체 Map은 더 이상 보내지 않는다 — personaCard(400자 이내
+        // 텍스트)로 대체. formality만 프롬프트 조립에 계속 쓰여 남긴다.
+        m.put("personaCard", PersonaCard.render(p));
         m.put("formality", formalityOf(p));
         if (p.getArchetype() != null) m.put("archetype", p.getArchetype());
         if (p.getTier() != null) m.put("tier", p.getTier());

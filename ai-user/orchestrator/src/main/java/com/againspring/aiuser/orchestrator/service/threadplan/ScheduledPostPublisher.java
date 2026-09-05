@@ -178,6 +178,7 @@ public class ScheduledPostPublisher {
             // Hard-commit popular source once the post is live.
             sourceReservationSupport.commitFromCandidatesJson(row.getCandidatesJson());
             leases.completePosted(row.getId(), WORKER, post.getId());
+            author.setLastPostAt(Instant.now()); personas.save(author); // WP3 계약 6
             telegramNotifier.published(row, post.getId());
             return Optional.of(post.getId());
         } catch (Exception e) {

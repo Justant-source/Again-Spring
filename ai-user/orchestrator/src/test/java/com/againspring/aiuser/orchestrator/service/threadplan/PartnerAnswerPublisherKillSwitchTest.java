@@ -54,7 +54,8 @@ class PartnerAnswerPublisherKillSwitchTest {
                 mock(org.springframework.jdbc.core.JdbcTemplate.class),
                 mock(com.againspring.aiuser.orchestrator.service.GenerationConfigSupport.class),
                 mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
-                mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class));
+                mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class),
+                mock(com.againspring.aiuser.orchestrator.service.persona.PersonaLottery.class));
     }
 
     @Test

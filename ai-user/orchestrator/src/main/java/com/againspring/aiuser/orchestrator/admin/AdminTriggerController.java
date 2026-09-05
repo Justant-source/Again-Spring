@@ -2,7 +2,6 @@ package com.againspring.aiuser.orchestrator.admin;
 
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
 import com.againspring.aiuser.orchestrator.domain.LlmGenerationGate;
-import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
 import com.againspring.aiuser.orchestrator.persona.PersonaProfileRegenerator;
 import com.againspring.aiuser.orchestrator.persona.PersonaRelationshipFiller;
@@ -11,14 +10,9 @@ import com.againspring.aiuser.orchestrator.repository.AiScheduledPostRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserRuntimeRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.scheduler.PairedPostScheduler;
-import com.againspring.aiuser.orchestrator.service.capsule.PersonaCapsuleService;
 import com.againspring.aiuser.orchestrator.service.engagement.PlanEngagementDispatcher;
 import com.againspring.aiuser.orchestrator.service.gate.EffectiveGatesService;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
-import com.againspring.aiuser.orchestrator.service.match.PersonaMatcherService;
-import com.againspring.aiuser.orchestrator.service.persona.PersonaAutoProvisionService;
-import com.againspring.aiuser.orchestrator.domain.StoryProfile;
-import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
 import com.againspring.aiuser.orchestrator.service.threadplan.HumanReplyTtlCleanupService;
 import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
@@ -69,10 +63,6 @@ public class AdminTriggerController {
     private final PlanEngagementDispatcher engagementDispatcher;
     private final ViewDispatcher viewDispatcher;
     private final HumanReplyTtlCleanupService humanReplyTtlCleanupService;
-    private final PersonaCapsuleService personaCapsuleService;
-    private final PersonaMatcherService personaMatcherService;
-    private final PersonaAutoProvisionService personaAutoProvisionService;
-    private final StoryProfileAnalyzer storyProfileAnalyzer;
     private final ThreadPlanGenerationService threadPlanGenerationService;
     private final LlmGenerationGateService llmGenerationGateService;
     private final EffectiveGatesService effectiveGatesService;
@@ -436,124 +426,6 @@ public class AdminTriggerController {
                 "inboxCancelled", result.inboxCancelled(),
                 "plansExpired", result.plansExpired(),
                 "flagEnabled", properties.getHumanReply().isTtlCleanupEnabled()));
-    }
-
-    /**
-     * WP2: backfill persona_semantic_capsules (≤3) + slim fact assertions for all active personas.
-     * Requires ai-learning {@code POST /embed}. Async — returns 202 immediately.
-     * sync=true runs inline (small envs / debug).
-     */
-    @PostMapping("/backfill-persona-capsules")
-    public ResponseEntity<Map<String, Object>> backfillPersonaCapsules(
-            @RequestParam(defaultValue = "20") int batchSize,
-            @RequestParam(defaultValue = "false") boolean sync) {
-        int size = Math.max(1, Math.min(batchSize, 50));
-        int activeCount = personaRepo.findByActiveTrue().size();
-        if (activeCount == 0) {
-            return ResponseEntity.ok(Map.of("queued", 0, "message", "활성 페르소나 없음"));
-        }
-        if (sync) {
-            var result = personaCapsuleService.backfillAllActive(size);
-            return ResponseEntity.ok(Map.of(
-                    "sync", true,
-                    "personasProcessed", result.personasProcessed(),
-                    "capsulesUpserted", result.capsulesUpserted(),
-                    "capsulesSkipped", result.capsulesSkipped(),
-                    "factsUpserted", result.factsUpserted(),
-                    "errors", result.errors()));
-        }
-        log.info("[backfill-persona-capsules] async start active={} batchSize={}", activeCount, size);
-        runCapsuleBackfillAsync(size);
-        return ResponseEntity.accepted().body(Map.of(
-                "queued", activeCount,
-                "batchSize", size,
-                "message", "백그라운드 capsule/fact backfill 시작. ai-learning /embed 필요."));
-    }
-
-    @Async
-    void runCapsuleBackfillAsync(int batchSize) {
-        var result = personaCapsuleService.backfillAllActive(batchSize);
-        log.info("[backfill-persona-capsules] done personas={} upserted={} skipped={} facts={} errors={}",
-                result.personasProcessed(), result.capsulesUpserted(), result.capsulesSkipped(),
-                result.factsUpserted(), result.errors());
-    }
-
-    /**
-     * WP3 W4-C: analyze story → matcher {@code bestAuthorAbove}; on miss, auto-create minimal persona.
-     * Query params only (no admin UI). Optional identity query overrides merge into explicitIdentity.
-     */
-    @PostMapping("/auto-persona-for-story")
-    public ResponseEntity<Map<String, Object>> autoPersonaForStory(
-            @RequestParam String category,
-            @RequestParam(defaultValue = "NATEPAN") String register,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String body,
-            @RequestParam(defaultValue = "0.35") double threshold,
-            @RequestParam(required = false) String age,
-            @RequestParam(required = false) String gender,
-            @RequestParam(required = false) String job,
-            @RequestParam(required = false) Long sourceExampleId) {
-        long exampleId = sourceExampleId != null ? sourceExampleId : 0L;
-        String corr = "admin-auto-persona";
-
-        // Heuristic analyzer → domain StoryProfile (override identity from query params)
-        var analyzed = storyProfileAnalyzer.analyze(title, body, category, register, sourceExampleId);
-        Map<String, String> identity = new java.util.LinkedHashMap<>(analyzed.explicitIdentity());
-        if (age != null && !age.isBlank()) identity.put("age", age.trim());
-        if (gender != null && !gender.isBlank()) identity.put("gender", gender.trim());
-        if (job != null && !job.isBlank()) identity.put("job", job.trim());
-
-        String cat = analyzed.category().isBlank() ? category : analyzed.category();
-        String reg = analyzed.sourceRegister().isBlank() ? register : analyzed.sourceRegister();
-        StoryProfile profile = new StoryProfile(
-                analyzed.centralConflict(),
-                cat,
-                analyzed.topics(),
-                identity,
-                analyzed.lifeContext(),
-                analyzed.valueAxis(),
-                analyzed.timeline(),
-                analyzed.specificDetails(),
-                analyzed.authorKnownFacts(),
-                analyzed.unknowns(),
-                reg,
-                analyzed.replyAffordances(),
-                analyzed.authorBlindSpot(),
-                analyzed.counterpartReasonablePoint());
-
-        var ranked = personaMatcherService.matchAuthors(profile, 1, exampleId, corr);
-        double bestScore = ranked.isEmpty() ? 0.0 : ranked.get(0).score();
-        String bestPersonaId = ranked.isEmpty() ? null : ranked.get(0).personaId();
-
-        Map<String, Object> out = new java.util.LinkedHashMap<>();
-        out.put("threshold", threshold);
-        out.put("category", profile.category());
-        out.put("register", profile.sourceRegister());
-        out.put("searchDoc", profile.toSearchDocument());
-        out.put("bestScore", bestScore);
-        out.put("bestPersonaId", bestPersonaId);
-
-        if (bestScore >= threshold && bestPersonaId != null) {
-            out.put("action", "MATCHED");
-            out.put("created", false);
-            out.put("message", "기존 페르소나 매칭 점수 ≥ threshold — 생성 생략");
-            return ResponseEntity.ok(out);
-        }
-
-        var result = personaAutoProvisionService.provision(profile, sourceExampleId, corr);
-        out.put("action", result.created() ? "CREATED" : "SKIPPED");
-        out.put("created", result.created());
-        out.put("failureReason", result.failureReason());
-        out.put("personaId", result.persona().map(Persona::getId).orElse(null));
-        if (result.conflicting().isPresent()) {
-            var c = result.conflicting().get();
-            out.put("conflict", Map.of(
-                    "age", c.age(),
-                    "gender", c.gender(),
-                    "job", c.job(),
-                    "voiceType", c.voiceType()));
-        }
-        return ResponseEntity.ok(out);
     }
 
     /**
