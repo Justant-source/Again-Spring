@@ -31,6 +31,14 @@ public class StructuredGenerationService {
     @Value("${llm.structured.prompt-mode-enabled:false}")
     private boolean structuredPromptModeEnabled;
 
+    /**
+     * persona-diversity-v4 순응도 보강(2026-09) — dark launch. 기본 false로 두는 이유:
+     * 150명 재생성 배치가 prod에서 진행 중인 시점에 자기검증 재작성 경로를 하나 더 켜면
+     * LLM 호출량이 늘어난다. 효과를 실측한 뒤 켤 것.
+     */
+    @Value("${self-critique.axis-compliance.enabled:false}")
+    private boolean axisComplianceEnabled;
+
     private static final Pattern META = Pattern.compile("(?i)(<<<|```)");
     /** SNS hook emotion enum (PLAN {@code hook_emotion}). */
     static final Set<String> HOOK_EMOTIONS = Set.of("shock", "anger", "tension", "sad", "hype");
@@ -232,6 +240,7 @@ public class StructuredGenerationService {
             String refined = selfCritique.critiqueAndRefine(
                     post.getBody(), "post", prompt, correlationId, provider,
                     resolveFormality(author), model, resolveVoiceType(author));
+            refined = enforceAxisCompliance(refined, "post", author, provider, model, correlationId);
             post = replacePostBodyIfValid(post, refined);
         }
 
@@ -245,12 +254,137 @@ public class StructuredGenerationService {
             String refined = selfCritique.critiqueAndRefine(
                     item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), provider,
                     resolveFormality(persona), model, resolveVoiceType(persona));
+            refined = enforceAxisCompliance(refined, "comment", persona, provider, model, correlationId + "-" + item.getRef());
             items.add(replaceCommentBodyIfValid(item, refined));
         }
 
         return ThreadPlanResponse.builder()
                 .provider(parsed.getProvider()).model(parsed.getModel()).correlationId(parsed.getCorrelationId())
                 .post(post).items(items).elapsedMs(parsed.getElapsedMs()).build();
+    }
+
+    // ── 축(style_axes) 순응도 보강 — persona-diversity-v4 실측 결함 대응(2026-09) ──────────
+    //
+    // dev 실측: profanity=HEAVY인데 욕설 0건 · humor=JOKER인데 드립 0건 · stance=DEFENSIVE인데
+    // 방어적 헤징 0건 · emoticon=HIGH인데 이모티콘 0건 · linebreak=WALL인데 실제는 잘게 끊음.
+    // PersonaCard 렌더링을 라벨→명령문으로 바꾼 게(§line2) 1차 대응이고, 여기는 2차 안전망이다.
+    //
+    // 이 중 결정론적으로(정규식/개수 세기) 안전하게 검사 가능한 축만 다룬다:
+    //   - emoticon(NONE/HIGH): ㅋ/ㅠ/ㅜ 존재 여부는 순수 형식 신호.
+    //   - linebreak(WALL/CHOPPED): 줄바꿈 개수는 순수 형식 신호.
+    // 의도적으로 제외한 것:
+    //   - profanity: AGENTS.md 절대 규칙 #3 — "AI-user 콘텐츠에 금지어·표현 denylist를 두지
+    //     않는다(욕설 포함)". 방향(첨가 유도 vs 제거 유도)에 상관없이 욕설 어휘 목록을 코드에
+    //     두는 것 자체가 이 규칙과 정면으로 겹친다. 판단: 구현하지 않는다.
+    //   - humor(JOKER)·stance(DEFENSIVE/OFFENSIVE): "드립이 있는지"·"방어적 헤징인지"는 의미
+    //     판단이라 어휘 매칭으로는 오탐이 오히려 더 크다(예: "ㅋㅋ"가 있다고 드립은 아니다).
+    //     판단: 결정론적 검사기로는 구현하지 않는다 — LLM 기반 판정은 self-critique 호출을
+    //     한 번 더 늘리므로 별도 트랙(비용 검토 포함)으로 미룬다.
+
+    private static final Pattern AXIS_TAG = Pattern.compile("-\\s*(\\w+)=(\\w+):");
+    private static final Pattern EMOTICON_CHARS = Pattern.compile("[ㅋㅠㅜ]");
+    /** linebreak 검사는 형식을 판단할 만큼 텍스트가 있을 때만(초단문 댓글은 축 표현 여지가 없음). */
+    private static final int LINEBREAK_CHECK_MIN_LEN = 40;
+
+    /** personaCard 문자열에서 {@code key=VALUE:} 태그만 뽑는다(PersonaCard.render의 axis 표기와 짝). */
+    static Map<String, String> parseStyleAxesFromCard(String personaCard) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (personaCard == null || personaCard.isBlank()) return out;
+        java.util.regex.Matcher m = AXIS_TAG.matcher(personaCard);
+        while (m.find()) out.put(m.group(1).toLowerCase(Locale.ROOT), m.group(2).toUpperCase(Locale.ROOT));
+        return out;
+    }
+
+    /** emoticon·linebreak 축만 결정론적으로 대조 — 위반 코드 목록(없으면 빈 리스트). */
+    static List<String> axisViolations(String body, Map<String, String> axes) {
+        List<String> out = new ArrayList<>();
+        if (body == null || body.isBlank() || axes == null || axes.isEmpty()) return out;
+
+        String emoticon = axes.get("emoticon");
+        boolean hasEmoticon = EMOTICON_CHARS.matcher(body).find();
+        if ("HIGH".equals(emoticon) && !hasEmoticon) out.add("emoticon_high_but_absent");
+        if ("NONE".equals(emoticon) && hasEmoticon) out.add("emoticon_none_but_present");
+
+        if (body.length() >= LINEBREAK_CHECK_MIN_LEN) {
+            String linebreak = axes.get("linebreak");
+            long newlines = body.chars().filter(c -> c == '\n').count();
+            if ("WALL".equals(linebreak) && newlines >= 2) out.add("linebreak_wall_but_chopped");
+            if ("CHOPPED".equals(linebreak) && newlines == 0) out.add("linebreak_chopped_but_wall");
+        }
+        return out;
+    }
+
+    private static String axisViolationFix(String code) {
+        return switch (code) {
+            case "emoticon_high_but_absent" ->
+                "이 페르소나는 이모티콘을 자주 쓴다 — ㅋㅋ·ㅠㅠ 같은 표현을 문단마다 최소 1개씩 실제로 넣어라";
+            case "emoticon_none_but_present" ->
+                "이 페르소나는 이모티콘을 전혀 안 쓴다 — ㅋㅋ·ㅠㅠ 등을 전부 빼라";
+            case "linebreak_wall_but_chopped" ->
+                "이 페르소나는 줄바꿈 없이 한 문단으로 몰아 쓴다 — 문장을 이어붙이고 줄바꿈을 없애라";
+            case "linebreak_chopped_but_wall" ->
+                "이 페르소나는 한두 문장마다 줄을 바꾼다 — 문단을 짧게 끊고 줄바꿈을 넣어라";
+            default -> code;
+        };
+    }
+
+    /** SelfCritiqueService.buildRetryPrompt와 같은 형태(짧은 재작성 전용, 스키마·페르소나 목록 재첨부 금지). */
+    static String buildAxisRetryPrompt(String draft, List<String> violations, String contentType) {
+        String kind = "post".equalsIgnoreCase(contentType) ? "사연 본문" : "댓글";
+        StringBuilder fixes = new StringBuilder();
+        for (String v : violations) fixes.append("- ").append(axisViolationFix(v)).append('\n');
+        return """
+                아래 %s만 다시 써라. JSON·스키마·페르소나 목록·원본 생성 프롬프트를 출력하지 마라.
+                의미·사실·전체 분량은 유지하고 아래 문제만 고쳐라:
+                %s
+                [원문]
+                %s
+                """.formatted(kind, fixes, draft == null ? "" : draft);
+    }
+
+    /**
+     * selfCritique.critiqueAndRefine 뒤에 거는 축 순응도 안전망. 위반이 없거나 플래그가
+     * 꺼져 있으면 즉시 원본 반환(0비용). 위반 시 최대 1회 추가 재작성을 시도하고, 재작성
+     * 결과가 위반을 줄이지 못하면(개선 실패) 원본을 그대로 반환한다 — 무음 실패가 아니라
+     * "실패해도 원본 유지"는 SelfCritiqueService.critiqueAndRefine과 동일한 graceful fallback
+     * 원칙이다(§llm-safety.md와 달리 이건 콘텐츠 오류가 아니라 품질 이슈이므로 게시 자체를
+     * 막지 않는다 — 정보 없음/파싱 실패 시에도 그냥 통과시킨다).
+     */
+    private String enforceAxisCompliance(String body, String contentType, ThreadPlanRequest.Persona persona,
+                                         LlmProvider provider, String model, String correlationId) {
+        if (!axisComplianceEnabled || body == null || body.isBlank() || persona == null) return body;
+        Map<String, String> axes = parseStyleAxesFromCard(persona.getPersonaCard());
+        if (axes.isEmpty()) return body;
+        List<String> violations = axisViolations(body, axes);
+        if (violations.isEmpty()) return body;
+
+        log.info("[AXIS_COMPLIANCE] violations={} corr={} persona={}", violations, correlationId, persona.getPersonaId());
+        try {
+            String raw = pool.executeSyncTask(buildAxisRetryPrompt(body, violations, contentType), model, 60000L,
+                    correlationId + "-axis-retry", provider);
+            String refined = cleanGeneratedText(raw);
+            if (refined != null && !refined.isBlank()) {
+                int before = violations.size();
+                int after = axisViolations(refined, axes).size();
+                if (after < before) {
+                    log.info("axis-compliance refined corr={} before={} after={}", correlationId, before, after);
+                    return refined;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("axis-compliance retry failed corr={}: {} — keeping original", correlationId, e.getMessage());
+        }
+        return body;
+    }
+
+    /** LLM 원문에서 흔한 감쌈(따옴표·코드펜스) 정도만 벗겨낸다 — OutputSanitizer 전체를 다시 태우지 않는다. */
+    private static String cleanGeneratedText(String raw) {
+        if (raw == null) return null;
+        String t = raw.strip();
+        if (t.startsWith("```")) {
+            t = t.replaceFirst("^```[a-zA-Z]*\\n?", "").replaceFirst("```\\s*$", "").strip();
+        }
+        return t;
     }
 
     private static ThreadPlanResponse.Post replacePostBodyIfValid(ThreadPlanResponse.Post post, String refined) {
@@ -553,6 +687,7 @@ public class StructuredGenerationService {
             String refined = selfCritique.critiqueAndRefine(
                     partnerPost.getBody(), "post", prompt, correlationId, provider,
                     resolveFormality(partnerPersona), model, resolveVoiceType(partnerPersona));
+            refined = enforceAxisCompliance(refined, "post", partnerPersona, provider, model, correlationId);
             if (refined != null && !refined.equals(partnerPost.getBody())) {
                 try {
                     validText(refined, "partner_post.body", 20, 1000);
@@ -577,6 +712,7 @@ public class StructuredGenerationService {
             String refined = selfCritique.critiqueAndRefine(
                     item.getBody(), "comment", prompt, correlationId + "-" + item.getRef(), provider,
                     resolveFormality(persona), model, resolveVoiceType(persona));
+            refined = enforceAxisCompliance(refined, "comment", persona, provider, model, correlationId + "-" + item.getRef());
             items.add(replaceCommentBodyIfValid(item, refined));
         }
         return PairedPhase2Response.builder()

@@ -140,6 +140,36 @@ class PromptAssemblerStyleTest {
         assertEquals(prefixWithCard, prefixWithoutCard, "personaCard는 PERSONA_SECTION 뒤 가변 영역에만 영향을 줘야 함");
     }
 
+    /**
+     * 2026-09 순응도 개정 — dev 실측에서 축 지시(profanity=HEAVY 등)가 출력에 반영되지 않는 걸
+     * 확인한 후, personaCard 블록을 <<<PERSONA_SECTION>>> 마커 직후 최상단(말투 규칙보다 먼저)에
+     * 두고 "명령이지 배경정보가 아니다"라고 명시적으로 프레이밍했다. 이 테스트는 그 배치를 잠근다.
+     */
+    @Test
+    void postPromptPlacesPersonaCardBeforeSpeechRulesForSalience() {
+        String card = "[페르소나] 닉네임=야근일상 · 34세 남 · 기혼 6년차\n"
+            + "[말투] 아래 문체 지시는 라벨이 아니라 명령이다 — 전부 실제 문장에 반영할 것:\n"
+            + "- profanity=HEAVY: 욕설·비속어를 실제로 섞어 쓴다 — 순화하지 않는다";
+        PostGenRequest req = PostGenRequest.builder()
+            .personaId("p1").voiceProfile("v").slangLevel(0.3)
+            .personaCard(card)
+            .category("WORK").archetype("work_credit_steal").formality("casual")
+            .lengthTier("MEDIUM")
+            .build();
+        String system = assembler.assemblePostPrompt(req).split("<<<USER_PROMPT>>>", 2)[0];
+
+        int markerIdx = system.indexOf(PERSONA_MARKER);
+        int personaHeaderIdx = system.indexOf("## 페르소나 특성");
+        int speechHeaderIdx = system.indexOf("## 말투 규칙");
+        int directiveIdx = system.indexOf("profanity=HEAVY");
+
+        assertTrue(markerIdx >= 0 && personaHeaderIdx > markerIdx, "페르소나 특성 헤더는 마커 뒤에 있어야 함");
+        assertTrue(personaHeaderIdx < speechHeaderIdx, "페르소나 특성이 말투 규칙보다 먼저 나와야 함(살리언스)");
+        assertTrue(directiveIdx > personaHeaderIdx && directiveIdx < speechHeaderIdx,
+            "축 지시 본문이 말투 규칙 이전, 페르소나 특성 헤더 이후에 와야 함");
+        assertTrue(system.contains("배경 설명이 아니라 실행 명령이다"), "축 지시가 명령이라는 프레이밍 문구 포함");
+    }
+
     /** persona-diversity-v4 계약4 — rewrite 경로도 personaCard가 있으면 voiceProfile 대신 카드를 쓴다. */
     @Test
     void rewritePromptPrefersPersonaCardOverVoiceProfileWhenPresent() {

@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 계약 4 (.request/persona-diversity-v4/00-shared.md) — {@code Persona} → 400자 이내 한 덩어리 텍스트.
+ * 계약 4 (.request/persona-diversity-v4/00-shared.md) — {@code Persona} → 한 덩어리 텍스트.
  * AI_POST·PAIRED·HUMAN_POST·human-reply 전부 이 카드를 쓰고 {@code voiceProfile} 전체 JSON은
  * 더 이상 보내지 않는다. 순수 함수(부작용 없음, 정렬 무작위성 없음 — 같은 입력엔 같은 출력).
  *
@@ -15,10 +15,27 @@ import java.util.Map;
  * 한 인자이므로 그대로 유지하되, 호출자가 이미 nickname을 조회했다면 {@link #render(Persona, String)}
  * 오버로드로 정확한 닉네임을 넘길 수 있다. 한 인자 버전은 voiceProfile.nickname(있으면) 또는
  * persona id로 대체한다.
+ *
+ * <p><b>2026-09 순응도 개정</b> — dev 실측에서 {@code style_axes} 5/10개가 실제 출력에 반영되지
+ * 않는 걸 확인했다(예: profanity=HEAVY인데 욕설 0건). 원인은 배선이 아니라 표현 방식: 종전엔
+ * "직설/분석/진지 · 반말 · ㅋㅋ 낮음" 같은 압축 라벨이었고, LLM이 이를 배경 정보로 흘려 읽었다.
+ * {@link #line2(Persona)}를 라벨에서 축별 명령문(예: "profanity=HEAVY: 욕설·비속어를 실제로
+ * 섞어 쓴다")으로 바꾸고, 계약 4의 400자 상한을 늘렸다(§MAX_LEN 주석 참고 — 실측 카드 길이가
+ * 늘어난 만큼 늘림, 실측·토큰 영향은 이 트랙 보고서 참고). 축=값 태그를 문장 안에 그대로 남긴
+ * 이유: {@code StructuredGenerationService}의 결정론적 self-critique가 같은 문자열에서
+ * 정규식으로 의도 값을 파싱해 출력과 대조할 수 있어야 하기 때문이다(라벨 문구가 바뀌어도
+ * axis=VALUE 토큰은 안정적).
  */
 public final class PersonaCard {
 
-    private static final int MAX_LEN = 400;
+    /**
+     * 계약 4 원안은 400자였으나, 라벨을 축별 명령문으로 펼치면서 실측 카드 길이가 늘었다
+     * (10개 축 전부 채워진 경우 약 750~850자 관측 — PersonaCardTest 참고). 라벨 압축을 되돌리면
+     * 순응도 문제가 재발하므로, 잘림으로 뒷부분 축(특히 [지뢰])이 날아가지 않도록 여유를 두고
+     * 1100자로 올린다. 토큰 영향(대략): 400자 카드 ≈ 250~300 토큰 → 1100자 카드 ≈ 650~750 토큰,
+     * 150명 캐스트 전원을 한 PLAN 요청에 실으면 +5~7만 토큰/요청 수준 증가 가능 — 상세는 보고서.
+     */
+    private static final int MAX_LEN = 1100;
 
     private PersonaCard() {
     }
@@ -94,47 +111,95 @@ public final class PersonaCard {
 
     // ── [말투] ────────────────────────────────────────────────────────────
 
+    /** {@code style_axes}가 렌더링되는 순서 — 결정론 보장(순수 함수 계약) + 파서 안정성. */
+    static final List<String> AXIS_ORDER = List.of(
+            "directness", "affect", "humor", "stance", "length",
+            "speech", "emoticon", "spelling", "linebreak", "profanity");
+
+    /**
+     * 2026-09 개정 — 축 값을 "라벨"이 아니라 "명령문"으로 렌더링한다.
+     * 각 줄은 {@code key=VALUE: 지시문} 형태로 시작해 {@code StructuredGenerationService}가
+     * 같은 문자열에서 정규식으로 의도 값을 되짚을 수 있게 한다(자기검증용, PersonaCard 자체는
+     * 파싱하지 않음 — 순수 렌더러 책임 분리).
+     */
     private static String line2(Persona p) {
         Map<String, String> axes = p.getStyleAxes();
         if (axes == null || axes.isEmpty()) return "정보 없음";
 
-        List<String> cluster = new java.util.ArrayList<>();
-        addAxis(cluster, axes, "directness", Map.of("BLUNT", "직설", "SOFT", "완곡"));
-        addAxis(cluster, axes, "affect", Map.of("EMOTIONAL", "감정", "ANALYTIC", "분석"));
-        addAxis(cluster, axes, "humor", Map.of("JOKER", "드립", "SERIOUS", "진지"));
-        addAxis(cluster, axes, "stance", Map.of("OFFENSIVE", "공격", "DEFENSIVE", "방어"));
-        addAxis(cluster, axes, "length", Map.of("LONG", "장문", "SHORT", "단문"));
-
-        List<String> parts = new java.util.ArrayList<>();
-        if (!cluster.isEmpty()) parts.add(String.join("/", cluster));
-
-        String speech = axisKr(axes, "speech", Map.of("BANMAL", "반말", "JONDAE", "존댓말", "MIXED", "혼용"));
-        if (!speech.isBlank()) parts.add(speech);
-
-        String emoticon = axisKr(axes, "emoticon", Map.of("NONE", "없음", "LOW", "낮음", "HIGH", "높음"));
-        if (!emoticon.isBlank()) parts.add("ㅋㅋ " + emoticon);
-
-        String spelling = axisKr(axes, "spelling", Map.of("CLEAN", "정확", "SLOPPY", "엉성"));
-        if (!spelling.isBlank()) parts.add("맞춤법 " + spelling);
-
-        String linebreak = axisKr(axes, "linebreak", Map.of("WALL", "통짜", "CHOPPED", "잘게"));
-        if (!linebreak.isBlank()) parts.add("줄바꿈 " + linebreak);
-
-        String profanity = axisKr(axes, "profanity", Map.of("NONE", "없음", "MILD", "약간", "HEAVY", "심함"));
-        if (!profanity.isBlank()) parts.add("욕설 " + profanity);
-
-        return parts.isEmpty() ? "정보 없음" : String.join(" · ", parts);
+        List<String> bullets = new java.util.ArrayList<>();
+        for (String key : AXIS_ORDER) {
+            String directive = axisDirective(key, axes.get(key));
+            if (directive != null) bullets.add("- " + directive);
+        }
+        if (bullets.isEmpty()) return "정보 없음";
+        return "아래 문체 지시는 라벨이 아니라 명령이다 — 전부 실제 문장에 반영할 것:\n"
+                + String.join("\n", bullets);
     }
 
-    private static void addAxis(List<String> out, Map<String, String> axes, String key, Map<String, String> dict) {
-        String kr = axisKr(axes, key, dict);
-        if (!kr.isBlank()) out.add(kr);
-    }
-
-    private static String axisKr(Map<String, String> axes, String key, Map<String, String> dict) {
-        String raw = axes.get(key);
-        if (raw == null || raw.isBlank()) return "";
-        return dict.getOrDefault(raw.toUpperCase(java.util.Locale.ROOT), "");
+    /**
+     * {@code key=VALUE: 한국어 지시문} 한 줄, 인식 불가 값이면 null(해당 축 생략).
+     * 지시문은 "무엇을 하라"는 구체 행동으로 쓴다 — 형용사 라벨 금지.
+     */
+    private static String axisDirective(String key, String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) return null;
+        String v = rawValue.toUpperCase(java.util.Locale.ROOT);
+        String directive = switch (key) {
+            case "directness" -> switch (v) {
+                case "BLUNT" -> "돌려 말하지 않고 하고 싶은 말을 바로 한다";
+                case "SOFT" -> "직접 말하지 않고 에둘러 표현한다";
+                default -> null;
+            };
+            case "affect" -> switch (v) {
+                case "EMOTIONAL" -> "감정을 억누르지 않고 그대로 터뜨리듯 쓴다";
+                case "ANALYTIC" -> "감정보다 상황을 분석하듯 담담하게 설명한다";
+                default -> null;
+            };
+            case "humor" -> switch (v) {
+                case "JOKER" -> "자조나 드립을 최소 1번은 실제로 넣는다";
+                case "SERIOUS" -> "농담 없이 시종일관 진지하게 쓴다";
+                default -> null;
+            };
+            case "stance" -> switch (v) {
+                case "OFFENSIVE" -> "상대 잘못을 직접 지적하며 몰아붙인다";
+                case "DEFENSIVE" -> "내 잘못일 가능성을 먼저 방어적으로 깔고 말한다(예: \"내가 예민한 걸 수도 있는데\")";
+                default -> null;
+            };
+            case "length" -> switch (v) {
+                case "LONG" -> "문장을 길게 늘여 쓴다";
+                case "SHORT" -> "문장을 짧게 끊어 쓴다";
+                default -> null;
+            };
+            case "speech" -> switch (v) {
+                case "BANMAL" -> "반말만 쓴다 — ~요/~습니다 종결 절대 금지";
+                case "JONDAE" -> "존댓말만 쓴다 — 반말 종결 절대 금지";
+                case "MIXED" -> "반말과 존댓말을 문장마다 섞어 쓴다";
+                default -> null;
+            };
+            case "emoticon" -> switch (v) {
+                case "NONE" -> "ㅋㅋ·ㅠㅠ 등 이모티콘을 전혀 쓰지 않는다";
+                case "LOW" -> "이모티콘은 글 전체에서 한두 번만 쓴다";
+                case "HIGH" -> "문단마다 ㅋㅋ·ㅠㅠ 같은 표현을 실제로 넣는다";
+                default -> null;
+            };
+            case "spelling" -> switch (v) {
+                case "CLEAN" -> "맞춤법·띄어쓰기를 정확히 지킨다";
+                case "SLOPPY" -> "오탈자·축약을 자연스럽게 섞는다(예: ㄱㅊ, 어케, 담에)";
+                default -> null;
+            };
+            case "linebreak" -> switch (v) {
+                case "WALL" -> "줄바꿈 없이 한 문단으로 몰아 쓴다";
+                case "CHOPPED" -> "한두 문장마다 줄을 바꾼다";
+                default -> null;
+            };
+            case "profanity" -> switch (v) {
+                case "NONE" -> "욕설을 전혀 쓰지 않는다";
+                case "MILD" -> "욕설을 아주 가끔, 약하게만 섞는다";
+                case "HEAVY" -> "욕설·비속어를 실제로 섞어 쓴다 — 순화하지 않는다";
+                default -> null;
+            };
+            default -> null;
+        };
+        return directive == null ? null : key + "=" + v + ": " + directive;
     }
 
     // ── [버릇] ────────────────────────────────────────────────────────────

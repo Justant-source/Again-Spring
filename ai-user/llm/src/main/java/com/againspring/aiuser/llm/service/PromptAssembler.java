@@ -745,25 +745,29 @@ SKELETON은 원문이 아니라 사건·역할·시퀀스만 남긴 뼈대다 �
 %s
 
 <<<PERSONA_SECTION>>>
+## 페르소나 특성 — 이번 호출에서 가장 먼저, 가장 무겁게 반영할 것
+아래 [말투] 줄은 배경 설명이 아니라 실행 명령이다. "직설/방어"처럼 성격을 묘사하는 게 아니라
+"욕설을 실제로 섞어 쓴다"처럼 **이번 글·댓글에 그대로 실행해야 하는 지시**로 적혀 있다.
+각 줄은 축=값 형태로 시작한다(예: profanity=HEAVY) — 그 값을 텍스트에 실제로 반영했는지
+스스로 다시 확인하고 출력할 것. 아래 페르소나 특성이 이어지는 "말투 규칙"보다 우선한다.
+%s
+%s%s%s
+
 ## 말투 규칙 (가장 중요)
 
 %s
 %s
-슬랭 수준 %.1f/1.0 %s
-
-## 페르소나 특성
-%s
-%s%s%s""".formatted(
+슬랭 수준 %.1f/1.0 %s""".formatted(
             safeGuide,
+            safeVoice,
+            cautionsSection,
+            globalRulesSection,
+            reconstructionRulesSection,
             speechRules,
             includeTypoInstruction
                 ? "\n**자연스러운 구어체** — 페르소나 특성의 writing_quirks에 consistent_errors가 있으면 그 오류 패턴을 **일관되게** 재현. mobile_typos: true이면 모바일 오탈자(자모분리·인접키) 2~3개 자연스럽게 포함. 맞춤법이 완벽할 필요 없음.\n"
                 : "\n**자연스러운 구어체** — 문장 길이·어미·쉼표 밀도는 자유롭게 다양화하되, 맞춤법과 띄어쓰기는 정확하게 지킬 것. 의도적인 오탈자는 넣지 않음.\n",
             slangLevel,
-            slangGuide,
-            safeVoice,
-            cautionsSection,
-            globalRulesSection,
-            reconstructionRulesSection);
+            slangGuide);
     }
 }
