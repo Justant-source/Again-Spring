@@ -1,5 +1,7 @@
 package com.againspring.aiuser.llm.service;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +11,13 @@ import java.util.Map;
  * 않을 때 쓰는 임시 축약기. age/gender/job/general_style/signature_phrases 5개만, 300자 이내.
  * WP3가 orchestrator 쪽에서 {@code personaCard} 문자열을 채워 보내기 시작하면 이 클래스는
  * 자연히 호출되지 않게 된다 — 하위 호환용으로 남겨둔다(삭제 금지).
+ *
+ * <p><b>이 폴백은 신원축(marital/job_type/style_axes)을 복원하지 못한다</b> — legacy
+ * voiceProfile(age/gender/job/general_style)에는 애초에 그 값들이 없기 때문이다. 그래서 이
+ * 폴백을 개선하는 대신, 호출될 때마다 경고 로그만 남긴다: 이 로그가 보이면 orchestrator 쪽
+ * 어딘가가 아직 personaCard를 채워 보내지 않고 있다는 뜻이다(본질적 수정 대상은 orchestrator).
  */
+@Slf4j
 public final class PersonaCardFallback {
     private static final int MAX_LEN = 300;
 
@@ -24,13 +32,20 @@ public final class PersonaCardFallback {
         if (raw == null || raw.isEmpty()) return "";
         Object vp = raw.get("voiceProfile");
         Map<String, Object> voiceProfile = vp instanceof Map ? (Map<String, Object>) vp : Map.of();
-        return renderFromVoiceProfile(voiceProfile);
+        return renderFromVoiceProfile(voiceProfile, raw.get("personaId"));
     }
 
     /** {@code voiceProfile}(persona.voice_profile 원본 맵)만 있을 때. */
-    @SuppressWarnings("unchecked")
     public static String renderFromVoiceProfile(Map<String, Object> voiceProfile) {
+        return renderFromVoiceProfile(voiceProfile, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String renderFromVoiceProfile(Map<String, Object> voiceProfile, Object personaId) {
         if (voiceProfile == null || voiceProfile.isEmpty()) return "";
+        log.warn("personaCard 미수신 — legacy voiceProfile 축약 폴백 사용 (신원축 marital/job_type/"
+                + "style_axes 복원 불가, orchestrator가 이 페르소나에 personaCard를 채워 보내야 함) personaId={}",
+                personaId == null ? "unknown" : personaId);
         String age = str(voiceProfile.get("age"));
         String gender = str(voiceProfile.get("gender"));
         String job = str(voiceProfile.get("job"));

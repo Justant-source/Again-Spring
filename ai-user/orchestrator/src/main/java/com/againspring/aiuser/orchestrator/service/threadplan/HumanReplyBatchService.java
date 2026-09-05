@@ -4,6 +4,7 @@ import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.client.dto.CommentThreadDto;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
+import com.againspring.aiuser.orchestrator.persona.PersonaCard;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
@@ -337,25 +338,13 @@ public class HumanReplyBatchService {
 
     static Map<String, Object> toResponderMap(Persona chosen) {
         Map<String, Object> responder = new LinkedHashMap<>();
+        String nickname = nicknameOf(chosen);
         responder.put("personaId", chosen.getId());
-        responder.put("nickname", nicknameOf(chosen));
-        // Slim voiceProfile: include only essential fields to prevent token overflow
-        // (exclude example_comments, example_replies, lexicon, writing_quirks, hot_buttons)
-        Map<String, Object> voice = chosen.getVoiceProfile();
-        if (voice != null && !voice.isEmpty()) {
-            Map<String, Object> slimVoice = new LinkedHashMap<>();
-            // Whitelist essential fields only
-            String[] essentialFields = {"voice_type", "age", "gender", "slang_level", "tone", "formality"};
-            for (String field : essentialFields) {
-                Object value = voice.get(field);
-                if (value != null && !String.valueOf(value).isBlank()) {
-                    slimVoice.put(field, value);
-                }
-            }
-            responder.put("voiceProfile", slimVoice);
-        } else {
-            responder.put("voiceProfile", Map.of());
-        }
+        responder.put("nickname", nickname);
+        // persona-diversity-v4 계약 4: voiceProfile 슬림 맵(레거시 6필드) 대신 personaCard(400자
+        // 이내 텍스트)를 싣는다 — WP1의 marital/job_type/style_axes 신원축은 voiceProfile에 없고
+        // PersonaCard.render()만 담고 있다.
+        responder.put("personaCard", PersonaCard.render(chosen, nickname));
         responder.put("formality", formalityOf(chosen));
         return responder;
     }

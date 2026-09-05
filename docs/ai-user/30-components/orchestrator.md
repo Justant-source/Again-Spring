@@ -25,8 +25,7 @@
 | `ThreadPlanPublisherScheduler` | due item lease·멱등 게시 |
 | `HumanReplyBatchScheduler` | 사람 댓글/대댓글을 30분 단위로 묶어 reply 생성 |
 | `HumanReplyTtlCleanupScheduler` | inbox/REQUESTED plan TTL 정리 (플래그 기본 OFF, no-op) |
-| `PersonaCapsuleSearchService` | story→persona top-K (capsule vector + interests fallback, LLM 없음) |
-| `PersonaMatcherService` | StoryProfile → hard filter + capsule search + author/comment score + match audits (WP3) |
+| `PersonaLottery` | 작성자·댓글자 가중 비복원 추첨(LRU×tier). 2026-09-05 `PersonaMatcherService`·`PersonaCapsuleSearchService`를 대체(§ 페르소나 스키마·선택 알고리즘) |
 | `StoryTwinGuard` | 최근 14일 published AI 글(≤30) 대비 title/body bigram twin 가드 (`AiPostBundleService`) |
 | `PlanSourceStoryResolver` | AI_POST primary source = `claimPopularSource` (findSimilar 아님) |
 
@@ -52,30 +51,23 @@ directness/affect/humor/stance/length/speech/emoticon/spelling/linebreak/profani
   최소 1개 갖도록 보정(기존 관계는 유지). MARRIED끼리 MARRIAGE(나이차 ≤8), DATING/ENGAGED끼리
   COUPLE, 나머지는 동일 연령대 ±5세 FRIEND 1~2개.
 
-## Capsule search (WP2)
+## Capsule search / Persona matcher — 삭제됨 (persona-diversity-v4, 2026-09-05)
 
-> **미사용 예정 (2026-09 persona-diversity-v4, Phase 2 확인 필요)**: 아래 캡슐 검색/matcher는
-> 신규 정체성 축(`personas.age_years`/`gender`/`marital`/`style_axes`)과 계약 6 가중 추첨으로
-> 대체될 예정이다. 연관 테이블 3개 — `persona_semantic_capsules`(V11)·`persona_match_audits`
-> (V12)·`persona_fact_assertions`(V10) — 도 폐기 대상 후보다. 실제 코드 삭제/폐기 시점과
-> 범위는 WP1~WP3 병합 후 Fable이 확정한다. 상세: `docs/_active/persona-diversity-v4.md`.
+과거 이 절이 설명하던 capsule 벡터 검색(`PersonaCapsuleSearchService`)과 그 위의 hard filter +
+가중합 score matcher(`PersonaMatcherService`)는 WP3에서 **코드에서 삭제됐다**(commit `66fbc529`·
+`81ba5dc9` — `PersonaMatcherService`/`PersonaCapsuleSearchService` grep 0건). 같이 삭제:
+`engine/PersonaSelector`, `service/match/**`(`PersonaHardFilter`·`RankedPersona`·`FilterResult`),
+`service/capsule/**`, `service/persona/PersonaAutoProvisionService`. admin 트리거
+`backfill-persona-capsules`·`auto-persona-for-story`도 함께 제거됐다.
 
-- 입력: 검색 텍스트(또는 category+topics), `topK`, optional register(`NATEPAN`|`BLIND`)
-- 경로: learning embed → `persona_semantic_capsules` cosine top rows → persona 집계
-- fallback: 활성 페르소나 `interests` (COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER)
-- optional audit: `persona_match_audits` (`AUTHOR_CANDIDATE` / `COMMENT_CANDIDATE`)
-- 상세 토폴로지: [architecture.md](./architecture.md) § Capsule persona search
+**대체**: `PersonaLottery`가 작성자·댓글자를 LRU×tier 가중 비복원 추첨으로 뽑는다(아래
+"페르소나 스키마·선택 알고리즘" 절). `AiPostBundleService`는 이제 `StoryProfileAnalyzer`로
+source 사연을 구조화한 뒤 `PersonaLottery.drawCommenters`로 cast를 뽑는다(author=`personas[0]`
+유지). micro-batch(4~6 persona/call) 생성과 publisher가 저장된 텍스트만 게시하는 구조는 그대로다.
 
-## Persona matcher (WP3 / W4-B)
-
-- 입력: `StoryProfile` (`toSearchDocument()` ≤512) + topK + sourceExampleId/correlationId
-- 경로: capsule pool (author≈20 / comment≈60) → `PersonaHardFilter` (active·register·age·gender·job·region만; marriage/parenting/cannot_claim은 `UNEVALUATED`) → score
-- score: `0.45*semantic + 0.25*register + 0.15*fact_ratio + 0.15*interest[category]`
-- API: `matchAuthors` / `matchCommenters` / `bestAuthorAbove` (threshold default `ai-user.matcher.author-threshold=0.35`)
-- audits: purpose `AUTHOR_CANDIDATE`|`COMMENT_CANDIDATE`, reasons에 UNEVALUATED 축·점수 기록 (capsule search purpose 미설정 → 이중 기록 방지)
-- PLAN 연동: `AiPostBundleService`가 source 사연을 `StoryProfileAnalyzer`로 1회 구조화하고, `matchCommenters`로 cast를 재정렬(author=`personas[0]` 유지). 요청에 `storyProfile`/`storySearchDoc` 포함. 기본 생성은 **micro-batch**(4~6 persona/call; 댓글 캐스트는 READY 하한+1슬라이스로 캡, follow-up은 하한 미달일 때만)이며 publisher는 저장된 텍스트만 게시한다.
-- 매칭 실패 시: `PersonaAutoProvisionService` + `POST /admin/trigger/auto-persona-for-story`
-- SSOT: `python3 ai-user/tools/wp3_persona_ssot_report.py`
+`persona_semantic_capsules`(V11)·`persona_match_audits`(V12)·`persona_fact_assertions`(V10)
+테이블·도메인 클래스는 **삭제하지 않았다** — 마이그레이션과 리포지토리는 남아 있으나 미사용
+상태다. 상세: [architecture.md](./architecture.md) § Persona 선택 — capsule 검색·matcher 폐기.
 
 ## 스케줄
 
@@ -286,7 +278,7 @@ PARSE_FAIL은 오케스트레이터가 아니라 `ai-user/llm`(별도 gradle 모
 
 > 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 동일 replan 계약([architecture.md](./architecture.md) · [thread-planning.md](../60-runtime/thread-planning.md)).
 
-## 페르소나 스키마 · 선택 알고리즘 (2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)
+## 페르소나 스키마 · 선택 알고리즘 (2026-09 persona-diversity-v4, WP1~WP4 병합 완료·2026-09-05)
 
 전체 계약: `docs/_active/persona-diversity-v4.md`. `personas`(Flyway `V22__persona_identity_axes.sql`,
 WP1)에 정체성 축이 추가된다:
@@ -310,8 +302,9 @@ JSON을 대체해 모든 생성 요청의 `personaCard` 필드로 들어간다.
 
 **선택 알고리즘**: 작성자·댓글자 선택은 하드 필터(카테고리별 시점 제한, `active=1`, 자기 글
 댓글 금지) 통과자 중 `weight = tierW × (1 + hoursSinceLast/24)^1.5`
-(HEAVY 3.0 / REGULAR 1.5 / LIGHT 1.0) 가중 비복원 추첨이다 — 위 "Persona matcher (WP3 / W4-B)"의
-score 기반 matcher를 대체한다. `personaId` 기준 결정론 정렬 금지.
+(HEAVY 3.0 / REGULAR 1.5 / LIGHT 1.0) 가중 비복원 추첨(`PersonaLottery`)이다 — 삭제된
+score 기반 matcher(`PersonaMatcherService`, 위 "Capsule search / Persona matcher — 삭제됨" 참고)를
+대체한다. `personaId` 기준 결정론 정렬 금지.
 
 ## history와 life state
 
@@ -341,9 +334,10 @@ host 권한 때문에 일부 root-owned legacy 파일이 남을 수 있지만 cu
 - `POST /admin/trigger/regenerate-persona-profiles?seed=&batch=10&dryRun=true&only=<id,id>&force=false` — WP1 신원 축 재생성. `dryRun=true`면 QuotaPlanner 분포만 반환(LLM 호출 없음, 계약 2 쿼터 검증용). `only`는 콤마구분 personaId — QuotaPlanner는 항상 전체 활성 인원 기준으로 계산하고 실제 LLM 호출·DB 갱신만 그 id들로 좁힌다. `force=true`면 `style_axes`가 이미 있어도 재생성한다
 - `POST /admin/trigger/fill-persona-relationships?seed=` — WP1 150명 관계 ≥1 보장(기존 관계 유지)
 
-> **(2026-09 persona-diversity-v4, 예정 — Phase 2 확인 필요)** WP1~WP3가 admin 트리거를
-> 2개 추가하고 2개 삭제할 예정이라고 알려왔으나, 이 worktree(WP4)에는 아직 병합되지 않아
-> 정확한 트리거 이름을 확인할 수 없다. Phase 2 병합 후 이 목록을 다시 대조한다.
+> **(2026-09 persona-diversity-v4, 2026-09-05 병합 후 확정)** WP1~WP3 병합(commit `66fbc529`)이
+> admin 트리거 2개를 추가(위 `regenerate-persona-profiles`·`fill-persona-relationships` — 이미
+> 반영됨)하고 2개를 삭제했다: `backfill-persona-capsules`·`auto-persona-for-story`
+> (`PersonaCapsuleSearchService`/`PersonaAutoProvisionService` 삭제와 함께 제거, 코드에 0건).
 
 ### test
 

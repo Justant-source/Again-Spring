@@ -481,75 +481,65 @@ def test_soft_reserve_locks_url_family():
     assert inserted_ids == {10, 20}
 
 
-def test_filter_phase2_quality_gate_requires_title_or_quality():
-    """Phase 2 gate (2026-08-22): rows need title OR (len>=300 AND quality>=0.6).
-
-    Title-less rows like OTHER category (K-pop gossip, entertainment) are excluded
-    unless they have substantive content + quality signal.
+def test_filter_excludes_reported_chatter_without_experience():
+    """잡담 배제 재설계(2026-08-22, commit 41857752): 구 Phase 2 게이트(길이·품질)는
+    실측(확실한 사연 200건 vs OTHER 300건)에서 판별력이 없어 폐기됐다. 현재는
+    "전언 형식이면서 1인칭 경험 서술이 전혀 없는 글"만 배제한다
+    (looks_reported AND NOT has_experience). 근거는 source_claim.py 주석 참조.
     """
     now = datetime(2026, 8, 22, 12, 0, 0)
     window_start = now - timedelta(days=14)
 
     rows = [
-        {  # id=1: HAS TITLE → passes (has_title=True)
+        {  # id=1: reported ("다고 밝혔다"), 경험 서술 전혀 없음 → BLOCKED
             "id": 1,
-            "content": "short",
+            "content": "그녀는 곧 결혼한다고 밝혔다",
             "content_type": "POST",
             "source": "blind",
             "source_url": "https://blind/1",
             "popularity_pct": 0.95,
             "created_at": now - timedelta(days=1),
-            "title": "title exists",
             "category": "OTHER",
-            "quality_score": 0.3,  # low quality, but title overrides
         },
-        {  # id=2: NO TITLE, short content, low quality → BLOCKED
+        {  # id=2: reported("다고 밝혔") + 경험 서술("제가 ") 동시 존재 → 통과
             "id": 2,
-            "content": "short gossip",
+            "content": "제가 남편이랑 이혼한다고 밝혔다",
             "content_type": "POST",
             "source": "blind",
             "source_url": "https://blind/2",
             "popularity_pct": 0.90,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.3,
         },
-        {  # id=3: NO TITLE, long content, high quality → passes (len>=300 AND quality>=0.6)
+        {  # id=3: 전언 형식 자체가 아님 → looks_reported=False → 통과
             "id": 3,
-            "content": "부부 갈등..." * 50,  # ~1500 chars
+            "content": "오늘 정말 힘든 하루였다",
             "content_type": "POST",
             "source": "blind",
             "source_url": "https://blind/3",
             "popularity_pct": 0.88,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.75,
         },
-        {  # id=4: NO TITLE, long content, but quality < 0.6 → BLOCKED
+        {  # id=4: reported("인터뷰") + 경험("말했는데") → 통과
             "id": 4,
-            "content": "장문 K-pop 잡담..." * 50,  # ~1500 chars
+            "content": "동료가 인터뷰에서 그렇게 말했는데 진짜 웃겼다",
             "content_type": "POST",
             "source": "blind",
             "source_url": "https://blind/4",
             "popularity_pct": 0.87,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.55,  # just below 0.6 threshold
         },
-        {  # id=5: NO TITLE, long content, quality=None → BLOCKED
+        {  # id=5: reported("누리꾼"), 경험 서술 없음 → BLOCKED
             "id": 5,
-            "content": "no quality score..." * 50,  # ~1500 chars
+            "content": "누리꾼들 반응이 뜨거웠다",
             "content_type": "POST",
             "source": "blind",
             "source_url": "https://blind/5",
             "popularity_pct": 0.86,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": None,
         },
     ]
 
@@ -562,70 +552,58 @@ def test_filter_phase2_quality_gate_requires_title_or_quality():
         now=now,
     )
 
-    # Only id=1 (has title) and id=3 (long + high quality) should pass
     ids = [r["id"] for r in result]
-    assert set(ids) == {1, 3}, f"Expected {{1, 3}}, got {set(ids)}"
+    assert set(ids) == {2, 3, 4}, f"Expected {{2, 3, 4}}, got {set(ids)}"
     # Verify they're ranked by popularity DESC
-    assert ids == [1, 3]  # 0.95 > 0.88
+    assert ids == [2, 3, 4]  # 0.90 > 0.88 > 0.87
 
 
-def test_filter_phase2_quality_gate_edge_cases():
-    """Edge cases: content length at boundary, quality score at threshold."""
+def test_filter_chatter_exclusion_edge_cases():
+    """경계 케이스: 트리거 종류(보도/기록으로)와 마커 등장 순서가 무관함을 검증."""
     now = datetime(2026, 8, 22, 12, 0, 0)
     window_start = now - timedelta(days=14)
 
-    content_299 = "x" * 299
-    content_300 = "x" * 300
-    content_301 = "x" * 301
-
     rows = [
-        {  # id=1: 299 chars, quality=0.6 → BLOCKED (need >= 300)
+        {  # id=1: reported("보도"), 경험 서술 없음 → BLOCKED
             "id": 1,
-            "content": content_299,
+            "content": "관련 내용이 언론에 보도됐다",
             "content_type": "POST",
             "source": "natepan",
             "source_url": "https://nate/1",
             "popularity_pct": 0.99,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.6,
         },
-        {  # id=2: 300 chars exactly, quality=0.6 → passes
+        {  # id=2: 경험 마커("내가 ")만 있고 reported 트리거 자체가 없음 → 통과
             "id": 2,
-            "content": content_300,
+            "content": "내가 어제 겪은 일인데 진짜 황당했다",
             "content_type": "POST",
             "source": "natepan",
             "source_url": "https://nate/2",
             "popularity_pct": 0.98,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.6,
         },
-        {  # id=3: 301 chars, quality=0.59 → BLOCKED (quality must be >= 0.6)
+        {  # id=3: 경험 마커("내가 ")가 reported 트리거("인터뷰")보다 먼저 등장 →
+            # 순서와 무관하게 has_experience=True로 통과해야 함
             "id": 3,
-            "content": content_301,
+            "content": "내가 실은 인터뷰에서 그렇게 말했다",
             "content_type": "POST",
             "source": "natepan",
             "source_url": "https://nate/3",
             "popularity_pct": 0.97,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.59,
         },
-        {  # id=4: 301 chars, quality=0.60 exactly → passes
+        {  # id=4: reported("기록으로"), 경험 서술 없음 → BLOCKED
             "id": 4,
-            "content": content_301,
+            "content": "당시 상황이 기록으로 남아있다",
             "content_type": "POST",
             "source": "natepan",
             "source_url": "https://nate/4",
             "popularity_pct": 0.96,
             "created_at": now - timedelta(days=1),
-            "title": None,
             "category": "OTHER",
-            "quality_score": 0.60,
         },
     ]
 
@@ -639,5 +617,4 @@ def test_filter_phase2_quality_gate_edge_cases():
     )
 
     ids = [r["id"] for r in result]
-    # Only id=2 (300 chars, quality=0.6) and id=4 (301 chars, quality=0.60) pass
-    assert set(ids) == {2, 4}, f"Expected {{2, 4}}, got {set(ids)}"
+    assert set(ids) == {2, 3}, f"Expected {{2, 3}}, got {set(ids)}"

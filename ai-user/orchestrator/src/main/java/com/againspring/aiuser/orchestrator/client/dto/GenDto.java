@@ -19,6 +19,12 @@ public class GenDto {
         private String personaId;
         private String archetype;
         private String voiceProfile;
+        /**
+         * persona-diversity-v4 계약 4 — {@code PersonaCard.render()} 출력(400자 이내). 있으면
+         * llm 워커 {@code PostGenRequest.personaCard}로 그대로 전달돼 {@link #voiceProfile} 대신
+         * 페르소나 특성 섹션에 쓰인다. 이 필드는 호출자가 채워야 한다(추가만으로는 자동 전송 안 됨).
+         */
+        private String personaCard;
         private String tier;
         private double slangLevel;
         private String category;
@@ -48,8 +54,13 @@ public class GenDto {
         private boolean reconstructMode = false;
         /** 재구성 원본 example_bank.id (reconstruct_mode=true 시 필수) */
         private Long sourceExampleId;
-        /** 재구성할 크롤 원본 본문 (reconstruct_mode=true 시 필수) */
-        private String sourceBody;
+        /**
+         * persona-diversity-v4 계약7 — 재구성 원본 골격(skeleton) JSON. llm 워커
+         * {@code /v2/extract-skeleton}이 뽑은 뼈대만 담는다. 원문 전문(크롤 원문)은
+         * 절대 이 필드에 넣지 않는다 — {@link com.againspring.aiuser.llm.service.PromptAssembler}가
+         * 이 값을 프롬프트에 SKELETON으로만 주입한다.
+         */
+        private Map<String, Object> sourceContext;
         /** scope=RECONSTRUCTION 전역 규칙 목록 ("- …" 개행 구분). 없으면 null. */
         private String reconstructionRules;
         /** 커뮤니티 voice 타입 — OutputSanitizer 분포 매칭용. 없으면 null. */
@@ -68,6 +79,12 @@ public class GenDto {
     public static class CommentRequest {
         private String personaId;
         private String voiceProfile;
+        /**
+         * persona-diversity-v4 계약 4 — {@code PersonaCard.render()} 출력(400자 이내). 있으면
+         * llm 워커 {@code CommentGenRequest.personaCard}로 그대로 전달된다. 이 필드는 호출자가
+         * 채워야 한다(추가만으로는 자동 전송 안 됨).
+         */
+        private String personaCard;
         private double slangLevel;
         private String postTitle;
         private String postBodyExcerpt;
@@ -111,6 +128,12 @@ public class GenDto {
     public static class ReplyRequest {
         private String personaId;
         private String voiceProfile;
+        /**
+         * persona-diversity-v4 계약 4 — {@code PersonaCard.render()} 출력(400자 이내). 있으면
+         * llm 워커 {@code ReplyGenRequest.personaCard}로 그대로 전달된다. 이 필드는 호출자가
+         * 채워야 한다(추가만으로는 자동 전송 안 됨).
+         */
+        private String personaCard;
         private double slangLevel;
         private String parentCommentExcerpt;
         private String threadContext;

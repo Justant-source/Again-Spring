@@ -183,6 +183,15 @@ public class PlanSourceStoryResolver {
     }
 
     /**
+     * persona-diversity-v4 배선: {@link #claimAndResolve}로 이미 claim한 소스를 호출자가 명시적으로
+     * 해제할 때 쓰는 공개 API(예: {@code PairedPostScheduler}의 b_side_viable 강등·
+     * {@code SourceOverlapGuard} 거부 경로). 실패해도 예외를 던지지 않는다.
+     */
+    public void release(Long exampleId, String reservationKey) {
+        releaseQuietly(exampleId, reservationKey);
+    }
+
+    /**
      * Legacy entry: maps persona {@code voice_type} → preferredSource and claims with a
      * short-lived reservation. Does not freestyle when the pool is empty — throws instead.
      * Prefer {@link #claimAndResolve} for new callers.

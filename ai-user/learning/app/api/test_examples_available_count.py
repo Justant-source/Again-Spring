@@ -132,34 +132,34 @@ def test_available_count_all_plazas():
                 assert data["category"] == plaza
 
 
-def test_available_count_applies_phase2_quality_gate():
-    """Phase 2 gate (2026-08-22): available-count must apply title OR quality predicate.
+def test_available_count_applies_chatter_exclusion_gate():
+    """잡담 배제 재설계(2026-08-22, commit 41857752)가 available-count에도 반영돼야 한다.
 
-    The endpoint should only count rows that have:
-    - A title, OR
-    - Content length >= 300 AND quality_score >= 0.6
-
-    This is verified by checking that the SQL query includes the gate condition
-    in the where_conditions list.
+    구 Phase 2 게이트(길이>=300 AND quality_score>=0.6)는 실측 결과 오탐이 커서
+    폐기되고, "전언 형식 + 1인칭 경험 서술 없음"만 배제하는 좁은 REGEXP 조건으로
+    교체됐다(app/services/source_claim.py의 _SELECT_CANDIDATE_SQL과 동일해야 함).
+    이 테스트는 available-count의 SQL이 그 REGEXP 조건을 그대로 포함하는지 검증한다.
     """
     with patch('app.api.examples.get_db') as mock_db:
         mock_cur = MagicMock()
-        mock_cur.fetchone.return_value = {"cnt": 163}  # Reduced from 432 OTHER by gate
+        mock_cur.fetchone.return_value = {"cnt": 1}
         mock_conn = MagicMock()
         mock_conn.cursor.return_value.__enter__.return_value = mock_cur
         mock_conn.cursor.return_value.__exit__.return_value = False
         mock_db.return_value.__enter__.return_value = mock_conn
 
-        # Query OTHER category which is most affected by quality gate
         response = client.get("/examples/available-count?source=natepan&category=OTHER&window_days=14")
 
         assert response.status_code == 200
         data = response.json()
         assert data["category"] == "OTHER"
-        assert data["count"] == 163  # 432 without gate → 163 with gate (38% survival)
+        assert data["count"] == 1
 
         # Verify the SQL was executed (mock should have been called)
         assert mock_cur.execute.called
         executed_sql = str(mock_cur.execute.call_args_list[0])
-        # Should include quality gate condition
-        assert "CHARACTER_LENGTH" in executed_sql or "quality_score" in executed_sql
+        # Should include the chatter-exclusion REGEXP condition, matching
+        # source_claim.py's looks_reported / has_experience patterns exactly.
+        assert "REGEXP" in executed_sql
+        assert "소속사" in executed_sql and "인터뷰" in executed_sql
+        assert "했는데" in executed_sql and "제가 " in executed_sql

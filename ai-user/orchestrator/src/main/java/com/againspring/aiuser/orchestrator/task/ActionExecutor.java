@@ -429,12 +429,26 @@ public class ActionExecutor {
 
         // ── 재구성 모드 판별 ────────────────────────────────────────────────────
         // findSimilar 1순위 결과가 실제 크롤 원본(source_url 보유)이면 재구성 모드로 전환.
-        // 재구성 모드: 단일 크롤 원본 1건을 충실히 사연으로 재서사. 폴백은 기존 경로.
+        // 재구성 모드: 단일 크롤 원본 1건의 골격(skeleton)만 뽑아 사연으로 재서사한다.
+        // persona-diversity-v4 계약7 — 크롤 원문 전문은 더 이상 LLM 프롬프트로 나가지 않는다.
+        // 골격 추출(/v2/extract-skeleton) 실패 시 원문 폴백 절대 금지 — 이 글 생성 자체를 건너뛴다.
         AiLearningClient.ExampleItem primarySource = null;
+        java.util.Map<String, Object> sourceSkeleton = null;
         if (!examples.isEmpty() && examples.get(0).hasSourceProvenance()) {
             primarySource = examples.get(0);
-            // 재구성 원본을 topic seed로 업데이트 (원본 내용 기반 주제 사용)
-            topicSeed = truncate(primarySource.getContent(), 200);
+            java.util.Optional<java.util.Map<String, Object>> skeletonOpt = llmClient.extractSkeleton(
+                    primarySource.getId(), category, primarySource.getTitle(), primarySource.getContent(), corrId);
+            if (skeletonOpt.isEmpty()) {
+                log.warn("legacy executePost: skeleton extraction failed sourceExampleId={} persona={} corr={} " +
+                                "— skipping post generation (no raw-body fallback, no silent failure)",
+                        primarySource.getId(), persona.getId(), corrId);
+                logAction(persona, action, "FAILED", corrId,
+                        java.util.Map.of("error", "skeleton_extract_failed", "sourceExampleId", primarySource.getId()));
+                return;
+            }
+            sourceSkeleton = skeletonOpt.get();
+            // 재구성 원본을 topic seed로 업데이트 — 골격에서 뽑은 일반화 문자열만 사용 (원문 금지)
+            topicSeed = generalizedTopicSeed(sourceSkeleton, category);
         }
 
         if (!examples.isEmpty()) {
@@ -483,10 +497,10 @@ public class ActionExecutor {
             .recentOutputs(casual ? null : formatRecentOutputs(recentBodies, 200))
             // Phase 3: 진행 중인 상황 (saga 이어가기용)
             .ongoingSituation(ongoingSituation)
-            // 재구성 모드 필드
+            // 재구성 모드 필드 — sourceContext는 골격 JSON만 담는다(원문 없음, 계약7)
             .reconstructMode(primarySource != null)
             .sourceExampleId(primarySource != null ? primarySource.getId() : null)
-            .sourceBody(primarySource != null ? primarySource.getContent() : null)
+            .sourceContext(sourceSkeleton)
             .voiceType(voiceProfileField(persona, "voice_type"))
             // R9 Track B: 글 종류 (CONFLICT=갈등 서사, CASUAL=일상/잡담)
             .postKind(casual ? "CASUAL" : "CONFLICT")
@@ -1604,6 +1618,23 @@ public class ActionExecutor {
     private String truncate(String s, int max) {
         if (s == null) return "";
         return s.length() > max ? s.substring(0, max) : s;
+    }
+
+    /**
+     * persona-diversity-v4 계약7 — 골격(skeleton) JSON에서 뽑은 짧은 일반화 문자열(200자 이내).
+     * 레거시 executePost 재구성 분기의 topicSeed로만 쓴다. 크롤 원문은 절대 반환하지 않는다.
+     * {@link com.againspring.aiuser.orchestrator.service.threadplan.PlanSourceStoryResolver
+     * #claimAndResolve}의 동명 헬퍼와 동일한 우선순위(incident → category)를 쓴다.
+     */
+    private static String generalizedTopicSeed(java.util.Map<String, Object> skeleton, String fallbackCategory) {
+        if (skeleton == null) return fallbackCategory;
+        Object incident = skeleton.get("incident");
+        if (incident != null && !String.valueOf(incident).isBlank()) {
+            String s = String.valueOf(incident).trim();
+            return s.length() > 200 ? s.substring(0, 200) : s;
+        }
+        Object category = skeleton.get("category");
+        return category != null ? String.valueOf(category) : fallbackCategory;
     }
 
     private String botEmail(Persona persona) {

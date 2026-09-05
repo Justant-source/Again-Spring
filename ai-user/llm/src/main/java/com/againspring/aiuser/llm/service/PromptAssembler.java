@@ -113,8 +113,9 @@ public class PromptAssembler {
         if ("AUTHOR".equalsIgnoreCase(req.getStance())) {
             return assembleAuthorPairedPrompt(req);
         }
-        // 재구성 모드: 단일 크롤 원본을 페르소나 보이스로 사연화
-        if (req.isReconstructMode() && req.getSourceBody() != null && !req.getSourceBody().isBlank()) {
+        // 재구성 모드: 단일 크롤 원본 골격(skeleton)을 페르소나 보이스로 사연화.
+        // persona-diversity-v4 계약7 — 원문(sourceBody)이 아니라 sourceContext(골격 JSON)로 게이팅한다.
+        if (req.isReconstructMode() && req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
             return assembleReconstructPrompt(req);
         }
         // R9 Track B: 일상 글 모드 — 갈등 서사 금지, 사건 의무 없음 (D-51)
@@ -208,23 +209,30 @@ public class PromptAssembler {
     }
 
     /**
-     * 재구성 프롬프트 — 단일 크롤 원본을 페르소나 보이스로 사연으로 재서사.
+     * 재구성 프롬프트 — 크롤 원문이 아니라 골격(SKELETON) JSON을 페르소나 보이스로 재서사.
      * post.md 가이드의 "실제 사건 원문 복제 금지(완전 창작)" 규칙과 충돌하므로
      * 별도 reconstruct 가이드를 사용하고 voice/post 가이드를 쓰지 않음.
      * 요청 오버라이드 또는 classpath에 voice/reconstruct 키가 있으면 그것을, 없으면 인라인 가이드를 사용.
+     *
+     * <p>persona-diversity-v4 계약7/레거시 배선 — 크롤 원문은 이 경로에 절대 실리지 않는다.
+     * {@code req.getSourceContext()}는 llm 워커 {@code /v2/extract-skeleton}이 만든 뼈대 JSON뿐이고,
+     * 고유명사·금액·날짜가 이미 일반화돼 있다({@code StructuredGenerationService.RECONSTRUCT_RULE}과
+     * 동일한 원칙). 골격 추출이 실패하면 호출자(레거시 {@code ActionExecutor})가 이 메서드 자체를
+     * 호출하지 않고 그 글 생성을 건너뛴다 — 원문 폴백 없음.</p>
      */
     private String assembleReconstructPrompt(PostGenRequest req) {
         String reconstructGuide = guide("voice/reconstruct", req.getPromptOverrides());
         if (reconstructGuide == null || reconstructGuide.isBlank()) {
             reconstructGuide = """
-아래 지시에 따라 외부 커뮤니티 원본 글을 한국 갈등 커뮤니티 스타일 사연으로 재구성합니다.
+아래 지시에 따라 소스 골격(SKELETON)을 한국 갈등 커뮤니티 스타일 사연으로 재구성합니다.
+SKELETON은 원문이 아니라 사건·역할·시퀀스만 남긴 뼈대다 — 이 자체를 그대로 옮기지 마라.
 
 ## 재구성 규칙
-- 원본의 갈등 상황·사건·감정을 충실히 반영하되 **원문 직접 복사 금지**
+- SKELETON은 뼈대다. 등장인물·직장·동네·금액·기간·순서의 세부는 페르소나 삶에 맞게 전부 새로 정한다
+- 반드시 "누가 무엇을 했다" 형태의 구체 사건 1개를 중심에 둔다. 감정 나열만 하는 글은 실격
 - 실명·연락처·주소 등 개인정보를 **완전히 제거·변환**
 - A(작성자)/B(상대방) 이분법 유지
 - 다시봄 커뮤니티 문체: 온점(.) 금지, 쌍따옴표 금지, 한국 구어체
-- "X가 Y를 했다" 형태의 구체 사건 최소 1개 포함
 """;
         }
         String system = buildSystem(personaVoice(req), req.getSlangLevel(),
@@ -234,25 +242,39 @@ public class PromptAssembler {
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
             : "- 반말로 작성 (~임, ~함, ~거든, ~거임)\n";
         String user = """
-            [원본 커뮤니티 글 — 재구성 대상]
+            [SKELETON — 재구성 대상 뼈대, 원문 아님]
             %s
 
             카테고리: %s
             글 길이: %s
             %s
-            위 원본을 바탕으로 '다시봄' 내부 synthetic 사연 예시로 재구성해주세요.
+            위 SKELETON을 바탕으로 '다시봄' 내부 synthetic 사연 예시로 재구성해주세요.
             - 출력 형식: 첫 줄=제목(공백 포함 12~40자), 빈 줄, 그다음 본문. 제목≠본문(동일 문자열 금지)
-            - 원본의 핵심 갈등·사건·감정을 유지하되 표현·순서는 자유롭게 재창작
-            - 개인정보(실명·연락처·주소) 완전 제거 또는 일반화 (남자친구→남자친구 등)
+            - SKELETON 뼈대는 유지하되 등장인물·직장·동네·금액·기간·세부 표현은 전부 새로 창작
+            - 뼈대 필드를 문장 그대로 옮기지 말 것 — "누가 무엇을 했다" 형태로 새로 서술
+            - 개인정보(실명·연락처·주소) 완전 제거 또는 일반화
             - ⚠️ 문장 끝 온점(.) 금지·쌍따옴표 금지
             %s%s""".formatted(
-                safe(req.getSourceBody().length() > 800 ? req.getSourceBody().substring(0, 800) + "…" : req.getSourceBody()),
+                safe(skeletonJson(req.getSourceContext())),
                 req.getCategory() != null ? req.getCategory() : "OTHER",
                 lengthInstruction(req.getLengthTier()),
                 dynamicExamplesBlock(req.getDynamicExamples()),
                 politeSuffix,
                 recentOutputsBlock(req.getRecentOutputs(), "글", "위 글들과 같은 소재·사건 유형 반복 금지"));
         return system + "\n" + SEP + "\n" + user;
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper SKELETON_JSON =
+        new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** SKELETON 맵을 JSON 문자열로 직렬화. 실패·빈 값이면 빈 객체 문자열. */
+    private static String skeletonJson(Map<String, Object> sourceContext) {
+        if (sourceContext == null || sourceContext.isEmpty()) return "{}";
+        try {
+            return SKELETON_JSON.writeValueAsString(sourceContext);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     /**

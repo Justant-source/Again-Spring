@@ -12,13 +12,13 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * persona-diversity-v4 계약1 — {@code voice_profile.marital} fallback 어댑터.
- * 이 브랜치엔 아직 personas.marital 컬럼·getter가 없어 voice_profile만 검증한다.
+ * persona-diversity-v4 계약1 — {@code personas.marital}(V22) 컬럼 읽기 어댑터.
+ * 컬럼이 SSOT다. {@code voice_profile.marital}은 어떤 코드도 채우지 않아 읽지 않는다.
  */
 class PersonaMaritalReaderTest {
 
     @Test
-    void readsMarriedFromVoiceProfile() {
+    void readsMarriedFromColumn() {
         assertThat(PersonaMaritalReader.read(persona("MARRIED"))).isEqualTo("MARRIED");
         assertThat(PersonaMaritalReader.isMarried(persona("MARRIED"))).isTrue();
     }
@@ -38,12 +38,15 @@ class PersonaMaritalReaderTest {
     }
 
     @Test
-    void personaWithoutVoiceProfileDefaultsToSingle() {
+    void voiceProfileMaritalIsIgnored() {
+        Map<String, Object> vp = new LinkedHashMap<>();
+        vp.put("marital", "MARRIED");
         Persona p = Persona.builder()
-                .id("p-novp")
+                .id("p-vp-only")
                 .archetype("TEST")
                 .tier("REGULAR")
-                .voiceProfile(null)
+                .marital("SINGLE")
+                .voiceProfile(vp)
                 .interests(Map.of())
                 .biasProfile(Map.of())
                 .circadian(List.of())
@@ -52,6 +55,7 @@ class PersonaMaritalReaderTest {
                 .createdAt(Instant.now())
                 .build();
         assertThat(PersonaMaritalReader.read(p)).isEqualTo("SINGLE");
+        assertThat(PersonaMaritalReader.isMarried(p)).isFalse();
     }
 
     @Test
@@ -60,13 +64,12 @@ class PersonaMaritalReaderTest {
     }
 
     private static Persona persona(String marital) {
-        Map<String, Object> voiceProfile = new LinkedHashMap<>();
-        if (marital != null) voiceProfile.put("marital", marital);
         return Persona.builder()
                 .id("p-marital")
+                .marital(marital)
                 .archetype("TEST")
                 .tier("REGULAR")
-                .voiceProfile(voiceProfile)
+                .voiceProfile(new LinkedHashMap<>())
                 .interests(Map.of())
                 .biasProfile(Map.of())
                 .circadian(List.of())

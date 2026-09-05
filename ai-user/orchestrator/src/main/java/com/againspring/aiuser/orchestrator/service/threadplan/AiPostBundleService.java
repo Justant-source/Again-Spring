@@ -18,6 +18,7 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.PlazaTopicalFitGate;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.safety.SoftProofread;
+import com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.storyprofile.StoryProfileAnalyzer;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
@@ -84,6 +85,7 @@ public class AiPostBundleService {
     private final StructuredGenerationFailureTelegramNotifier structuredGenNotifier;
     private final PlazaTopicalFitGate plazaTopicalFitGate;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final SourceOverlapGuard sourceOverlapGuard;
 
     /** Derive environment (dev/prod) from backend base URL for alerting. */
     private String deriveEnvironment() {
@@ -284,6 +286,20 @@ public class AiPostBundleService {
             return HoldResult.generationSkipped(sourceName, plaza, personaId, exampleId, attempt.detail());
         }
         Bundle bundle = attempt.bundle();
+
+        // persona-diversity-v4 WP2 item5 배선: 게시 홀딩 직전, 재구성 결과가 원문을 그대로
+        // 옮기지 않았는지 12-gram 대조. 원문(bundle.source().sourceBody())은 이 검사에서만
+        // 메모리로 쓰고 로그·DB에는 절대 남기지 않는다.
+        SourceOverlapGuard.GuardResult overlapResult =
+                sourceOverlapGuard.check(
+                        bundle.content.title() + "\n" + bundle.content.body(),
+                        bundle.source == null ? null : bundle.source.sourceBody());
+        if (!overlapResult.passed()) {
+            log.error("AI post rejected: reason={} overlapRatio={} corr={} exampleId={}",
+                    overlapResult.reason(), overlapResult.overlapRatio(), correlationId, exampleId);
+            sourceReservationSupport.release(exampleId, holdId);
+            return HoldResult.llmOrSafety(sourceName, plaza, personaId, exampleId, overlapResult.reason());
+        }
 
         candidateScheduleSupport.enrichMissingScheduledAts(bundle.response, scheduledPublishAt);
 

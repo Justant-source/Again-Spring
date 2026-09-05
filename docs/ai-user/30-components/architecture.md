@@ -102,19 +102,26 @@ flowchart LR
 | life state | DB `persona_life_state` | orchestrator | orchestrator |
 | relationships | `ai-user/docs/personas/profiles/relationships.yml` | paired posts | 사용자 |
 | example bank | DB `example_bank` | learning, orchestrator | learning, backend bridge |
-| semantic capsules | DB `persona_semantic_capsules` (≤3/persona, VECTOR 1024) | `PersonaCapsuleSearchService` | W3-B `PersonaCapsuleService` backfill |
-| match audits | DB `persona_match_audits` | 운영·캘리브레이션 | search path (best-effort) |
+| semantic capsules (미사용) | DB `persona_semantic_capsules` (V11, ≤3/persona, VECTOR 1024) | — | — |
+| match audits (미사용) | DB `persona_match_audits` (V12) | — | — |
 
-## Capsule persona search (WP2 / W3-C)
+## Persona 선택 — capsule 검색·matcher 폐기 (persona-diversity-v4, 2026-09-05 병합)
 
-LLM 없이 사연 검색 문서 → 페르소나 top-K:
+과거엔 LLM 없이 사연 검색 문서 → 페르소나 top-K를 뽑는 capsule 벡터 검색(`PersonaCapsuleSearchService`)과,
+그 결과 위에 hard filter + 가중합 score를 얹는 matcher(`PersonaMatcherService`)가 있었다. 이 흐름은
+`persona-diversity-v4` WP3에서 **삭제됐다**(2026-09-05, commit `66fbc529`·`81ba5dc9` — `grep`으로
+`PersonaMatcherService`/`PersonaCapsuleSearchService` 0건 확인). 같이 삭제된 것: `engine/PersonaSelector`,
+`service/match/**`(`PersonaHardFilter`·`RankedPersona`·`FilterResult`), `service/capsule/**`,
+`service/persona/PersonaAutoProvisionService`. `AdminTriggerController`의 `backfill-persona-capsules`·
+`auto-persona-for-story` 두 엔드포인트도 함께 제거됐다.
 
-1. `AiLearningClient.embedOptional()` → learning `POST /embed` (KURE 1024-dim, 512자 절단).
-2. JDBC `VEC_DISTANCE_COSINE` on active `persona_semantic_capsules` (optional `voice_type` register = NATEPAN|BLIND).
-3. persona 단위 집계: score = max(similarity × weight), matched capsule types 수집.
-4. **Degrade**: embed 실패·capsule 없음·히트 0 → 활성 페르소나를 `interests[category]` 내림차순 (category는 인자 또는 검색문 선두 토큰).
-5. `purpose=AUTHOR_CANDIDATE|COMMENT_CANDIDATE`면 `persona_match_audits`에 best-effort 기록.
-6. **Matcher (WP3)**: `PersonaMatcherService`가 capsule pool 위 hard filter + 가중합 score를 적용하고 audits를 기록한다 (capsule search는 purpose 없이 호출).
+**대체**: `PersonaLottery`(LRU×tier 가중 비복원 추첨 — `weight = tierW × (1 + hoursSinceLast/24)^1.5`,
+HEAVY=3.0/REGULAR=1.5/LIGHT=1.0)가 작성자·댓글자를 뽑는다. 결정론 정렬(personaId 등)로 타이브레이크하지
+않는다. 상세: [orchestrator.md](./orchestrator.md) § 페르소나 스키마·선택 알고리즘.
+
+`persona_semantic_capsules`(V11)·`persona_match_audits`(V12)·`persona_fact_assertions`(V10) 테이블과
+그 JPA 엔티티/리포지토리는 **삭제하지 않았다** — 마이그레이션·도메인 클래스는 코드베이스에 남아 있으나
+어떤 생성·선택 경로도 더 이상 읽거나 쓰지 않는 **미사용 상태**다.
 
 ## 스케줄 요약
 

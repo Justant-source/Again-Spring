@@ -10,6 +10,22 @@ def test_config_tables_are_not_synced():
     assert not (names & EXCLUDED)
 
 
+def test_personas_is_not_synced():
+    """persona-diversity-v4 WP1 실측(2026-09): prod->dev 동기화가 dev에서 재생성한
+    personas 컬럼(voice_profile 등, V22 신규 컬럼 포함)을 prod의 예전 값으로 되돌렸다.
+    dev/prod 오케스트레이터가 각자 독립 시드·진화시키므로 personas는 sync 대상에서 뺀다."""
+    names = {s.name for s in sync.SYNC_TABLES} | {s.name for s in sync.CONTENT_TABLES}
+    assert "personas" not in names
+
+
+def test_personas_companion_sync_removed_from_content_cycle():
+    import inspect
+
+    source = inspect.getsource(sync._run_tables)
+    assert "personas(companion)" not in source
+    assert "users(companion)" in source
+
+
 def test_posts_and_comments_have_mask_and_where():
     for specs in (sync.SYNC_TABLES, sync.CONTENT_TABLES):
         by = {s.name: s for s in specs}

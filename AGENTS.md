@@ -75,7 +75,7 @@ python3 scripts/lint_docs.py
 4. **🚨 prod 배포** — 명시적 "prod에 배포해줘" 지시 없으면 금지. **dev/prod 완전 격리**. 필수 순서:
    ① local unit/build → ② **`scripts/deploy.sh dev [--ai-user-canary]`** (기동+헬스대기+검증 일체, AI-user 변경 시 canary 병행) → ③ e2e-realbe (`E2E_BASE_URL=http://localhost:8090`) 전체 통과
    → ④ (명시 지시 시에만) **`scripts/deploy.sh prod --i-mean-it`** (백업+기동+헬스대기+검증 일체) → ⑤ main commit & push
-   **prod에서 e2e·직접 반영 금지.** `prod-dev-sync`=5분 콘텐츠+24h full. **dev LLM 금지(L3)**. e2e는 `:8090`만(E3).
+   **prod에서 e2e·직접 반영 금지.** `prod-dev-sync`=1시간 콘텐츠(2026-09-03 5분→1시간)+24h full. **dev LLM 금지(L3)**. e2e는 `:8090`만(E3).
 5. **`.env.prod` git 커밋 절대 금지**
 6. **문서 위치** — 루트는 `README.md`·`CLAUDE.md`·`AGENTS.md`만. 모든 상세 문서는 `docs/` 하위만.
 7. **🚨 LLM 토큰/크레딧 소진·거절·누출 = 오류, 콘텐츠 아님** — 오류 문자열을 글·댓글 본문으로 절대 게시 금지. 시그니처 SSOT = `docs/shared/policies/llm-error-signatures.json` 한 파일. 4개 모듈(llm·orchestrator·backend·learning) 로더가 같은 파일을 읽는다 — **코드에 시그니처 문자열을 하드코딩하지 않는다.** (상세: `.claude/rules/llm-safety.md`)

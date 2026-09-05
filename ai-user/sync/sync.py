@@ -1,10 +1,18 @@
 """
 Prod DB -> dev DB 동기화 서비스.
 
-- 5분 콘텐츠 증분 (T1+U1): posts/comments/votes/likes + 참조 users(비식별)·personas
+- 콘텐츠 증분 (SYNC_CONTENT_CRON, 기본 매시 0분; 과거엔 5분): T1+U1 —
+  posts/comments/votes/likes + 참조 users(비식별)만. personas는 동반 동기화 안 함(아래 참고).
 - 24h full (SYNC_CRON, 기본 KST 05:30): 전체 SYNC_TABLES
 - 실사용자 계정은 dev에서 로그인 불가하도록 비식별화
 - D1: prod 우선 upsert (dev-only 행 삭제 안 함)
+- `personas`는 동기화 대상에서 제외한다(2026-09, persona-diversity-v4 WP1 실측):
+  dev·prod 오케스트레이터가 동일 시드(personas/profiles/)로 각자 독립적으로 페르소나를
+  만들고 각자의 tick으로 독립 진화시킨다(AiUserSeedLoader). prod->dev 방향 동기화가 있으면
+  dev에서 갱신한 voice_profile 등 컬럼이 다음 주기에 prod의 예전 값으로 되돌아간다 — V22
+  신규 컬럼(age_years 등)이 prod에 아직 없을 때도, 두 DB에 공통인 옛 컬럼(voice_profile 등)만
+  으로 이미 발생한다. posts/comments의 author_id FK는 dev 자체 시드 personas 행으로 충족되어
+  personas를 안 옮겨도 깨지지 않는다.
 """
 
 from __future__ import annotations
@@ -176,6 +184,9 @@ def _mask_real_user(row: dict, now: datetime, ctx: "SyncContext | None" = None) 
 USERS_SPEC = TableSpec(
     "users", ("id",), time_columns=("updated_at", "created_at"), transform=_mask_real_user
 )
+# personas는 더 이상 sync 대상이 아니다(위 모듈 docstring 참고) — dev/prod가 각자 독립적으로
+# 페르소나를 시드·진화시키므로, prod->dev 방향 동기화가 dev의 최신 페르소나 데이터(예:
+# persona-diversity-v4 재생성)를 되돌린다. 정의는 과거 코드/테스트 참조용으로 남긴다.
 PERSONAS_SPEC = TableSpec("personas", ("id",), mode="full")
 
 POSTS_WHERE = "`visibility` <> 'PRIVATE' AND `status` <> 'DRAFT' AND `deleted_at` IS NULL"
@@ -190,7 +201,7 @@ COMMENTS_SPEC = TableSpec("post_comments", ("id",), time_columns=("updated_at", 
 # dev 튜닝을 덮으므로 제외(2026-09). ai_content_corrections·ai_global_rules는 콘텐츠 규칙이라 유지.
 SYNC_TABLES: tuple[TableSpec, ...] = (
     USERS_SPEC,
-    PERSONAS_SPEC,
+    # PERSONAS_SPEC 제외 — 위 모듈 docstring/PERSONAS_SPEC 주석 참고 (2026-09, persona-diversity-v4)
     TableSpec("persona_relationships", ("id",), mode="full"),
     TableSpec("persona_seen_posts", ("persona_id", "post_id"), time_columns=("seen_at",)),
     TableSpec("persona_action_log", ("id",), time_columns=("created_at",)),
@@ -206,7 +217,7 @@ SYNC_TABLES: tuple[TableSpec, ...] = (
     TableSpec("post_likes", ("id",), time_columns=("created_at",)),
 )
 
-# 5분 콘텐츠 (T1) — users/personas는 U1 동반으로만
+# 콘텐츠 증분 (T1) — users는 U1 동반으로만, personas는 동반 안 함(모듈 docstring 참고)
 CONTENT_TABLES: tuple[TableSpec, ...] = (
     POSTS_SPEC,
     TableSpec("vote_options", ("id",), mode="full"),
@@ -449,13 +460,11 @@ def _run_tables(
 
             if companion_authors:
                 user_ids = _collect_ids(collected_rows, USER_ID_COLUMNS)
-                # personas.id == users.id for AI personas
-                persona_ids = set(user_ids)
+                # personas는 동반 동기화하지 않는다 — 모듈 docstring 참고. users만 동반한다
+                # (실사용자 비식별화 + FK 표시용; personas.id == users.id인 AI 계정은 users
+                # companion으로 이미 존재가 보장되고, personas 자체는 dev 자체 시드로 채워진다).
                 counts["users(companion)"] = sync_rows_by_ids(
                     prod_cur, dev_cur, USERS_SPEC, user_ids, now, ctx
-                )
-                counts["personas(companion)"] = sync_rows_by_ids(
-                    prod_cur, dev_cur, PERSONAS_SPEC, persona_ids, now, ctx
                 )
 
             dev_cur.execute("SET FOREIGN_KEY_CHECKS = 1")

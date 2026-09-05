@@ -143,7 +143,7 @@ class AiPostBundleServiceTest {
                 storyProfileAnalyzer, personaLottery, storyTwinGuard, sourceReservationSupport,
                 new com.againspring.aiuser.orchestrator.service.GenerationConfigSupport(configRepository, properties),
                 mock(org.springframework.jdbc.core.JdbcTemplate.class), circuitBreaker, notifier, plazaTopicalFitGate,
-                promptTemplateCache);
+                promptTemplateCache, new com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard());
     }
 
     @Test

@@ -124,14 +124,19 @@ docker logs -f againspring-prod-dev-sync
 
 ## 7. sync 운영 주의점
 
-`prod-dev-sync`는 **5분 콘텐츠 증분** + **KST 일 1회 full**을 실행하며, 컨테이너 기동 시에도 full→content 순으로 1회 동기화한다.
+`prod-dev-sync`는 **1시간 콘텐츠 증분**(2026-09-03 5분→1시간, `f4867a68`) + **KST 일 1회 full**을 실행하며, 컨테이너 기동 시에도 full→content 순으로 1회 동기화한다.
 
 - full cron: `SYNC_CRON` 기본 `30 5 * * *` / timezone `Asia/Seoul`
 - content cron: `SYNC_CONTENT_CRON` 기본 `0 * * * *` / lookback `SYNC_CONTENT_LOOKBACK_MINUTES` 기본 75
 - 실사용자 계정은 dev에서 비식별화되고 로그인 불가 상태로 반영된다.
 - 실사용자 `posts`/`post_comments`는 제목·본문이 마스킹되고, `PRIVATE`/`DRAFT`/삭제된 글은 제외되며,
   `invite_token`은 (작성자 불문) 복사하지 않는다.
-- 5분 잡은 posts/comments/votes/likes(+vote_options)와 참조 users·personas만 (T1+U1).
+- 1시간 잡은 posts/comments/votes/likes(+vote_options)와 참조 users만 (T1+U1). **`personas`는
+  content·full 모두 sync 대상이 아니다**(2026-09, persona-diversity-v4 WP1 — dev·prod 오케스트레이터가
+  동일 시드로 각자 독립적으로 페르소나를 진화시키므로, prod→dev 단방향 동기화가 있으면 dev의 최신
+  페르소나 갱신(voice_profile 등)이 다음 주기에 prod 예전 값으로 되돌아간다. posts/comments의
+  author_id FK는 dev 자체 시드 personas 행으로 충족되어 personas를 안 옮겨도 깨지지 않는다.
+  근거: `ai-user/sync/sync.py` 모듈 docstring·`SYNC_TABLES`/`CONTENT_TABLES`).
 - full 잡은 아래 전체 표.
 - D1: prod 우선 upsert. e2e 잔여는 cleanup.
 - L3: `ai-user-orchestrator-dev`는 compose profile `ai-user-dev` + `AI_USER_DEV_ENABLED=false` (기본 미기동). dev backend는 LLM 네트워크 미연결.
@@ -139,12 +144,13 @@ docker logs -f againspring-prod-dev-sync
 현재 반영 범위:
 
 - `users`, `posts`, `vote_options`, `post_comments`, `votes`, `post_likes`
-- `personas`, `persona_relationships`, `persona_seen_posts`, `persona_action_log`
+- `persona_relationships`, `persona_seen_posts`, `persona_action_log`
 - `persona_history_entries`, `persona_life_state`, `persona_daily_quota`
 - `ai_content_corrections`, `ai_global_rules`
 
 설정 테이블(`ai_user_runtime`·`ai_user_generation_config`·`system_setting`·`ai_prompt_template`)은
-dev 튜닝을 prod 값으로 덮어써버리므로 sync 대상에서 제외한다(2026-09).
+dev 튜닝을 prod 값으로 덮어써버리므로 sync 대상에서 제외한다(2026-09). `personas`도 위와 같은
+이유로 별도 제외된다.
 
 ### 기존 dev 원문 정리
 

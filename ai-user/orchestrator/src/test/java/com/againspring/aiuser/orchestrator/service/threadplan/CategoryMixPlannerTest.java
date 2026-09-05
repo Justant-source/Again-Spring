@@ -107,13 +107,12 @@ class CategoryMixPlannerTest {
     }
 
     private static Persona persona(String marital) {
-        Map<String, Object> voiceProfile = new LinkedHashMap<>();
-        voiceProfile.put("marital", marital);
         return Persona.builder()
                 .id("p-" + marital)
+                .marital(marital)
                 .archetype("TEST")
                 .tier("REGULAR")
-                .voiceProfile(voiceProfile)
+                .voiceProfile(new LinkedHashMap<>())
                 .interests(Map.of())
                 .biasProfile(Map.of())
                 .circadian(List.of())

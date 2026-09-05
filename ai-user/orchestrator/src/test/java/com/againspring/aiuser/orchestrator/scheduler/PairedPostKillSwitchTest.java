@@ -12,6 +12,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -52,7 +53,10 @@ class PairedPostKillSwitchTest {
                 mock(com.againspring.aiuser.orchestrator.service.GenerationConfigSupport.class),
                 mock(com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService.class),
                 mock(com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache.class),
-                mock(com.againspring.aiuser.orchestrator.service.persona.PersonaLottery.class));
+                mock(com.againspring.aiuser.orchestrator.service.persona.PersonaLottery.class),
+                pairedSourceStoryResolverStub(),
+                mock(com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService.class),
+                new com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard());
     }
 
     private Persona author() {
@@ -87,5 +91,12 @@ class PairedPostKillSwitchTest {
 
         assertThat(attempt.hold()).isEmpty();
         assertThat(attempt.detail()).isNotEqualTo("kill switch");
+    }
+
+    /** paired guard용 source claim은 이 테스트들의 관심사가 아니다 — 항상 빈 결과로 fail-open 시킨다. */
+    private static com.againspring.aiuser.orchestrator.service.threadplan.PlanSourceStoryResolver pairedSourceStoryResolverStub() {
+        var resolver = mock(com.againspring.aiuser.orchestrator.service.threadplan.PlanSourceStoryResolver.class);
+        when(resolver.claimAndResolve(any(), any(), any(), any(), any())).thenReturn(java.util.Optional.empty());
+        return resolver;
     }
 }

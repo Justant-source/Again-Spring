@@ -12,9 +12,11 @@ import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepo
 import com.againspring.aiuser.orchestrator.repository.PersonaRelationshipRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard;
 import com.againspring.aiuser.orchestrator.service.DailyPostQuotaService;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
+import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
 import com.againspring.aiuser.orchestrator.service.threadplan.CategoryMixPlanner;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
 import com.againspring.aiuser.orchestrator.service.threadplan.ActivityCurve;
@@ -24,6 +26,7 @@ import com.againspring.aiuser.orchestrator.service.threadplan.LlmCallBudget;
 import com.againspring.aiuser.orchestrator.service.threadplan.NightlySlotFailure;
 import com.againspring.aiuser.orchestrator.service.threadplan.PairedHoldMeta;
 import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
+import com.againspring.aiuser.orchestrator.service.threadplan.PlanSourceStoryResolver;
 import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
 import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
 import com.againspring.aiuser.orchestrator.service.threadplan.StoryPersonaCommentFilter;
@@ -77,6 +80,9 @@ public class PairedPostScheduler {
     private final LlmGenerationGateService llmGenerationGateService;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
     private final PersonaLottery personaLottery;
+    private final PlanSourceStoryResolver sourceStoryResolver;
+    private final AiPostBundleService aiPostBundleService;
+    private final SourceOverlapGuard sourceOverlapGuard;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
@@ -290,12 +296,31 @@ public class PairedPostScheduler {
             return HoldPairResult.fail(HoldResult.Outcome.GENERATION_SKIPPED, false, "author slot still quiet");
         }
 
+        // persona-diversity-v4 WP2/WP3 배선: 계약7 골격의 b_side_viable을 보려면 popular source를
+        // claim해야 한다. 실패(claim 없음·skeleton 추출 실패·네트워크 오류)는 전부 기존 동작
+        // (freestyle, viable 취급)으로 fail-open — 이 배선 이전에는 paired가 claim 자체를
+        // 하지 않았으므로 회귀 위험을 만들지 않는다.
+        String reservationKey = "paired-" + corrId;
+        Instant reserveUntil = slot.plus(Duration.ofHours(24));
+        PlanSourceStoryResolver.ResolvedSource resolvedSource = claimForPairedGuard(
+                author, preferredSource, reservationKey, reserveUntil, category, corrId);
+
+        if (resolvedSource != null && !isBSideViable(resolvedSource)) {
+            log.warn("[PairedPost] PAIRED_DOWNGRADED_TO_SOLO corrId={} persona={} category={} exampleId={}",
+                    corrId, author.getId(), category, resolvedSource.sourceExampleId());
+            sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            return downgradeToSolo(author, category, corrId, slot, preferredSource, budget);
+        }
+
         Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId());
         if (call1.llmInvoked() && budget != null) {
             budget.consume();
         }
         if (call1.hold().isEmpty()) {
             log.warn("[PairedPost] Call1 failed corrId={} reason={}", corrId, call1.detail());
+            if (resolvedSource != null) {
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            }
             return HoldPairResult.fail(
                     call1.llmInvoked() ? HoldResult.Outcome.LLM_OR_SAFETY : HoldResult.Outcome.GENERATION_SKIPPED,
                     call1.llmInvoked(),
@@ -306,8 +331,25 @@ public class PairedPostScheduler {
                 safetyGuard.check(heldContent.body(), ContentSafetyGuard.ContentType.POST);
         if (!authorGuard.passed()) {
             log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
+            if (resolvedSource != null) {
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            }
             return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true,
                     "unsafe author body: " + authorGuard.reason());
+        }
+
+        if (resolvedSource != null) {
+            // persona-diversity-v4 WP2 item5 배선: paired author 본문 경로. 원문(sourceBody)은
+            // 이 검사에서만 메모리로 쓰고 로그·DB에는 절대 남기지 않는다.
+            SourceOverlapGuard.GuardResult overlap = sourceOverlapGuard.check(
+                    heldContent.title() + "\n" + heldContent.body(), resolvedSource.sourceBody());
+            if (!overlap.passed()) {
+                log.error("[PairedPost] {} overlapRatio={} corrId={}",
+                        overlap.reason(), overlap.overlapRatio(), corrId);
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true, overlap.reason());
+            }
+            sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
         }
 
         String candidatesJson;
@@ -342,6 +384,50 @@ public class PairedPostScheduler {
                 partner.getId().substring(0, Math.min(8, partner.getId().length())),
                 category, slot, heldContent.itemCount());
         return new HoldPairResult(true, held.getId(), HoldResult.Outcome.SAVED, "saved");
+    }
+
+    /**
+     * persona-diversity-v4 배선 — b_side_viable 판정과 {@link SourceOverlapGuard} 대조에만 쓸
+     * popular source를 claim한다. 실패(claim 없음·skeleton 추출 실패·예외)는 전부 {@code null}
+     * (기존 freestyle 동작 유지, fail-open).
+     */
+    private PlanSourceStoryResolver.ResolvedSource claimForPairedGuard(
+            Persona author, String preferredSource, String reservationKey, Instant reserveUntil,
+            String category, String corrId) {
+        try {
+            return sourceStoryResolver
+                    .claimAndResolve(author, preferredSource, reservationKey, reserveUntil, category)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.debug("[PairedPost] source claim for guard failed (non-critical) corrId={}: {}",
+                    corrId, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 계약7 골격의 {@code b_side_viable}. 키 부재·파싱 불가 시 기존 동작 유지를 위해 true(강행). */
+    private static boolean isBSideViable(PlanSourceStoryResolver.ResolvedSource source) {
+        if (source == null || source.sourceContext() == null) return true;
+        Object v = source.sourceContext().get("b_side_viable");
+        if (v == null) return true;
+        if (v instanceof Boolean b) return b;
+        return !"false".equalsIgnoreCase(String.valueOf(v).trim());
+    }
+
+    /** WP3 배선 — b_side_viable=false 골격의 paired 슬롯을 solo 홀딩으로 강등한다. */
+    private HoldPairResult downgradeToSolo(Persona author, String category, String corrId, Instant slot,
+                                           String preferredSource, LlmCallBudget budget) {
+        HoldResult solo = aiPostBundleService.generateAndHoldResult(
+                author, category, null, corrId, slot, preferredSource, Set.of());
+        if (budget != null && solo.llmInvoked()) {
+            budget.consume();
+        }
+        if (solo.outcome() == HoldResult.Outcome.SAVED) {
+            String scheduledId = solo.saved().map(AiScheduledPost::getId).orElse(null);
+            log.info("[PairedPost] downgraded-to-solo saved corrId={} scheduledId={}", corrId, scheduledId);
+            return new HoldPairResult(true, scheduledId, HoldResult.Outcome.SAVED, "downgraded-to-solo");
+        }
+        return HoldPairResult.fail(solo.outcome(), solo.llmInvoked(), "downgraded-to-solo: " + solo.detail());
     }
 
     Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,

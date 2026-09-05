@@ -11,6 +11,14 @@ import java.util.Map;
 public class ReplyGenRequest {
     private String personaId;
     private String voiceProfile;
+    /**
+     * persona-diversity-v4 계약 4 — WP1 {@code PersonaCard.render()} 출력(400자 이내). 오케스트레이터
+     * {@code GenDto.ReplyRequest.personaCard}에서 넘어온다. 있으면 {@code PromptAssembler}가
+     * {@link #voiceProfile} 대신 이 값을 페르소나 특성 섹션에 쓴다(레거시 {@code /generate/reply}
+     * 경로, WP2 소비 작업 진행 중 — 아직 미소비면 personaVoice 헬퍼를 assembleReplyPrompt에 배선할 것).
+     * 없으면 {@link com.againspring.aiuser.llm.service.PersonaCardFallback}이 voiceProfile에서 축약한다.
+     */
+    private String personaCard;
     private double slangLevel;
     private String parentCommentExcerpt;
     private String threadContext;

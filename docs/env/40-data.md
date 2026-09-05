@@ -282,14 +282,14 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
 | 변수 | 설명 | 기본값 |
 |---|---|---|
 | `SYNC_CRON` | 24h full cron (5-field) | `30 5 * * *` |
-| `SYNC_CONTENT_CRON` | 5분 콘텐츠 증분 cron | `0 * * * *` |
+| `SYNC_CONTENT_CRON` | 1시간 콘텐츠 증분 cron(2026-09-03 5분→1시간) | `0 * * * *` |
 | `SYNC_TIMEZONE` | scheduler timezone | `Asia/Seoul` |
 | `SYNC_BACKFILL_DAYS` | full 잡 증분 backfill window | `7` |
 | `SYNC_CONTENT_LOOKBACK_MINUTES` | 콘텐츠 잡 lookback (겹침 허용) | `75` |
 | `DEV_DB_NAME` | dev DB 이름 | `againspring_dev` |
 | `AI_USER_DEV_ENABLED` | orchestrator-dev 하드 게이트 (기본 off, L3) | `false` |
 
-- **5분 콘텐츠(T1+U1)**: `posts`, `vote_options`, `post_comments`, `votes`, `post_likes` + 참조 `users`(비식별)·`personas`
+- **1시간 콘텐츠(T1+U1)**: `posts`, `vote_options`, `post_comments`, `votes`, `post_likes` + 참조 `users`(비식별). `personas`는 제외(아래 참고)
 - **24h full**: 아래 전체 표
 - D1: prod 우선 upsert (dev-only 행 삭제 안 함)
 - **실사용자 `posts`/`post_comments`**는 dev로 복사될 때 제목·본문이 마스킹되고, `PRIVATE`/`DRAFT`/삭제된 글은 제외되며, `invite_token`은 (작성자 불문) 복사하지 않는다.
@@ -298,13 +298,15 @@ prod는 현재 `AI_USER_FORCE_ACTIVE=true`, `AI_USER_LLM_DEFAULT_TIMEOUT_MS=6000
 
 - `users`
 - `posts`, `vote_options`, `post_comments`, `votes`, `post_likes`
-- `personas`, `persona_relationships`, `persona_seen_posts`, `persona_action_log`
+- `persona_relationships`, `persona_seen_posts`, `persona_action_log`
 - `persona_history_entries`, `persona_life_state`, `persona_daily_quota`
 - `ai_content_corrections`, `ai_global_rules`
 
 설정 테이블(`ai_user_runtime`·`ai_user_generation_config`·`system_setting`·`ai_prompt_template`)은
 dev 튜닝을 prod 값으로 덮어써버리므로 sync 대상에서 제외한다(2026-09). `ai_content_corrections`·
-`ai_global_rules`는 콘텐츠 규칙이라 계속 sync된다.
+`ai_global_rules`는 콘텐츠 규칙이라 계속 sync된다. `personas`도 sync 대상에서 제외된다(2026-09,
+persona-diversity-v4 WP1 — dev·prod가 각자 독립 시드로 페르소나를 진화시키므로 prod→dev 동기화가
+dev 갱신을 되돌린다. 상세: `docs/ai-user/60-runtime/operations.md` §7).
 
 `users`는 dev 반영 시 비식별화되고 로그인 가능한 상태를 유지하지 않는다.
 

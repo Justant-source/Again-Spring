@@ -51,8 +51,12 @@ public class PostGenRequest {
     private boolean reconstructMode;
     /** 재구성 원본 example_bank.id */
     private Long sourceExampleId;
-    /** 재구성할 크롤 원본 본문 */
-    private String sourceBody;
+    /**
+     * persona-diversity-v4 계약7 — 재구성 원본 골격(skeleton) JSON. orchestrator
+     * {@code LlmAiUserClient#extractSkeleton}이 llm 워커 {@code /v2/extract-skeleton}에서
+     * 받은 뼈대만 담는다. 크롤 원문 전문은 이 DTO에 실리지 않는다(프롬프트 누출 경로 차단).
+     */
+    private Map<String, Object> sourceContext;
     /** scope=RECONSTRUCTION 전역 규칙 목록 ("- …" 개행 구분). 없으면 null. */
     private String reconstructionRules;
     /** 커뮤니티 voice 타입 (NATEPAN/DCINSIDE/THEQOO 등) — OutputSanitizer 분포 매칭용. 없으면 null. */

@@ -75,7 +75,7 @@ class HumanReplyBatchServiceTest {
     }
 
     @Test
-    void buildItemInjectsBodiesAndCandidateRespondersWithStructuredVoice() {
+    void buildItemInjectsBodiesAndCandidateRespondersWithPersonaCard() {
         AiHumanInteractionInbox entry = AiHumanInteractionInbox.builder()
                 .id("inbox-1").postId("post-1").sourceCommentId("42")
                 .parentCommentId("10").authorId("u1").interactionType("REPLY")
@@ -92,7 +92,9 @@ class HumanReplyBatchServiceTest {
                 .thenReturn(List.of(Map.of("body", "부모 댓글")));
         when(planItems.findByPostAndTypesAndStatuses(any(), any(), any())).thenReturn(List.of());
         Map<String, Object> voice = Map.of("formality", "casual", "nickname", "봄이", "voice_type", "NATEPAN");
-        Persona persona = Persona.builder().id("p-active").active(true).voiceProfile(voice).build();
+        Persona persona = Persona.builder().id("p-active").active(true).voiceProfile(voice)
+                .ageYears(34).gender("M").marital("MARRIED").marriedYears(6).hasKids(true)
+                .jobType("CORP_MID").build();
         when(personaRepository.findByActiveTrue()).thenReturn(List.of(persona));
 
         Optional<Map<String, Object>> item = service.buildItem(entry);
@@ -105,12 +107,14 @@ class HumanReplyBatchServiceTest {
         assertThat(candidates.get(0).get("personaId")).isEqualTo("p-active");
         assertThat(candidates.get(0).get("formality")).isEqualTo("casual");
         assertThat(candidates.get(0).get("nickname")).isEqualTo("봄이");
-        assertThat(candidates.get(0).get("voiceProfile")).isInstanceOf(Map.class);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> slimVoice = (Map<String, Object>) candidates.get(0).get("voiceProfile");
-        assertThat(slimVoice).containsEntry("formality", "casual").containsEntry("voice_type", "NATEPAN");
-        assertThat(slimVoice).doesNotContainKey("nickname");
-        assertThat(candidates.get(0).get("voiceProfile")).isNotInstanceOf(String.class);
+        // persona-diversity-v4 계약 4: voiceProfile 슬림 맵은 더 이상 실리지 않고 personaCard가
+        // WP1 신원축(결혼·자녀·직군)을 담아 대신 실린다.
+        assertThat(candidates.get(0)).doesNotContainKey("voiceProfile");
+        Object cardObj = candidates.get(0).get("personaCard");
+        assertThat(cardObj).isInstanceOf(String.class);
+        String card = (String) cardObj;
+        assertThat(card).contains("봄이").contains("34세 남").contains("기혼 6년차").contains("아이 있음")
+                .contains("중견기업 직장인");
     }
 
     @Test
