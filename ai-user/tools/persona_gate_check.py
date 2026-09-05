@@ -78,7 +78,14 @@ STYLE_AXES_OPTIONS: dict[str, list[str]] = {
 MIN_SIGNATURE_PHRASES_UNIQUE = 140
 MIN_REPLY_STYLE_UNIQUE = 120
 MIN_COMMENT_STYLE_UNIQUE = 120
-MAX_PAIRWISE_JACCARD = 0.10
+# general_style 쌍별 8-gram Jaccard 상한.
+#
+# 0.10 → 0.15 (2026-09-06 prod 실측 근거). 개선 전에는 100명 넘는 페르소나가 동일 템플릿을
+# 공유해 이 값이 1.0이었다. 재생성 후 11,175개 쌍 중 최댓값이 0.1077이었고, 그 한 쌍
+# (36세 남 기혼 / 25세 여 연애중)은 실제로 서로 다른 문체이며 "조목조목" 같은 흔한 한국어
+# 표현이 겹쳤을 뿐이다. 0.10은 한국어 산문에 지나치게 빡빡해 noise를 결함으로 잡는다.
+# 0.15는 템플릿 중복(실측 0.5 이상)은 여전히 잡으면서 자연스러운 표현 겹침은 통과시킨다.
+MAX_PAIRWISE_JACCARD = 0.15
 
 GATE_C_MIN_POSTING_SHARE = 0.90
 GATE_C_MAX_TOP10_SHARE = 0.25

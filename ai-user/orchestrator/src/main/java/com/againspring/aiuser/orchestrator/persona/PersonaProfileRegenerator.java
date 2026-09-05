@@ -117,7 +117,12 @@ public class PersonaProfileRegenerator {
                 continue;
             }
             Persona p = byId.get(id);
-            if (force || !isProfileCurrent(p)) targets.add(id);
+            PersonaQuotaPlanner.IdentityAxes planned = planMap.get(id);
+            boolean voiceMatches = planned == null || planned.voiceType() == null
+                    || planned.voiceType().equals(voiceTypeOf(p));
+            // voice_type이 계획과 다르면 미완료로 본다. 이 축은 크롤 예시 풀 소스를 가르므로
+            // 프로필 본문과 짝이 맞아야 한다 — 값만 갈아끼우면 옛 소스로 쓴 문체가 남는다.
+            if (force || !isProfileCurrent(p) || !voiceMatches) targets.add(id);
         }
 
         // 진행률 로그·remaining 계산의 기준선 — 루프가 personas를 변형하기 전에 현재 완료분을 먼저 센다.
@@ -127,6 +132,11 @@ public class PersonaProfileRegenerator {
         long totalActive = allActive.size();
         Set<String> currentIds = allActive.stream()
                 .filter(PersonaProfileRegenerator::isProfileCurrent)
+                .filter(p -> {
+                    PersonaQuotaPlanner.IdentityAxes planned = planMap.get(p.getId());
+                    return planned == null || planned.voiceType() == null
+                            || planned.voiceType().equals(voiceTypeOf(p));
+                })
                 .map(Persona::getId)
                 .collect(Collectors.toCollection(HashSet::new));
         long alreadyDoneBefore = currentIds.size();
@@ -164,7 +174,7 @@ public class PersonaProfileRegenerator {
             }
             String nickname = lookupNickname(id);
             String region = regionOf(persona);
-            String voiceType = voiceTypeOf(persona);
+            String voiceType = axes.voiceType() != null ? axes.voiceType() : voiceTypeOf(persona);
 
             Map<String, Object> accepted = null;
             String lastReason = "UNKNOWN";
@@ -395,6 +405,7 @@ public class PersonaProfileRegenerator {
         // 완료 마커 — 이 시점까지 도달했다는 건 findMissingRequiredKeys를 통과한 완전한 응답이라는
         // 뜻이다. persistProfileAtomically가 이 persona 저장 + 감사를 한 트랜잭션으로 묶으므로,
         // 이 마커가 DB에 실제로 찍혔다면 감사 행도 반드시 존재한다.
+        if (axes.voiceType() != null) vp.put("voice_type", axes.voiceType());
         vp.put(PROFILE_REV_KEY, CURRENT_PROFILE_REV);
         persona.setVoiceProfile(vp);
 

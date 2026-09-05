@@ -36,7 +36,8 @@ public class PersonaQuotaPlanner {
             boolean hasKids,
             String jobType,
             String tier,
-            Map<String, String> styleAxes
+            Map<String, String> styleAxes,
+            String voiceType
     ) {
     }
 
@@ -118,6 +119,14 @@ public class PersonaQuotaPlanner {
         // 10) style_axes — 계약 3, 축마다 독립 셔플
         Map<String, Map<String, String>> styleAxes = assignStyleAxes(sortedIds, n, rng);
 
+        // voice_type NATEPAN 75 : BLIND 75 — **별도 난수 스트림**을 쓴다. 위 축들과 같은 rng를
+        // 쓰면 소비 순서가 밀려 이미 재생성된 프로필의 배정까지 전부 달라지고, 집단 전체를 다시
+        // 돌려야 한다. 이 축만 독립 배정하면 불일치한 인원만 재생성하면 된다(2026-09-06).
+        // 재생성기가 예전엔 이 필드를 보존만 해서 실제 분포가 113:37로 굳어 있었다 — 크롤
+        // 예시 풀이 소스별로 갈리므로 블라인드형 커뮤니티 목표와 어긋났다.
+        Map<String, String> voiceType = zip(sortedIds, weightedLabels(n, linked(
+                "NATEPAN", 75.0, "BLIND", 75.0), new Random(seed ^ 0x5EED_0501CE1L)));
+
         Map<String, IdentityAxes> out = new LinkedHashMap<>();
         for (String id : sortedIds) {
             String maritalFinal = marital.get(id);
@@ -129,7 +138,8 @@ public class PersonaQuotaPlanner {
                     Boolean.TRUE.equals(hasKids.get(id)),
                     jobType.get(id),
                     tier.get(id),
-                    styleAxes.get(id)
+                    styleAxes.get(id),
+                    voiceType.get(id)
             ));
         }
         return out;

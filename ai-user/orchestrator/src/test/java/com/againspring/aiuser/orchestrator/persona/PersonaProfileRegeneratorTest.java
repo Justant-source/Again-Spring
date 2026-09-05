@@ -80,14 +80,16 @@ class PersonaProfileRegeneratorTest {
     }
 
     /** style_axes + voice_profile.profile_rev 마커까지 갖춘, 정상적으로 완료된 페르소나. */
+    /** 완료 상태: profile_rev 마커 + 계획과 일치하는 voice_type. 둘 다 맞아야 재개가 건너뛴다. */
     private static Persona donePersona(String id) {
         return persona(id, Map.of("speech", "BANMAL"),
-                Map.of(PersonaProfileRegenerator.PROFILE_REV_KEY, PersonaProfileRegenerator.CURRENT_PROFILE_REV));
+                Map.of(PersonaProfileRegenerator.PROFILE_REV_KEY, PersonaProfileRegenerator.CURRENT_PROFILE_REV,
+                        "voice_type", "NATEPAN"));
     }
 
     private static PersonaQuotaPlanner.IdentityAxes axes() {
         return new PersonaQuotaPlanner.IdentityAxes(30, "F", "SINGLE", null, false, "CORP_LARGE", "REGULAR",
-                Map.of("speech", "BANMAL", "emoticon", "LOW", "profanity", "NONE"));
+                Map.of("speech", "BANMAL", "emoticon", "LOW", "profanity", "NONE"), "NATEPAN");
     }
 
     /** §4 응답 스키마 필수 키를 전부 채운 완전한 응답 — 성공 케이스 픽스처. */
@@ -128,6 +130,26 @@ class PersonaProfileRegeneratorTest {
         assertThat(result.get("remaining")).isEqualTo(0L);
         assertThat(result.get("haltedReason")).isNull();
         verify(llmClient, never()).generatePersonaProfile(eq("p1"), any(), any(), any(), any(), anyList());
+    }
+
+    @Test
+    void resumeReprocessesPersonaWhoseVoiceTypeDiffersFromPlan() {
+        // 마커는 최신인데 voice_type이 계획과 다른 경우. 이 축은 크롤 예시 풀 소스를 가르므로
+        // 값만 갈아끼우면 옛 소스로 쓴 문체가 남는다 — 프로필째 다시 만들어야 한다(2026-09-06).
+        Persona staleVoice = persona("p1", Map.of("speech", "BANMAL"),
+                Map.of(PersonaProfileRegenerator.PROFILE_REV_KEY, PersonaProfileRegenerator.CURRENT_PROFILE_REV,
+                        "voice_type", "BLIND"));
+        when(personaRepo.findActiveIdsOrderById()).thenReturn(List.of("p1"));
+        when(personaRepo.findByActiveTrue()).thenReturn(List.of(staleVoice));
+        when(quotaPlanner.plan(anyList(), anyLong())).thenReturn(Map.of("p1", axes())); // 계획은 NATEPAN
+        when(llmClient.generatePersonaProfile(eq("p1"), any(), any(), any(), any(), anyList()))
+                .thenReturn(success("p1"));
+
+        Map<String, Object> result = regenerator.regenerate(1L, 10, null, false);
+
+        assertThat(result.get("targetCount")).isEqualTo(1);
+        assertThat(result.get("succeeded")).isEqualTo(1);
+        verify(llmClient).generatePersonaProfile(eq("p1"), any(), any(), any(), any(), anyList());
     }
 
     @Test

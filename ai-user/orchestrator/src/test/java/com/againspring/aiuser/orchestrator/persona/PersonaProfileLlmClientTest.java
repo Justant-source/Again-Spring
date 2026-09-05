@@ -23,7 +23,7 @@ class PersonaProfileLlmClientTest {
 
     private static PersonaQuotaPlanner.IdentityAxes axes() {
         return new PersonaQuotaPlanner.IdentityAxes(30, "F", "SINGLE", null, false, "CORP_LARGE", "REGULAR",
-                Map.of("speech", "BANMAL"));
+                Map.of("speech", "BANMAL"), "NATEPAN");
     }
 
     @Test
