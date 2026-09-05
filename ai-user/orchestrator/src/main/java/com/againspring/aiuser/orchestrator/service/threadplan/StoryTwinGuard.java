@@ -16,7 +16,8 @@ import java.util.Set;
  *
  * <p>Compares a candidate title+body against recent <strong>published</strong> AI posts
  * ({@code users.synthetic = 1}, same identification as {@code DailyPostQuotaService}).
- * Window: last {@value #WINDOW_DAYS} days, up to {@value #RECENT_LIMIT} posts.
+ * Window: last {@value #WINDOW_DAYS} days, up to {@value #RECENT_LIMIT} rows from each of
+ * two sources — published posts and still-unpublished scheduled holds.
  * No embedding — char 2-gram Jaccard (adapted from {@code ActionExecutor.maxBigramJaccard}).
  *
  * <h2>Thresholds (high bar — catch near-copies like "직장 엄마" twins, not all WORK posts)</h2>
@@ -35,7 +36,11 @@ import java.util.Set;
 public class StoryTwinGuard {
 
     public static final int WINDOW_DAYS = 14;
-    public static final int RECENT_LIMIT = 30;
+    /**
+     * 각 소스(발행분·홀딩분)에서 가져올 최대 건수. 새벽 배치가 한 번에 최대 100건까지 만들므로
+     * 30이면 같은 배치 안에서도 앞쪽 글들이 비교 대상에서 밀려난다(2026-09-05 리뷰).
+     */
+    public static final int RECENT_LIMIT = 120;
     /** Title near-copy bar (stricter than body). */
     public static final double TITLE_JACCARD_THRESHOLD = 0.45;
     /** Body near-copy bar (slightly looser — catch paraphrased twins). */
@@ -84,11 +89,24 @@ public class StoryTwinGuard {
     }
 
     /**
-     * Recent published AI posts: {@code users.synthetic = 1}, not deleted,
-     * last {@value #WINDOW_DAYS} days, newest first, limit {@value #RECENT_LIMIT}.
-     * Fail-open (empty list) on query errors so generation is not blocked by DB blips.
+     * Recent AI stories to compare against: published posts <em>and</em> still-unpublished
+     * scheduled holds, both from the last {@value #WINDOW_DAYS} days, newest first,
+     * up to {@value #RECENT_LIMIT} each.
+     *
+     * <p>발행분만 보면 같은 배치에서 동시에 만들어지는 형제 글끼리는 서로 비교되지 않는다.
+     * 새벽 배치가 한 번에 최대 100건까지 만드는데, 그것들이 전부 홀딩 상태라 이 가드에
+     * 보이지 않았다. 대량 배치일수록 실질 비교 범위가 "최근 14일"이 아니라 "최근 발행 30건"
+     * (몇 시간치)으로 쪼그라들던 사각지대다(2026-09-05 리뷰).</p>
+     *
+     * <p>Fail-open (empty list) on query errors so generation is not blocked by DB blips.</p>
      */
     public List<RecentAiPost> loadRecentAiPosts() {
+        List<RecentAiPost> out = new java.util.ArrayList<>(queryPublished());
+        out.addAll(queryScheduledHolds());
+        return out;
+    }
+
+    private List<RecentAiPost> queryPublished() {
         try {
             return jdbcTemplate.query(
                     "SELECT COALESCE(NULLIF(TRIM(p.user_title), ''), p.title) AS title,"
@@ -103,7 +121,25 @@ public class StoryTwinGuard {
                             + " LIMIT " + RECENT_LIMIT,
                     (rs, rowNum) -> new RecentAiPost(rs.getString("title"), rs.getString("body")));
         } catch (Exception e) {
-            log.warn("StoryTwinGuard loadRecentAiPosts failed (fail-open): {}", e.getMessage());
+            log.warn("StoryTwinGuard published query failed (fail-open): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 아직 발행되지 않은 홀딩분. 같은 배치의 형제 글을 서로 비교하기 위한 것이다. */
+    private List<RecentAiPost> queryScheduledHolds() {
+        try {
+            return jdbcTemplate.query(
+                    "SELECT s.title AS title, s.body AS body"
+                            + " FROM ai_scheduled_posts s"
+                            + " WHERE s.status = 'SCHEDULED'"
+                            + "   AND s.body IS NOT NULL"
+                            + "   AND s.created_at >= NOW() - INTERVAL " + WINDOW_DAYS + " DAY"
+                            + " ORDER BY s.created_at DESC"
+                            + " LIMIT " + RECENT_LIMIT,
+                    (rs, rowNum) -> new RecentAiPost(rs.getString("title"), rs.getString("body")));
+        } catch (Exception e) {
+            log.warn("StoryTwinGuard scheduled-hold query failed (fail-open): {}", e.getMessage());
             return List.of();
         }
     }

@@ -113,6 +113,8 @@ class StoryTwinGuardTest {
         assertThat(StoryTwinGuard.TITLE_JACCARD_THRESHOLD).isEqualTo(0.45);
         assertThat(StoryTwinGuard.BODY_JACCARD_THRESHOLD).isEqualTo(0.35);
         assertThat(StoryTwinGuard.WINDOW_DAYS).isEqualTo(14);
-        assertThat(StoryTwinGuard.RECENT_LIMIT).isEqualTo(30);
+        // 30 → 120 (2026-09-05): 새벽 배치가 한 번에 최대 100건을 만드는데 30이면 같은 배치
+        // 안에서도 앞쪽 글이 비교 대상에서 밀려났다. 발행분·홀딩분 두 소스에 각각 적용된다.
+        assertThat(StoryTwinGuard.RECENT_LIMIT).isEqualTo(120);
     }
 }
