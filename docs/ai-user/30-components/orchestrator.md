@@ -288,7 +288,7 @@ WP1)에 정체성 축이 추가된다:
 | `age_years` | 23~49 | |
 | `gender` | `M`\|`F` | |
 | `marital` | `SINGLE`\|`DATING`\|`ENGAGED`\|`MARRIED` | |
-| `married_years` | 0~24, `≤ age_years−25` | MARRIED만 |
+| `married_years` | 1~24, `≤ age_years−23` | MARRIED만. 결혼 최소 연령 23세(2026-09-05 수정 — 최초 25세안이 계약2의 23~29세 밴드 MARRIED 15명 요구와 상충해 married_years=0 기혼(23세)이 나오던 결함 수정). married_years=0 금지 → MARRIED 배정 최소 연령 24세 |
 | `has_kids` | bool | MARRIED만 1 가능 |
 | `job_type` | 8종(`CORP_LARGE`·`CORP_MID`·`STARTUP`·`PUBLIC`·`PROFESSIONAL`·`SELF_EMPLOYED`·`FREELANCER`·`JOBSEEKER`·`PARENT_LEAVE`) | |
 | `job_title` | LLM 생성 문자열 | |

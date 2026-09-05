@@ -18,7 +18,7 @@
 >   age_years: 34          # 23~49
 >   gender: M              # M | F
 >   marital: MARRIED       # SINGLE | DATING | ENGAGED | MARRIED
->   married_years: 6       # MARRIED만, married_years <= age_years - 25
+>   married_years: 6       # MARRIED만, 1 <= married_years <= age_years - 23 (2026-09-05: 최소 결혼연령 23세, married_years=0 금지 → MARRIED 최소연령 24세)
 >   has_kids: true         # MARRIED만 true 가능
 >   job_type: CORP_MID     # CORP_LARGE·CORP_MID·STARTUP·PUBLIC·PROFESSIONAL·SELF_EMPLOYED·FREELANCER·JOBSEEKER·PARENT_LEAVE
 >   job_title: "중견 제조업 구매팀 5년차 대리"

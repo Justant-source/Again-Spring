@@ -331,7 +331,11 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
             married_by_age_band[band] = married_by_age_band.get(band, 0) + 1
             if has_kids:
                 kids_of_married += 1
-            if married_years is not None and age is not None and married_years > age - 25:
+            # 계약1 개정(2026-09-05): 결혼 최소 연령 25→23세 + married_years≥1 보장.
+            # married_years ≤ age-23 AND married_years ≥ 1 (0년차 기혼은 부자연스러워 금지).
+            if married_years is not None and age is not None and (
+                married_years > age - 23 or married_years < 1
+            ):
                 married_years_violations.append(row.get("id"))
         elif has_kids:
             has_kids_violations.append(row.get("id"))

@@ -70,11 +70,14 @@ public class PersonaQuotaPlanner {
         assignEvenAges(bandGroups.get("MID"), AGE_BAND_MID, rng, ageYears);
         assignEvenAges(bandGroups.get("OLD"), AGE_BAND_OLD, rng, ageYears);
 
-        // 4) 연령대 내 결혼 여부 (MARRIED 15/45/30 교차 쿼터, 밴드 명목 크기 60/60/30 기준)
+        // 4) 연령대 내 결혼 여부 (MARRIED 15/45/30 교차 쿼터, 밴드 명목 크기 60/60/30 기준).
+        //    MARRIED 최소 결혼 연령 23세(계약1) + married_years≥1 보장을 위해 MARRIED 배정
+        //    자체를 age_years≥24로 제한한다(23세는 SINGLE/DATING/ENGAGED만 가능, YOUNG 밴드만
+        //    해당 — MID/OLD 밴드는 전원 30세 이상이라 제약이 걸리지 않는다: minMarriedAge=0).
         Map<String, String> marital = new LinkedHashMap<>();
-        assignMaritalWithinBand(bandGroups.get("YOUNG"), 60.0, 15.0, rng, marital);
-        assignMaritalWithinBand(bandGroups.get("MID"), 60.0, 45.0, rng, marital);
-        assignMaritalWithinBand(bandGroups.get("OLD"), 30.0, 30.0, rng, marital);
+        assignMaritalWithinBand(bandGroups.get("YOUNG"), 60.0, 15.0, rng, marital, ageYears, 24);
+        assignMaritalWithinBand(bandGroups.get("MID"), 60.0, 45.0, rng, marital, ageYears, 0);
+        assignMaritalWithinBand(bandGroups.get("OLD"), 30.0, 30.0, rng, marital, ageYears, 0);
 
         // 5) 미혼 60명을 SINGLE/DATING/ENGAGED 균등 3분할
         List<String> nonMarried = sortedIds.stream()
@@ -93,13 +96,16 @@ public class PersonaQuotaPlanner {
         for (String id : sortedIds) hasKids.put(id, false);
         for (int i = 0; i < married.size(); i++) hasKids.put(married.get(i), "YES".equals(kidsLabels.get(i)));
 
-        // 7) MARRIED married_years: 0..max(0, min(24, age-25)) 균등 (계약1) — 1..min(24,age-25) 목표(WP1 상세)와
-        //    상충 시 계약1(00-shared.md) 우선, 실현 불가 구간(age<26)은 0으로 클램프.
+        // 7) MARRIED married_years: [1, max(1, min(24, age-23))] 균등 (계약1, 2026-09-05 개정).
+        //    결혼 최소 연령을 25→23세로 낮추되 married_years=0(결혼 0년차)인 부자연스러운 상태를
+        //    막기 위해 married_years≥1을 강제한다 — 그 결과 MARRIED 배정 가능 최소 연령은 24세
+        //    (24-23=1)가 되고, 위 4)에서 이미 age_years≥24로 걸러졌으므로 married 리스트의 모든
+        //    구성원은 upper≥1이 보장된다(Math.max(1, ...)은 안전망).
         Map<String, Integer> marriedYears = new LinkedHashMap<>();
         for (String id : married) {
             int age = ageYears.get(id);
-            int upper = Math.max(0, Math.min(24, age - 25));
-            marriedYears.put(id, upper == 0 ? 0 : rng.nextInt(upper + 1));
+            int upper = Math.max(1, Math.min(24, age - 23));
+            marriedYears.put(id, 1 + rng.nextInt(upper));
         }
 
         // 8) job_type — 제약 있는 3종 먼저 배정(전용 풀), 나머지 6종은 남은 인원에 배분
@@ -143,14 +149,32 @@ public class PersonaQuotaPlanner {
      * @param bandNominalSize 계약상 이 밴드의 150명 기준 명목 크기(YOUNG/MID=60, OLD=30) — 실제
      *                        group.size()가 다르면 이 크기 대비 비율로 스케일된다.
      * @param marriedWeight   같은 명목 기준의 MARRIED 절대값(15/45/30)
+     * @param ageYears        이미 배정된 나이(3단계 결과) — minMarriedAge 제약 판정에 쓴다.
+     * @param minMarriedAge   이 값 미만인 구성원은 MARRIED 배정 대상에서 제외한다(0=제약 없음).
+     *                        먼저 전체 group 기준으로 목표 MARRIED 인원수를 계산해 쿼터 총량은
+     *                        그대로 유지하고, 그 인원수만큼을 (연령 조건을 만족하는) 부분집합에서만
+     *                        뽑는다 — 조건을 만족하는 인원이 목표보다 적으면 있는 만큼만 배정한다.
      */
     private void assignMaritalWithinBand(List<String> group, double bandNominalSize, double marriedWeight,
-                                          Random rng, Map<String, String> out) {
+                                          Random rng, Map<String, String> out,
+                                          Map<String, Integer> ageYears, int minMarriedAge) {
         if (group == null || group.isEmpty()) return;
         LinkedHashMap<String, Double> weights = linked(
                 "MARRIED", marriedWeight, "NONMARRIED", Math.max(0.0, bandNominalSize - marriedWeight));
         List<String> labels = weightedLabels(group.size(), weights, rng);
-        for (int i = 0; i < group.size(); i++) out.put(group.get(i), labels.get(i));
+        int marriedTarget = (int) labels.stream().filter("MARRIED"::equals).count();
+
+        if (minMarriedAge <= 0) {
+            for (int i = 0; i < group.size(); i++) out.put(group.get(i), labels.get(i));
+            return;
+        }
+
+        List<String> eligible = new ArrayList<>(group.stream()
+                .filter(id -> ageYears.get(id) >= minMarriedAge).toList());
+        Collections.shuffle(eligible, rng);
+        int marriedCount = Math.min(marriedTarget, eligible.size());
+        Set<String> marriedIds = new HashSet<>(eligible.subList(0, marriedCount));
+        for (String id : group) out.put(id, marriedIds.contains(id) ? "MARRIED" : "NONMARRIED");
     }
 
     private Map<String, String> assignJobTypes(

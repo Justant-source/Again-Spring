@@ -78,14 +78,38 @@ def test_evaluate_gate_a_fails_on_gender_skew():
 
 
 def test_evaluate_gate_a_flags_married_years_violation():
+    # 계약1 개정(2026-09-05): married_years ≤ age-23. 30세면 상한 7년차, 10년차는 위반.
     rows = _build_compliant_personas()
     rows[0]["marital"] = "MARRIED"
     rows[0]["age_years"] = 30
-    rows[0]["married_years"] = 10  # 30-25=5 < 10 → 위반
+    rows[0]["married_years"] = 10  # 30-23=7 < 10 → 위반
     result = mod.evaluate_gate_a(rows)
     detail = next(c for c in result.checks if c["check"] == "married_years_violations")
     assert detail["pass"] is False
     assert "persona_000" in detail["detail"]
+
+
+def test_evaluate_gate_a_flags_married_years_zero_as_violation():
+    # 계약1 개정: married_years=0(결혼 0년차)은 23세든 몇 세든 항상 위반이다.
+    rows = _build_compliant_personas()
+    rows[0]["marital"] = "MARRIED"
+    rows[0]["age_years"] = 23
+    rows[0]["married_years"] = 0
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "married_years_violations")
+    assert detail["pass"] is False
+    assert "persona_000" in detail["detail"]
+
+
+def test_evaluate_gate_a_passes_married_years_one_at_age24():
+    # 계약1 개정: 24세 기혼 1년차는 정확히 경계값이며 위반이 아니다.
+    rows = _build_compliant_personas()
+    rows[0]["marital"] = "MARRIED"
+    rows[0]["age_years"] = 24
+    rows[0]["married_years"] = 1
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "married_years_violations")
+    assert detail["pass"] is True
 
 
 def test_evaluate_gate_a_flags_has_kids_without_married():

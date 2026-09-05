@@ -545,3 +545,37 @@ python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate d
   시그니처 또는 연속 5회 실패를 만나면 자동으로 멈춘다(`processed`/`remaining`/`haltedReason`
   응답 필드로 진척 확인). 완료 판정은 `voice_profile.profile_rev="v4"` 마커다 — 상세:
   [llm-call-budget.md](../70-policy/llm-call-budget.md) §1.5.
+
+### `resume-persona-profile-regen.sh` — 세션 한도 리셋 자동 대기·재개
+
+2026-09-05 dev/prod 재생성 배치가 하루에 두 번 세션 한도로 중단됐다(dev 6am UTC 리셋,
+prod 49/150에서 11am UTC 리셋). `PersonaProfileRegenerator`의 한도 감지·halt 자체는 정확히
+동작했지만, 리셋 후 재실행은 사람이 트리거를 다시 쳐야 했다. `env/scripts/resume-persona-profile-regen.sh`가
+그 재시도만 자동화한다 — LLM 호출·판정 로직은 전혀 새로 만들지 않고 기존 트리거를 반복 호출할 뿐이다.
+
+```bash
+env/scripts/resume-persona-profile-regen.sh --env dev --seed 20260905
+env/scripts/resume-persona-profile-regen.sh --env prod --seed 20260905 --i-mean-it   # prod는 --i-mean-it 필수
+env/scripts/resume-persona-profile-regen.sh --dry-run --env dev --seed 1             # 트리거 호출 없이 로직만 시연
+```
+
+- 재개 원리: only 없이(=force=false) 같은 seed로 재호출하면 `isProfileCurrent`가 이미
+  완료된(`voice_profile.profile_rev="v4"`) 페르소나를 건너뛴다 — 그래서 이 스크립트는 매
+  재시도마다 동일한 요청을 반복하기만 하면 된다. `--seed`는 QuotaPlanner 분포 계산에
+  쓰이므로 전체 재시도 동안 반드시 같은 값을 유지해야 한다.
+- `remaining==0`이면 성공 종료. `haltedReason`이 `LLM_ERROR_SIGNATURE: ...`(세션 한도/인증/거절)이면
+  오류 문구에서 리셋 시각을 파싱해(`env/scripts/lib/session-reset-time.sh`의
+  `parse_session_reset_epoch`) 그때까지 대기 후 재시도한다. 처리하는 실제 문구 두 종류:
+  `You've hit your session limit · resets 11am (UTC)`, `resets 8pm (Asia/Seoul)`
+  (시:분 및 `(TZ)`가 IANA 이름이든 `UTC`든 모두 GNU `date -d "today HH:MM" TZ=<tz>`로 계산). 파싱
+  실패 시 고정 30분(`--fallback-wait-minutes`)으로 폴백한다.
+- `haltedReason`이 `CONSECUTIVE_FAILURES(...)`이면 한도가 아니라 실제 결함이므로 **재시도하지
+  않고 실패 종료**한다 — 사람이 봐야 한다.
+- 전체 재시도 상한은 `--max-retries`(기본 12)로 무한 루프를 막는다. 컨테이너 이름은 환경별로
+  다르다 — **prod는 `-prod` 접미사가 붙지 않는다**(`againspring-ai-user-orchestrator`), dev만
+  `-dev`(`againspring-ai-user-orchestrator-dev`).
+- 진행·완료·실패는 텔레그램으로 알린다. 자격 파일 경로(`~/.config/again-spring-watchdog/telegram.env`)와
+  `send_telegram` 함수는 `ops-watchdog.sh`와 동일하게 재사용한다(새 경로/함수를 만들지 않았다).
+- 리셋 시각 파서는 `env/scripts/lib/session-reset-time.sh`에 독립 함수로 분리돼 있고,
+  `env/scripts/lib/test-session-reset-time.sh`로 두 실제 문구 + 분 포함 변형 + 자정/정오 경계값 +
+  파싱 실패 케이스를 검증한다(`bash env/scripts/lib/test-session-reset-time.sh`).

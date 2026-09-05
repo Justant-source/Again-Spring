@@ -133,15 +133,43 @@ class PersonaQuotaPlannerTest {
 
     @Test
     void plan_marriedYearsWithinAgeConstraint() {
+        // 00-shared.md 계약1 개정(2026-09-05): 결혼 최소 연령 25→23세, married_years≥1 보장.
+        // 즉 married_years ∈ [1, min(24, age-23)]이고 MARRIED 배정 최소 연령은 24세다.
         var result = planner.plan(ids150(), 7L);
         for (var e : result.entrySet()) {
             var axes = e.getValue();
             if ("MARRIED".equals(axes.marital())) {
                 assertThat(axes.marriedYears()).as("married_years present " + e.getKey()).isNotNull();
-                assertThat(axes.marriedYears()).isBetween(0, 24);
-                assertThat(axes.marriedYears()).isLessThanOrEqualTo(Math.max(0, axes.ageYears() - 25));
+                assertThat(axes.marriedYears()).isBetween(1, 24);
+                assertThat(axes.marriedYears()).isLessThanOrEqualTo(axes.ageYears() - 23);
             } else {
                 assertThat(axes.marriedYears()).isNull();
+            }
+        }
+    }
+
+    @Test
+    void plan_age23NeverMarried() {
+        // 계약1 개정: MARRIED 배정 가능 최소 연령은 24세(24-23=1년차). 23세는 married_years≥1을
+        // 만족할 수 없으므로 SINGLE/DATING/ENGAGED만 나와야 한다.
+        var result = planner.plan(ids150(), 7L);
+        for (var e : result.entrySet()) {
+            var axes = e.getValue();
+            if (axes.ageYears() == 23) {
+                assertThat(axes.marital()).as("age23 marital " + e.getKey()).isNotEqualTo("MARRIED");
+            }
+        }
+    }
+
+    @Test
+    void plan_marriedCrossQuotaByAgeBandStillExactAfterAge23Exclusion() {
+        // 계약2 쿼터(23~29 밴드 MARRIED=15)는 유지되되, 그 15명은 전부 24~29세에서 나와야 한다.
+        var result = planner.plan(ids150(), 7L);
+        for (var e : result.entrySet()) {
+            var axes = e.getValue();
+            if ("MARRIED".equals(axes.marital()) && band(axes.ageYears()).equals("23-29")) {
+                assertThat(axes.ageYears()).as("young-band married age " + e.getKey())
+                        .isGreaterThanOrEqualTo(24);
             }
         }
     }
