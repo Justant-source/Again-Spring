@@ -60,6 +60,40 @@ public class LlmAiUserClient {
         return generateStructured("/v2/generate/human-replies", request);
     }
 
+    /**
+     * persona-diversity-v4 WP2 계약7 — 크롤 원본에서 골격(뼈대) JSON만 뽑는다.
+     * 응답이 {@code ok:false}(파싱 실패·필수 키 누락·sequence 3개 미만)면 empty —
+     * 호출자가 해당 소스를 release하고 다음 소스로 재시도해야 한다(원문을 sourceContext에
+     * 담지 않기 위한 방어이므로 무음 실패가 아니라 로그를 남긴다).
+     */
+    public Optional<java.util.Map<String, Object>> extractSkeleton(
+            Long sourceExampleId, String category, String title, String content, String correlationId) {
+        try {
+            java.util.Map<String, Object> req = new java.util.LinkedHashMap<>();
+            req.put("sourceExampleId", sourceExampleId);
+            req.put("category", category == null ? "" : category);
+            req.put("title", title == null ? "" : title);
+            req.put("content", content == null ? "" : content);
+            req.put("correlationId", correlationId == null ? "" : correlationId);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> resp = restClient.post().uri("/v2/extract-skeleton").body(req).retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {});
+            if (resp == null) {
+                log.warn("extractSkeleton empty response sourceExampleId={}", sourceExampleId);
+                return Optional.empty();
+            }
+            Object ok = resp.get("ok");
+            if (ok != null && !Boolean.parseBoolean(String.valueOf(ok))) {
+                log.warn("extractSkeleton rejected sourceExampleId={} reason={}", sourceExampleId, resp.get("reason"));
+                return Optional.empty();
+            }
+            return Optional.of(resp);
+        } catch (Exception e) {
+            log.warn("extractSkeleton call failed sourceExampleId={}: {}", sourceExampleId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private Optional<java.util.Map<String, Object>> generateStructured(String path, Object request) {
         String correlationId = extractCorrelationId(request);
         int maxAttempts = 3;

@@ -174,6 +174,32 @@ class PairedStructuredGenerationTest {
         assertThrows(IllegalArgumentException.class, () -> service.createPairedPhase2(req, "corr-p2-8"));
     }
 
+    /** persona-diversity-v4 WP2 item6 — b_side_viable=false 골격에서 PARTNER 글 요청은 400류로 거부. */
+    @Test
+    void phase2RejectsPartnerPostWhenBSideNotViable() {
+        StructuredGenerationService service = configured(mock(LlmWorkerPool.class));
+        PairedPhase2Request req = phase2Request(true);
+        req.setBSideViable(false);
+        assertThrows(IllegalArgumentException.class, () -> service.createPairedPhase2(req, "corr-p2-bside"));
+    }
+
+    /** b_side_viable=false여도 comment-only 후속 호출(includePartnerPost=false)은 막지 않는다. */
+    @Test
+    void phase2AllowsCommentOnlyEvenWhenBSideNotViable() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.PAIRED_PHASE2))).thenReturn(phase2Json(false, 4));
+
+        PairedPhase2Request req = phase2Request(false);
+        req.setBSideViable(false);
+        req.setMinTopLevel(1);
+        req.setMinItems(1);
+        PairedPhase2Response response = service.createPairedPhase2(req, "corr-p2-bside-comments");
+
+        assertNull(response.getPartnerPost());
+    }
+
     private static StructuredGenerationService configured(LlmWorkerPool pool) {
         LlmParseFailureSampler sampler = org.mockito.Mockito.mock(LlmParseFailureSampler.class);
         StructuredSchemaCatalog schemaCatalog = org.mockito.Mockito.mock(StructuredSchemaCatalog.class);

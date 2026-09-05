@@ -632,7 +632,8 @@ public class AiPostBundleService {
         request.put("sourceContext", source.sourceContext());
         request.put("reconstructMode", source.reconstructMode());
         if (source.sourceExampleId() != null) request.put("sourceExampleId", source.sourceExampleId());
-        if (source.sourceBody() != null) request.put("sourceBody", source.sourceBody());
+        // persona-diversity-v4 WP2 item3: sourceBody(원문 전문) 전달 제거 — sourceContext가
+        // 이제 골격(뼈대) JSON만 담으므로 원문을 별도 필드로 다시 실을 필요가 없다.
         if (source.dynamicExamples() != null && !source.dynamicExamples().isBlank()) {
             request.put("dynamicExamples", source.dynamicExamples());
         }

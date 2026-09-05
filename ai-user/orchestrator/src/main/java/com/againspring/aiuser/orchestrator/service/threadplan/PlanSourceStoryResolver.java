@@ -1,6 +1,7 @@
 package com.againspring.aiuser.orchestrator.service.threadplan;
 
 import com.againspring.aiuser.orchestrator.client.AiLearningClient;
+import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
 import lombok.RequiredArgsConstructor;
@@ -10,23 +11,34 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Resolves example_bank grounding for PLAN AI_POST generation via popularity claim
  * ({@link AiLearningClient#claimPopularSource}) — no findSimilar primary selection,
  * no archetype freestyle fallback when the claim pool is empty.
+ *
+ * <p>persona-diversity-v4 WP2 계약7 — claim 성공 후 llm 워커 {@code /v2/extract-skeleton}로
+ * "뼈대"만 뽑아 {@code sourceContext}에 담는다. 원문 본문·topicSeed 원문 필드는 더 이상
+ * sourceContext에 실리지 않는다. 골격 추출이 실패하면 그 소스를 release하고 다음 소스로
+ * 최대 3회 재시도한다(기존 fill 재시도 관례 재사용).</p>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PlanSourceStoryResolver {
+    /** 계약3 §3 — 골격 추출 실패 시 release 후 재시도하는 최대 횟수. */
+    static final int MAX_SKELETON_ATTEMPTS = 3;
+
     private final AiLearningClient aiLearningClient;
     private final PersonaHistoryStore personaHistoryStore;
+    private final LlmAiUserClient llmAiUserClient;
 
     public record ResolvedSource(
             String topicSeed,
@@ -85,42 +97,89 @@ public class PlanSourceStoryResolver {
         }
 
         String plaza = normalizePlazaCategory(categoryHint);
-        Optional<AiLearningClient.ExampleItem> claimed =
-                aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plaza, excludeExampleIds);
-        if (claimed.isEmpty()) {
-            log.info("claimAndResolve empty: no popular source for preferredSource={} plaza={} reservationKey={}",
-                    source, plaza, reservationKey);
-            return Optional.empty();
+        Set<Long> excluded = excludeExampleIds == null ? new HashSet<>() : new HashSet<>(excludeExampleIds);
+
+        for (int attempt = 1; attempt <= MAX_SKELETON_ATTEMPTS; attempt++) {
+            Optional<AiLearningClient.ExampleItem> claimed =
+                    aiLearningClient.claimPopularSource(source, reservationKey, reserveUntil, plaza, excluded);
+            if (claimed.isEmpty()) {
+                log.info("claimAndResolve empty: no popular source for preferredSource={} plaza={} reservationKey={} attempt={}/{}",
+                        source, plaza, reservationKey, attempt, MAX_SKELETON_ATTEMPTS);
+                return Optional.empty();
+            }
+
+            AiLearningClient.ExampleItem primary = claimed.get();
+            Optional<Map<String, Object>> skeleton = extractSkeleton(primary, plaza, reservationKey);
+            if (skeleton.isEmpty()) {
+                log.warn("claimAndResolve: skeleton extraction failed exampleId={} attempt={}/{} — releasing and retrying",
+                        primary.getId(), attempt, MAX_SKELETON_ATTEMPTS);
+                releaseQuietly(primary.getId(), reservationKey);
+                excluded.add(primary.getId());
+                continue;
+            }
+
+            return Optional.of(buildResolvedSource(author, source, primary, skeleton.get()));
         }
 
-        AiLearningClient.ExampleItem primary = claimed.get();
-        String topicSeed = truncate(primary.getContent(), 200);
-        if (topicSeed == null) topicSeed = "";
+        log.warn("claimAndResolve: skeleton extraction failed {} times, giving up preferredSource={} plaza={} reservationKey={}",
+                MAX_SKELETON_ATTEMPTS, source, plaza, reservationKey);
+        return Optional.empty();
+    }
 
+    /** 계약7 골격만 담은 {@code sourceContext} + 일반화된 topicSeed로 {@link ResolvedSource}를 만든다. */
+    private ResolvedSource buildResolvedSource(
+            Persona author, String source, AiLearningClient.ExampleItem primary, Map<String, Object> skeleton) {
         String dynamicExamples = optionalStyleExamples(author, source);
         List<String> recent = loadRecentPostBodies(author, 3);
 
-        Map<String, Object> ctx = new LinkedHashMap<>();
-        ctx.put("topicSeed", topicSeed);
-        ctx.put("reconstructMode", true);
-        ctx.put("exampleId", primary.getId());
-        ctx.put("title", primary.getTitle() == null ? "" : primary.getTitle());
-        ctx.put("body", truncate(primary.getContent(), 2000));
-        ctx.put("source", primary.getSource() != null ? primary.getSource() : source);
-        ctx.put("sourceUrl", primary.getSourceUrl());
+        // item3: sourceContext에는 골격 JSON만 — 원문 body·raw topicSeed 필드는 담지 않는다.
+        Map<String, Object> ctx = new LinkedHashMap<>(skeleton);
+        ctx.remove("ok");
+        ctx.remove("reason");
 
-        return Optional.of(new ResolvedSource(
-                topicSeed,
+        return new ResolvedSource(
+                generalizedTopicSeed(skeleton),
                 ctx,
                 true,
                 primary.getId(),
+                // sourceBody: 원문 그대로 유지 — StoryProfile 분석·provenance·(장래) SourceOverlapGuard
+                // 입력으로 AiPostBundleService가 이미 쓰고 있어 이 브랜치에서는 필드 자체를 없애지
+                // 않았다(레코드 arity 변경은 다른 WP가 만지는 파일까지 깨뜨린다 — 보고서 참조).
+                // sourceContext(LLM 프롬프트로 나가는 값)에는 더 이상 실리지 않으므로 프롬프트
+                // 누출 경로는 막혀 있다.
                 primary.getContent(),
                 primary.getSource() != null ? primary.getSource() : source,
                 primary.getSourceUrl(),
                 primary.getTitle(),
                 dynamicExamples,
                 recent
-        ));
+        );
+    }
+
+    /** 원문 대신 골격에서 뽑은 짧은 일반화 문자열(200자 이내) — LLM 요청 {@code topicHint}로 나간다. */
+    private static String generalizedTopicSeed(Map<String, Object> skeleton) {
+        Object incident = skeleton.get("incident");
+        if (incident != null && !String.valueOf(incident).isBlank()) {
+            return truncate(String.valueOf(incident), 200);
+        }
+        Object category = skeleton.get("category");
+        return category != null ? String.valueOf(category) : "";
+    }
+
+    /** llm 워커 {@code /v2/extract-skeleton} 호출. 실패(ok:false·네트워크 오류)는 empty. */
+    private Optional<Map<String, Object>> extractSkeleton(
+            AiLearningClient.ExampleItem primary, String plaza, String correlationId) {
+        return llmAiUserClient.extractSkeleton(
+                primary.getId(), plaza, primary.getTitle(), primary.getContent(), correlationId);
+    }
+
+    private void releaseQuietly(Long exampleId, String reservationKey) {
+        if (exampleId == null) return;
+        try {
+            aiLearningClient.releaseSource(exampleId, reservationKey);
+        } catch (Exception e) {
+            log.debug("releaseSource failed (non-critical) exampleId={}: {}", exampleId, e.getMessage());
+        }
     }
 
     /**

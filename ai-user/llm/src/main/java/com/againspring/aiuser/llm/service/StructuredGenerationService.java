@@ -41,6 +41,18 @@ public class StructuredGenerationService {
     /** Marketing X/IG capture: bodies with more than this many non-empty newline blocks need a split. */
     public static final int SHORT_POST_MAX_BLOCKS = 8;
     public static final int MAX_PARTS_PER_SIDE = 4;
+    /**
+     * persona-diversity-v4 WP2 계약4 항목4 — SKELETON 재구성 규칙.
+     * 뼈대 문장을 그대로 옮기지 않고, 등장인물·세부는 PERSONA_CARD(=AUTHOR/PARTNER의 personaCard)의
+     * 삶에 맞게 새로 정하게 한다. 원문 SOURCE_BODY는 더 이상 프롬프트에 실리지 않는다.
+     */
+    static final String RECONSTRUCT_RULE = """
+            RECONSTRUCT_RULE=
+            - SKELETON은 뼈대다. 등장인물·직장·동네·금액·기간·순서의 세부는 AUTHOR/PARTNER의 personaCard 삶에 맞게 전부 새로 정한다.
+            - 반드시 "누가 무엇을 했다" 형태의 구체 사건 1개를 중심에 둔다. 감정 나열만 하는 글은 실격.
+            - 작성자 시점(A)이면 author_claim을 말하되 gray_zone을 숨기지 않는다. 독자가 B에게도 표를 줄 여지를 남긴다.
+            - 상대방 시점(B) 글이면 counterpart_claim으로 같은 사건을 다시 말한다.
+            - 뼈대 문장을 그대로 옮기지 마라. 카드의 말투 축·시그니처 표현을 실제로 쓴다.""";
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
     private final LlmParseFailureSampler parseFailureSampler;
@@ -590,17 +602,16 @@ public class StructuredGenerationService {
     private String pairedPhase1Prompt(PairedPhase1Request req) {
         StringBuilder grounding = new StringBuilder();
         if (req.getAuthor() != null && !req.getAuthor().isEmpty()) {
-            grounding.append("\nAUTHOR=").append(json(req.getAuthor()));
+            grounding.append("\nAUTHOR=").append(json(personaCardBlock(req.getAuthor())));
         }
         if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
-            grounding.append("\nSOURCE_CONTEXT=").append(json(cleanValues(req.getSourceContext())));
+            grounding.append("\nSKELETON=").append(json(cleanValues(req.getSourceContext())));
         }
         if (Boolean.TRUE.equals(req.getReconstructMode())) {
             grounding.append("\nRECONSTRUCT_MODE=true");
             if (req.getSourceExampleId() != null) grounding.append("\nSOURCE_EXAMPLE_ID=").append(req.getSourceExampleId());
-            if (!blank(req.getSourceBody())) {
-                grounding.append("\nSOURCE_BODY=").append(clean(req.getSourceBody()));
-                grounding.append("\nRECONSTRUCT_RULE=Re-narrate the SOURCE_BODY as the author's lived conflict story in their voice. Keep concrete facts/relationships; do not copy sentences verbatim; do not invent a different incident.");
+            if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+                grounding.append("\n").append(RECONSTRUCT_RULE);
             }
         }
         if (!blank(req.getDynamicExamples())) {
@@ -618,7 +629,7 @@ public class StructuredGenerationService {
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
                 Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방. Product framing = plaza empathy votes (공감).
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId to any comment or reply. Phase1 comments are community bystanders only.
-                When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed.
+                When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed.
                 AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear enough for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
@@ -631,7 +642,7 @@ public class StructuredGenerationService {
                 grounding +
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 overusedMetaphorsHint(req.getOverusedMetaphorIds()) +
-                "\nPERSONAS=" + json(req.getPersonas()) +
+                "\nPERSONAS=" + json(personaCardList(req.getPersonas())) +
                 "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
     }
 
@@ -671,10 +682,10 @@ public class StructuredGenerationService {
                 "\nAUTHOR_POST=" + json(Map.of(
                         "title", clean(req.getAuthorPost().getTitle()),
                         "body", clean(req.getAuthorPost().getBody()))) +
-                "\nPARTNER=" + json(req.getPartner() == null ? Map.of() : req.getPartner()) +
+                "\nPARTNER=" + json(personaCardBlock(req.getPartner())) +
                 "\nPUBLISHED_TOP_LEVEL_COMMENTS=" + json(publishedRows) +
                 "\nINCLUDE_PARTNER_POST=" + wantPartner +
-                "\nPERSONAS=" + json(req.getPersonas()) +
+                "\nPERSONAS=" + json(personaCardList(req.getPersonas())) +
                 "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
     }
 
@@ -683,18 +694,17 @@ public class StructuredGenerationService {
                 ? "EXISTING_POST=" + json(Map.of("title", clean(req.getExistingTitle()), "body", clean(req.getExistingBody()))) : "";
         StringBuilder grounding = new StringBuilder();
         if (req.getAuthor() != null && !req.getAuthor().isEmpty()) {
-            grounding.append("\nAUTHOR=").append(json(req.getAuthor()));
+            grounding.append("\nAUTHOR=").append(json(personaCardBlock(req.getAuthor())));
         }
         if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
-            grounding.append("\nSOURCE_CONTEXT=").append(json(cleanValues(req.getSourceContext())));
+            grounding.append("\nSKELETON=").append(json(cleanValues(req.getSourceContext())));
         }
         boolean reconstruct = Boolean.TRUE.equals(req.getReconstructMode());
         if (reconstruct) {
             grounding.append("\nRECONSTRUCT_MODE=true");
             if (req.getSourceExampleId() != null) grounding.append("\nSOURCE_EXAMPLE_ID=").append(req.getSourceExampleId());
-            if (!blank(req.getSourceBody())) {
-                grounding.append("\nSOURCE_BODY=").append(clean(req.getSourceBody()));
-                grounding.append("\nRECONSTRUCT_RULE=Re-narrate the SOURCE_BODY as the author's lived conflict story in their voice. Keep concrete facts/relationships; do not copy sentences verbatim; do not invent a different incident.");
+            if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+                grounding.append("\n").append(RECONSTRUCT_RULE);
             }
         }
         if (!blank(req.getDynamicExamples())) {
@@ -709,7 +719,7 @@ public class StructuredGenerationService {
                 The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","hook_emotion":"tension","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use personal data, internal notes, or claims of being an AI. Product framing = plaza empathy votes (공감).
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId (or the AI_POST author) to any comment or reply. Comments are bystanders only — the story author must not appear as a community commenter.
-                When SOURCE_CONTEXT or SOURCE_BODY is present, the post must be grounded in that source — TOPIC is only a short seed, not the whole story.
+                When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed, not the whole story.
                 AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required for AI_POST.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
@@ -719,7 +729,7 @@ public class StructuredGenerationService {
                 grounding +
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 overusedMetaphorsHint(req.getOverusedMetaphorIds()) +
-                "\nPERSONAS=" + json(req.getPersonas()) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
+                "\nPERSONAS=" + json(personaCardList(req.getPersonas())) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
     }
 
     /**
@@ -809,6 +819,12 @@ public class StructuredGenerationService {
             for (var c : r.getPublishedTopLevelComments()) {
                 if (c == null || blank(c.getBody())) throw new IllegalArgumentException("published comment body is required");
             }
+        }
+        // persona-diversity-v4 계약5/7 — b_side_viable=false인 골격에서 PARTNER(상대방 B) 글을
+        // 요청하면 400. 골격이 없거나(freestyle) b_side_viable을 안 보내면(null) 게이트 미적용.
+        boolean wantPartner = r.getIncludePartnerPost() == null || Boolean.TRUE.equals(r.getIncludePartnerPost());
+        if (wantPartner && Boolean.FALSE.equals(r.getBSideViable())) {
+            throw new IllegalArgumentException("PAIRED_NOT_ALLOWED_FOR_CATEGORY: b_side_viable=false");
         }
     }
 
@@ -1270,6 +1286,49 @@ public class StructuredGenerationService {
         if (raw == null || raw.isEmpty()) return raw;
         Map<String, Object> out = new LinkedHashMap<>();
         raw.forEach((k, v) -> out.put(k, v instanceof String str ? clean(str) : v));
+        return out;
+    }
+
+    /**
+     * persona-diversity-v4 계약4 — AUTHOR=/PARTNER=에 voiceProfile 전체 JSON을 더 이상 넣지 않고
+     * personaCard 문자열(또는 {@link PersonaCardFallback}) 하나만 담는다.
+     * {@code raw}는 orchestrator {@code PlanPersonaMapper}가 만든
+     * {@code {personaId, nickname, voiceProfile:{...}, personaCard?, ...}} 형태의 맵.
+     */
+    private static Map<String, Object> personaCardBlock(Map<String, Object> raw) {
+        if (raw == null || raw.isEmpty()) return Map.of();
+        Map<String, Object> out = new LinkedHashMap<>();
+        Object personaId = raw.get("personaId");
+        if (personaId != null) out.put("personaId", personaId);
+        Object nickname = raw.get("nickname");
+        if (nickname != null) out.put("nickname", nickname);
+        Object explicitCard = raw.get("personaCard");
+        String card = (explicitCard instanceof String s && !s.isBlank())
+                ? clean(s)
+                : PersonaCardFallback.render(raw);
+        if (!card.isBlank()) out.put("personaCard", card);
+        return out;
+    }
+
+    /**
+     * persona-diversity-v4 계약4 — PERSONAS= 캐스트 목록도 personaCard 하나만 담는다
+     * (댓글/대댓글 캐스팅에 필요한 personaId/nickname/formality는 유지).
+     */
+    private static List<Map<String, Object>> personaCardList(List<ThreadPlanRequest.Persona> personas) {
+        if (personas == null || personas.isEmpty()) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>(personas.size());
+        for (ThreadPlanRequest.Persona p : personas) {
+            if (p == null || blank(p.getPersonaId())) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("personaId", p.getPersonaId());
+            if (!blank(p.getNickname())) m.put("nickname", p.getNickname());
+            if (!blank(p.getFormality())) m.put("formality", p.getFormality());
+            String card = !blank(p.getPersonaCard())
+                    ? clean(p.getPersonaCard())
+                    : PersonaCardFallback.renderFromVoiceProfile(p.getVoiceProfile());
+            if (!card.isBlank()) m.put("personaCard", card);
+            out.add(m);
+        }
         return out;
     }
 

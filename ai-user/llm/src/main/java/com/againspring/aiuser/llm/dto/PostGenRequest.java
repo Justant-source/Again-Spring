@@ -12,6 +12,12 @@ public class PostGenRequest {
     private String personaId;
     private String archetype;
     private String voiceProfile;     // JSON string with voice descriptor
+    /**
+     * persona-diversity-v4 계약 4 — WP1 {@code PersonaCard.render()} 출력. 있으면 legacy
+     * {@code /generate/post}(PromptAssembler)가 {@link #voiceProfile} 대신 이 값을 페르소나
+     * 특성 섹션에 쓴다. 없으면 기존처럼 voiceProfile 문자열을 그대로 쓴다.
+     */
+    private String personaCard;
     private String tier;             // HEAVY/REGULAR/LIGHT/DORMANT
     private double slangLevel;       // 0.0-1.0
     private String category;         // PostCategory name: COUPLE/MARRIED/FRIEND/FAMILY/WORK/OTHER

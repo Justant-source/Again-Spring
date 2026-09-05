@@ -82,5 +82,12 @@ public class ThreadPlanRequest {
         private Map<String, Object> voiceProfile;
         /** casual | polite | formal — from voice_profile.$.formality, not hard-coded "neutral". */
         private String formality;
+        /**
+         * persona-diversity-v4 계약 4 — WP1 {@code PersonaCard.render()} 출력(400자 이내 한 덩어리).
+         * 있으면 프롬프트에 이 문자열만 실리고 {@link #voiceProfile} 전체는 더 이상 삽입되지 않는다.
+         * 없으면 {@link com.againspring.aiuser.llm.service.PersonaCardFallback}이 voiceProfile에서
+         * 5개 필드만 축약한다.
+         */
+        private String personaCard;
     }
 }

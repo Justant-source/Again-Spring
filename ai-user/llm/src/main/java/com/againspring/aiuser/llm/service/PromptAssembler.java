@@ -40,6 +40,16 @@ public class PromptAssembler {
         return v.replace("%", "%%");
     }
 
+    /**
+     * persona-diversity-v4 계약4 — legacy {@code /generate/post}(assemblePostPrompt 및 그 분기)도
+     * personaCard가 있으면 그것을("## 페르소나 특성" 섹션), 없으면 기존 voiceProfile 문자열을 쓴다.
+     */
+    private static String personaVoice(PostGenRequest req) {
+        return (req.getPersonaCard() != null && !req.getPersonaCard().isBlank())
+                ? req.getPersonaCard()
+                : req.getVoiceProfile();
+    }
+
     private String loadResourceOrEmpty(String path) {
         try {
             return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
@@ -112,7 +122,7 @@ public class PromptAssembler {
             return assembleCasualPostPrompt(req);
         }
         // 기존 로직 유지 (단독 사연 — stance 미지정)
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/post", req.getPromptOverrides()), req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), guide("voice/post", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -217,7 +227,7 @@ public class PromptAssembler {
 - "X가 Y를 했다" 형태의 구체 사건 최소 1개 포함
 """;
         }
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(),
                 reconstructGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), req.getReconstructionRules());
         String politeSuffix = isPolite(req.getFormality())
@@ -256,7 +266,7 @@ public class PromptAssembler {
         if (casualGuide.isBlank()) {
             casualGuide = "일상 글 모드 — 갈등/분쟁 서사 금지. 일상 관찰·취향·수다·경험 공유. 큰 결론 없이 끝내도 됨.";
         }
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), casualGuide, req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), casualGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -297,7 +307,7 @@ public class PromptAssembler {
     private String assembleAuthorPairedPrompt(PostGenRequest req) {
         String pairedGuide = guide("voice/post_paired_author", req.getPromptOverrides());
         if (pairedGuide.isBlank()) pairedGuide = guide("voice/post", req.getPromptOverrides());
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), pairedGuide, req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), pairedGuide, req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"
@@ -337,7 +347,7 @@ public class PromptAssembler {
     }
 
     private String assemblePartnerPrompt(PostGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/partner", req.getPromptOverrides()), req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), guide("voice/partner", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String politeSuffix = isPolite(req.getFormality())
             ? "- 자연스러운 구어 존댓말로 작성 (~요, ~어요, ~더라고요)\n"

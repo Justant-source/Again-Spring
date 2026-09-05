@@ -306,8 +306,12 @@ class StructuredGenerationServiceTest {
         assertEquals("polite", StructuredGenerationService.resolveFormality(req.getPersonas().get(0)));
     }
 
+    /**
+     * persona-diversity-v4 WP2 계약4 — PERSONAS=에 voiceProfile 전체 JSON을 더 이상 넣지 않고
+     * personaCard(또는 PersonaCardFallback 축약)만 담는다.
+     */
     @Test
-    void planPromptSerializesVoiceProfileAsJsonObjectNotMapToString() throws Exception {
+    void planPromptUsesPersonaCardNotFullVoiceProfile() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
         StructuredGenerationService service = configuredService(pool, disabledCritique());
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
@@ -327,32 +331,40 @@ class StructuredGenerationServiceTest {
         String prompt = promptCaptor.getValue();
         assertTrue(prompt.contains("PERSONAS="));
         assertTrue(prompt.contains("\"nickname\":\"닉네임실명\""));
-        assertTrue(prompt.contains("\"formality\":\"casual\""));
-        assertTrue(prompt.contains("\"voice_type\":\"NATEPAN\""));
         assertFalse(prompt.contains("voiceProfile={"), "Map.toString() must not appear in prompt");
+        assertFalse(prompt.contains("\"voice_type\":\"NATEPAN\""),
+                "raw voice_profile fields must not be embedded — only personaCard");
 
         int personasIdx = prompt.indexOf("PERSONAS=");
         String personasJson = prompt.substring(personasIdx + "PERSONAS=".length(), prompt.indexOf("\nLIMITS="));
         List<Map<String, Object>> personas = JSON.readValue(personasJson, new TypeReference<>() {});
         assertEquals("닉네임실명", personas.get(0).get("nickname"));
-        assertInstanceOf(Map.class, personas.get(0).get("voiceProfile"));
-        @SuppressWarnings("unchecked")
-        Map<String, Object> vp = (Map<String, Object>) personas.get(0).get("voiceProfile");
-        assertEquals("NATEPAN", vp.get("voice_type"));
+        assertFalse(personas.get(0).containsKey("voiceProfile"), "voiceProfile must not be nested in PERSONAS=");
+        assertTrue(personas.get(0).containsKey("personaCard"), "PersonaCardFallback must fill personaCard when absent");
+        String card = String.valueOf(personas.get(0).get("personaCard"));
+        assertTrue(card.length() <= 300);
+        assertTrue(card.contains("20대"));
     }
 
+    /**
+     * persona-diversity-v4 WP2 완료조건 — 프롬프트 조립 스냅샷: SKELETON은 실리되
+     * 원문 소스 본문 문장은 프롬프트 어디에도 나타나지 않아야 한다(SOURCE_BODY 필드 자체를 제거).
+     */
     @Test
-    void planPromptIncludesSourceGroundingFields() throws Exception {
+    void planPromptIncludesSkeletonButNeverLeaksRawSourceBody() throws Exception {
         LlmWorkerPool pool = mock(LlmWorkerPool.class);
         StructuredGenerationService service = configuredService(pool, disabledCritique());
         when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
                 eq(StructuredOutputSchema.THREAD_PLAN))).thenReturn(validPlanJson("한국어 댓글입니다"));
 
+        String rawSourceSentence = "친구에게 돈을 빌려줬는데 연락이 두절됐어요";
         ThreadPlanRequest request = planRequest();
-        request.setSourceContext(Map.of("source", "natepan", "register", "NATEPAN"));
+        request.setSourceContext(Map.of(
+                "category", "FRIEND", "incident", "친구 사이 금전 갈등", "b_side_viable", true));
         request.setReconstructMode(true);
         request.setSourceExampleId(42L);
-        request.setSourceBody("원본 사연 본문입니다. 친구에게 돈을 빌려줬는데 연락이 두절됐어요.");
+        // WP2 item3: orchestrator no longer sends sourceBody on the wire; simulate that (null).
+        request.setSourceBody(null);
         request.setDynamicExamples("문체 앵커 예시");
         request.setRecentOutputs(List.of("최근 글 요약"));
         request.setAuthor(Map.of("personaId", "p1", "nickname", "작성자닉"));
@@ -366,13 +378,15 @@ class StructuredGenerationServiceTest {
         verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
                 eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
         String prompt = promptCaptor.getValue();
-        assertTrue(prompt.contains("SOURCE_CONTEXT="));
+        assertTrue(prompt.contains("SKELETON="));
         assertTrue(prompt.contains("RECONSTRUCT_MODE=true"));
-        assertTrue(prompt.contains("SOURCE_BODY="));
+        assertTrue(prompt.contains("RECONSTRUCT_RULE="));
         assertTrue(prompt.contains("STYLE_EXAMPLES="));
         assertTrue(prompt.contains("RECENT_OUTPUTS="));
         assertTrue(prompt.contains("AUTHOR="));
-        assertTrue(prompt.contains("원본 사연 본문"));
+        assertFalse(prompt.contains("SOURCE_CONTEXT="), "legacy SOURCE_CONTEXT= key must be gone");
+        assertFalse(prompt.contains("SOURCE_BODY="), "raw source body field must be gone");
+        assertFalse(prompt.contains(rawSourceSentence), "verbatim source sentence must never reach the prompt");
     }
 
     @Test

@@ -20,6 +20,13 @@ public class PairedPhase2Request {
     private AuthorPost authorPost;
     /** Explicit 상대방 voice/profile. */
     private Map<String, Object> partner;
+    /**
+     * persona-diversity-v4 계약 5/7 — 골격의 {@code b_side_viable}. false인데
+     * {@code includePartnerPost}가 true면 상대방(B)이 글을 올릴 만한 관계가 아니라는 뜻이므로
+     * {@code createPairedPhase2}가 400으로 거부한다. 골격이 없거나(freestyle) 알 수 없으면 null
+     * — 이 경우 게이트를 적용하지 않는다.
+     */
+    private Boolean bSideViable;
     private List<ThreadPlanRequest.Persona> personas;
     /**
      * Up to 5–8 latest published top-level comments (may be empty).

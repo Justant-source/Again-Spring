@@ -111,6 +111,35 @@ class PromptAssemblerStyleTest {
         assertTrue(user.contains("12~40자"), "제목 글자수 상한");
     }
 
+    /** persona-diversity-v4 계약4 — personaCard가 있으면 "## 페르소나 특성"에 voiceProfile 대신 카드가 실린다. */
+    @Test
+    void postPromptPrefersPersonaCardOverVoiceProfileWhenPresent() {
+        PostGenRequest withCard = PostGenRequest.builder()
+            .personaId("p1").voiceProfile("v-원본-voiceProfile-문자열").slangLevel(0.3)
+            .personaCard("[페르소나] 야근일상 · 34세 남 · 기혼 6년차")
+            .category("WORK").archetype("work_credit_steal").formality("casual")
+            .lengthTier("MEDIUM")
+            .build();
+        String prompt = assembler.assemblePostPrompt(withCard);
+        String system = prompt.split("<<<USER_PROMPT>>>", 2)[0];
+
+        assertTrue(system.contains("야근일상"), "personaCard 텍스트가 페르소나 특성에 실려야 함");
+        assertFalse(system.contains("v-원본-voiceProfile-문자열"), "personaCard가 있으면 voiceProfile 문자열은 쓰지 않음");
+
+        PostGenRequest withoutCard = PostGenRequest.builder()
+            .personaId("p1").voiceProfile("v-원본-voiceProfile-문자열").slangLevel(0.3)
+            .category("WORK").archetype("work_credit_steal").formality("casual")
+            .lengthTier("MEDIUM")
+            .build();
+        String fallbackSystem = assembler.assemblePostPrompt(withoutCard).split("<<<USER_PROMPT>>>", 2)[0];
+        assertTrue(fallbackSystem.contains("v-원본-voiceProfile-문자열"), "personaCard 없으면 기존 voiceProfile 문자열 유지");
+
+        // 캐싱 불변식: personaCard 유무는 <<<PERSONA_SECTION>>> 앞 정적 prefix에 영향 없어야 함.
+        String prefixWithCard = prompt.split(PERSONA_MARKER, 2)[0];
+        String prefixWithoutCard = assembler.assemblePostPrompt(withoutCard).split(PERSONA_MARKER, 2)[0];
+        assertEquals(prefixWithCard, prefixWithoutCard, "personaCard는 PERSONA_SECTION 뒤 가변 영역에만 영향을 줘야 함");
+    }
+
     @Test
     void authorPairedPromptLeavesCounterpartAnchors() {
         PostGenRequest req = PostGenRequest.builder()
