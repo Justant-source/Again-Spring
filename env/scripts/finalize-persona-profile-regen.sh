@@ -233,7 +233,20 @@ print_summary() {
 # ── DB 헬퍼 (nightly-ai-user-batch.sh / persona_gate_check.py와 동일 관례: docker exec mariadb) ──
 db_query() {
   # --raw: mariadb -B(batch) 모드의 이중 백슬래시 이스케이프 방지(persona_gate_check.py와 동일 이유).
-  docker exec "$DB_CONTAINER" mariadb --raw -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -N -B -e "$1" 2>>"$LOG_FILE"
+  #
+  # 비밀번호는 argv로 넘기지 않는다. -p"$DB_PASS" 형태는 호스트 `ps auxww`와
+  # `docker top "$DB_CONTAINER"` 양쪽에 프로세스가 사는 동안 평문으로 남는다(2026-09-05 보안 리뷰).
+  # `docker exec -e MYSQL_PWD=...`도 값이 docker 클라이언트 argv에 그대로 남아 해결이 안 된다.
+  # `--env-file`은 argv에 경로만 남긴다. 파일은 0600으로 만들고 호출 직후 지운다.
+  local pwd_file
+  pwd_file=$(mktemp) || { log "ERROR: 임시 파일 생성 실패"; return 1; }
+  chmod 600 "$pwd_file"
+  printf 'MYSQL_PWD=%s\n' "$DB_PASS" > "$pwd_file"
+  docker exec --env-file="$pwd_file" "$DB_CONTAINER" mariadb --raw -u"$DB_USER" "$DB_NAME" \
+    -N -B -e "$1" 2>>"$LOG_FILE"
+  local rc=$?
+  rm -f "$pwd_file"
+  return $rc
 }
 
 if [[ "$DRY_RUN" -ne 1 ]]; then
@@ -244,8 +257,10 @@ if [[ "$DRY_RUN" -ne 1 ]]; then
   DB_USER=$(grep -oP '^MARIADB_USER=\K.*' "$ENV_FILE")
   DB_PASS=$(grep -oP '^MARIADB_PASSWORD=\K.*' "$ENV_FILE")
   DB_NAME=$(grep -oP '^MARIADB_DATABASE=\K.*' "$ENV_FILE")
-  if [[ -z "$DB_USER" || -z "$DB_NAME" ]]; then
-    log "ERROR: $ENV_FILE 에서 MARIADB_USER/MARIADB_DATABASE를 읽지 못함 — 중단"
+  # DB_PASS도 함께 검증한다. set -e가 없어 명시적 가드에만 의존하는 구조라, 하나라도 빠지면
+  # 인증 실패가 "게이트 FAIL"로 조용히 둔갑한다(2026-09-05 보안 리뷰).
+  if [[ -z "$DB_USER" || -z "$DB_NAME" || -z "$DB_PASS" ]]; then
+    log "ERROR: $ENV_FILE 에서 MARIADB_USER/MARIADB_PASSWORD/MARIADB_DATABASE를 읽지 못함 — 중단"
     exit 1
   fi
 

@@ -151,13 +151,14 @@ export default function C3StoryRead({ params }: PageProps) {
         </div>
       )}
 
-      {/* 헤드라인 */}
-      <h1 style={{ fontSize: 20, color: 'var(--L-ink)', fontWeight: 500, fontFamily: 'var(--font-serif)', margin: 0, marginBottom: 14, lineHeight: 1.4, letterSpacing: '-0.01em' }}>
-        {post.title}
-      </h1>
-
-      {/* 전문 카드 + 우측 하단 ⋯ */}
+      {/* 전문 카드 + 헤드라인 + 우측 하단 ⋯ */}
+      {/* 헤드라인은 카드 안, 본문 바로 위에 둔다 — X 캡처(capture-x-thread.js)가
+          본문 <p>의 parentElement(이 div)만 잘라서 스크린샷하므로, 카드 밖에 두면
+          캡처에서 통째로 잘려나간다(2026-09-04 실렌더 검증 중 발견). */}
       <div style={{ position: 'relative', background: bg, borderRadius: 12, padding: '22px 22px 44px' }}>
+        <h1 style={{ fontSize: 20, color: 'var(--L-ink)', fontWeight: 500, fontFamily: 'var(--font-serif)', margin: 0, marginBottom: 14, lineHeight: 1.4, letterSpacing: '-0.01em' }}>
+          {post.title}
+        </h1>
         <p style={{ margin: 0, fontSize: 15, fontFamily: 'var(--font-serif)', lineHeight: 1.85, color: 'var(--P-ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {body}
         </p>

@@ -132,8 +132,15 @@ public class ScheduledPostPublisher {
             String email = jdbcTemplate.queryForObject("select email from users where id = ?", String.class, author.getId());
             Optional<String> jwt = tokens.getToken(author.getId(), email, properties.getBotPassword());
             if (jwt.isEmpty()) {
-                // Keep soft-reserve across retryable auth failures.
-                leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true);
+                // Keep soft-reserve across retryable auth failures — but cap retries like every other
+                // failure path. A permanently broken bot account (password change, deleted user) would
+                // otherwise retry forever and never reach FAILED.
+                boolean authRetryable = row.getAttemptCount() < 3;
+                if (authRetryable) {
+                    leases.releaseFailed(row.getId(), WORKER, "AUTH_FAILED", true);
+                } else {
+                    failAndRelease(row, "AUTH_FAILED", false);
+                }
                 return Optional.empty();
             }
 
@@ -169,11 +176,20 @@ public class ScheduledPostPublisher {
             }
 
             PostDto post = published.get();
-            if (paired) {
-                Instant partnerAt = schedulePartnerAfterAuthorPublic(row, post, jwt.get(), pairedMeta);
-                attachPhase1FromHold(row, post, partnerAt);
-            } else {
-                replayCandidates(row, post);
+            // 여기서부터는 글이 이미 사용자에게 보인다. 후처리(상대방 예약·phase1 댓글·댓글 재생)
+            // 실패가 바깥 catch로 전파되면 row가 SCHEDULED로 되돌아가고, 다음 틱이 createPost를
+            // 다시 불러 같은 사연이 두 번 게시된다. 중복 게시는 후처리 누락보다 훨씬 나쁘므로
+            // 후처리는 여기서 삼키고, 발행 자체는 성공으로 확정한다(2026-09-05 리뷰).
+            try {
+                if (paired) {
+                    Instant partnerAt = schedulePartnerAfterAuthorPublic(row, post, jwt.get(), pairedMeta);
+                    attachPhase1FromHold(row, post, partnerAt);
+                } else {
+                    replayCandidates(row, post);
+                }
+            } catch (Exception postProcessing) {
+                log.error("Scheduled post published but post-processing failed id={} postId={} paired={}: {}",
+                        row.getId(), post.getId(), paired, postProcessing.toString(), postProcessing);
             }
             // Hard-commit popular source once the post is live.
             sourceReservationSupport.commitFromCandidatesJson(row.getCandidatesJson());
