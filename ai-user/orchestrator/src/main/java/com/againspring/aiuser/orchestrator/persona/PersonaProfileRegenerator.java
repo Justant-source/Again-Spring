@@ -51,7 +51,15 @@ public class PersonaProfileRegenerator {
      * 전부 이 마커 기준으로 통일된다.
      */
     static final String PROFILE_REV_KEY = "profile_rev";
-    static final String CURRENT_PROFILE_REV = "v4";
+    /**
+     * 프로필 리비전. {@code PersonaQuotaPlanner}의 축 배정 알고리즘이 바뀌면 올린다 —
+     * 같은 seed라도 배정 결과가 달라지므로, 옛 리비전으로 만든 프로필을 그대로 두면
+     * 집단 전체의 쿼터(계약 2)가 어긋난다. 값을 올리면 재개 필터가 옛 프로필을
+     * 미완료로 보고 자동으로 다시 처리한다.
+     *
+     * <p>v5(2026-09-05): 결혼 최소 연령 25→23세 개정으로 4단계 이후 RNG 소비 순서가 바뀌었다.</p>
+     */
+    static final String CURRENT_PROFILE_REV = "v5";
 
     /** §4 응답 스키마(01-wp1-persona-data.md §4) 필수 키 — 값이 비어 있으면 그 시도는 실패다. */
     private static final List<String> REQUIRED_RESPONSE_KEYS = List.of(

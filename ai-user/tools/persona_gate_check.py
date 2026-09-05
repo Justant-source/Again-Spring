@@ -45,7 +45,7 @@ REQUIRED_V22_COLUMNS = {"age_years", "gender", "marital", "married_years", "has_
 # 값을 바꾸면 두 곳 모두 갱신할 것. style_axes 유무만으로 "재생성 완료"를 판정하면 오염 상태
 # (축은 채워졌지만 감사/voice_profile 갱신이 실패한 상태, 2026-09 dev 12명 사례)를 완료로
 # 잘못 세게 된다 — 재생성 진척 계측은 반드시 이 마커까지 함께 확인한다.
-CURRENT_PROFILE_REV = "v4"
+CURRENT_PROFILE_REV = "v5"  # 축 배정 알고리즘 변경 시 올린다 — PersonaProfileRegenerator와 같은 값이어야 한다
 
 QUOTA_TOLERANCE = 3  # 계약 2 — 축별 오차 ±3
 DIVERSITY_TOLERANCE = 5  # 계약 3 — style_axes 각 축 분포 오차 ±5
