@@ -1,5 +1,6 @@
 package com.againspring.aiuser.orchestrator.service.threadplan;
 
+import com.againspring.aiuser.orchestrator.client.AiLearningClient;
 import com.againspring.aiuser.orchestrator.client.BackendBotClient;
 import com.againspring.aiuser.orchestrator.client.LlmAiUserClient;
 import com.againspring.aiuser.orchestrator.config.OrchestratorProperties;
@@ -9,6 +10,7 @@ import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
+import com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
@@ -55,6 +57,8 @@ public class PartnerAnswerPublisher {
     private final LlmAiUserClient llmClient;
     private final BackendBotClient backend;
     private final ContentSafetyGuard safetyGuard;
+    private final SourceOverlapGuard sourceOverlapGuard;
+    private final AiLearningClient aiLearningClient;
     private final ThreadPlanGenerationService threadPlanGenerationService;
     private final OrchestratorProperties properties;
     private final AiUserGenerationConfigRepository generationConfigRepository;
@@ -102,6 +106,24 @@ public class PartnerAnswerPublisher {
             if (!guard.passed()) {
                 leases.releaseFailed(row.getId(), WORKER, "CALL2_BLOCKED", false);
                 return;
+            }
+
+            // persona-diversity-v4 WP2 배선 — 상대방(B) 재구성 결과도 A측(PairedPostScheduler)과
+            // 동일하게 원문 12-gram 대조를 거친다. Call2는 Call1과 다른 lease/row라 claim 시점의
+            // ResolvedSource가 메모리에 없으므로, sourceExampleId로 example_bank 원문을 다시 조회해
+            // (AiLearningClient#getExampleById) 이 스코프에서만 대조하고 버린다(로그·DB 미기록).
+            if (result.sourceExampleId() != null) {
+                Optional<String> sourceBody = fetchSourceBodyForOverlapCheck(result.sourceExampleId());
+                if (sourceBody.isPresent()) {
+                    SourceOverlapGuard.GuardResult overlap =
+                            sourceOverlapGuard.check(result.partnerBody(), sourceBody.get());
+                    if (!overlap.passed()) {
+                        log.error("[PartnerAnswer] {} overlapRatio={} corrId={}",
+                                overlap.reason(), overlap.overlapRatio(), row.getCorrelationId());
+                        leases.releaseFailed(row.getId(), WORKER, "CALL2_SOURCE_OVERLAP", false);
+                        return;
+                    }
+                }
             }
 
             boolean ok = backend.submitPartnerAnswer(
@@ -199,7 +221,8 @@ public class PartnerAnswerPublisher {
 
         // persona-diversity-v4 WP2 재배선 — Call1이 claim한 계약7 골격을 상대방(B) 재구성에도
         // 태운다. 골격이 없으면(claim 실패·freestyle) 기존 자유 생성 동작 그대로.
-        loadPairedSkeleton(row.getScheduledPostId()).ifPresent(skeleton -> {
+        Optional<PairedSkeleton> skeletonOpt = loadPairedSkeleton(row.getScheduledPostId());
+        skeletonOpt.ifPresent(skeleton -> {
             if (skeleton.sourceContext() != null && !skeleton.sourceContext().isEmpty()) {
                 request.put("sourceContext", skeleton.sourceContext());
             }
@@ -242,7 +265,26 @@ public class PartnerAnswerPublisher {
             log.info("[PartnerAnswer] Call2 stripped {} story-persona comment(s) corrId={}", stripped, corr);
         }
         int items = response.get("items") instanceof List<?> list ? list.size() : 0;
-        return Optional.of(new Call2Result(partnerBody.strip(), extractPartnerSplits(response), response, items));
+        Long sourceExampleId = skeletonOpt.map(PairedSkeleton::sourceExampleId).orElse(null);
+        return Optional.of(new Call2Result(
+                partnerBody.strip(), extractPartnerSplits(response), response, items, sourceExampleId));
+    }
+
+    /**
+     * example_bank 원문을 id로 재조회한다(claim 시점 값은 다른 lease/row라 메모리에 없음).
+     * 조회 실패(learning 비활성·네트워크 오류·행 삭제)는 fail-open — 이 배선 이전(대조 없음)과
+     * 같은 위험 수준을 유지할 뿐 더 나쁘게 만들지 않는다. 반환값은 호출 스코프를 벗어나지 않고
+     * SourceOverlapGuard 대조 직후 버려진다(로그·DB 미기록).
+     */
+    private Optional<String> fetchSourceBodyForOverlapCheck(Long sourceExampleId) {
+        try {
+            return aiLearningClient.getExampleById(sourceExampleId)
+                    .map(AiLearningClient.ExampleItem::getContent);
+        } catch (Exception e) {
+            log.debug("[PartnerAnswer] source refetch failed (non-critical) exampleId={}: {}",
+                    sourceExampleId, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     private static String extractPartnerBody(Map<String, Object> response) {
@@ -288,7 +330,7 @@ public class PartnerAnswerPublisher {
     }
 
     private record Call2Result(String partnerBody, List<Integer> captureSplits,
-                               Map<String, Object> response, int itemCount) { }
+                               Map<String, Object> response, int itemCount, Long sourceExampleId) { }
 
     private record PairedSkeleton(Map<String, Object> sourceContext, Boolean reconstructMode,
                                    Long sourceExampleId, Boolean bSideViable) { }

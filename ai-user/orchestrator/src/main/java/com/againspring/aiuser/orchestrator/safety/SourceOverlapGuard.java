@@ -11,11 +11,18 @@ import java.util.Set;
  * {@code ai-user/learning/app/services/ngram_guard.py}와 동일 정의: 공백 정규화 후 문자 12-gram,
  * {@code overlap = |gen ∩ src| / |gen|}, 임계 0.20 초과면 거부.
  *
- * <p><b>배선 상태</b>: 이 클래스는 구현·단위테스트만 완료했다. 문서(item5)가 지정한 실제 호출
- * 지점(AiPostBundleService 홀딩 직전)은 WP2 소유 편집 범위(`:625-640` 요청 조립 구간)
- * <p>배선 지점: solo(`AiPostBundleService`) · paired(`PairedPostScheduler`) · 레거시(`ActionExecutor`)
- * 세 경로의 게시 직전. 레거시 경로는 소스 예약 개념이 없어 거부 시 해제할 예약이 없다.</p>
- * 동시에 수정 중이므로, 병합 시점에 호출부를 붙여야 한다.</p>
+ * <p><b>배선 상태</b>: 배선 완료. 호출 지점 4곳:</p>
+ * <ul>
+ *   <li>solo(`AiPostBundleService`) — 게시 홀딩 직전, 작성자 본문 대 claim한 원문</li>
+ *   <li>paired A측(`PairedPostScheduler`) — Call1 hold 직전, 작성자 본문 대 claim한 원문
+ *       (거부 시 claim한 예약을 해제)</li>
+ *   <li>paired B측(`PartnerAnswerPublisher`) — Call2 제출 직전, 상대방 본문 대 원문. Call2는
+ *       Call1과 다른 lease/row라 claim 시점 원문이 메모리에 없어, 골격에 실어 둔
+ *       {@code sourceExampleId}로 {@code AiLearningClient#getExampleById}를 통해 원문을
+ *       재조회한 뒤 대조한다(예약은 A측이 이미 소비했으므로 여기서 해제할 것은 없다)</li>
+ *   <li>레거시(`ActionExecutor`) — {@code /generate/post} 재구성 분기 게시 직전. 소스 예약
+ *       개념이 없어 거부 시 해제할 예약이 없다</li>
+ * </ul>
  */
 @Slf4j
 @Component

@@ -391,6 +391,27 @@ public class AiLearningClient {
     }
 
     /**
+     * Re-fetch a single example_bank row by id ({@code GET /examples/{id}}) — used by
+     * {@code PartnerAnswerPublisher} to re-check B측 재구성 결과 against the same original the
+     * A측 claim used, since Call2 runs as a separate lease/row that never held the claim-time
+     * {@code ResolvedSource} in memory. Callers must discard the returned content after the
+     * comparison — never log or persist it. Disabled / missing / any failure → empty (fail-open;
+     * unchanged from the no-check status quo, never worse).
+     */
+    public Optional<ExampleItem> getExampleById(long exampleId) {
+        if (!enabled) return Optional.empty();
+        try {
+            String body = restTemplate.getForObject(baseUrl + "/examples/" + exampleId, String.class);
+            if (body == null || body.isBlank()) return Optional.empty();
+            ExampleItem item = objectMapper.readValue(body, ExampleItem.class);
+            return Optional.ofNullable(item);
+        } catch (Exception e) {
+            log.debug("AiLearning getExampleById failed (non-critical) exampleId={}: {}", exampleId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Accept a claimed ExampleItem JSON; treat null/blank/`{"status":"empty"}`/missing id as empty.
      */
     private Optional<ExampleItem> parseClaimedExample(String body) {

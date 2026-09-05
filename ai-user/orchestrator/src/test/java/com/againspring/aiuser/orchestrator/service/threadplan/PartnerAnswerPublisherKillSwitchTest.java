@@ -47,6 +47,8 @@ class PartnerAnswerPublisherKillSwitchTest {
                 mock(com.againspring.aiuser.orchestrator.client.LlmAiUserClient.class),
                 mock(com.againspring.aiuser.orchestrator.client.BackendBotClient.class),
                 mock(com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard.class),
+                mock(com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard.class),
+                mock(com.againspring.aiuser.orchestrator.client.AiLearningClient.class),
                 mock(ThreadPlanGenerationService.class),
                 props,
                 generationConfigRepository,

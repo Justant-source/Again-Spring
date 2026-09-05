@@ -314,113 +314,146 @@ public class PairedPostScheduler {
         PlanSourceStoryResolver.ResolvedSource resolvedSource = claimForPairedGuard(
                 author, preferredSource, reservationKey, reserveUntil, category, corrId);
 
-        if (resolvedSource != null && !isBSideViable(resolvedSource)) {
-            log.warn("[PairedPost] PAIRED_DOWNGRADED_TO_SOLO corrId={} persona={} category={} exampleId={}",
-                    corrId, author.getId(), category, resolvedSource.sourceExampleId());
-            sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
-            return downgradeToSolo(author, category, corrId, slot, preferredSource, budget);
-        }
-
-        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId(), resolvedSource);
-        if (call1.llmInvoked() && budget != null) {
-            budget.consume();
-        }
-        if (call1.hold().isEmpty()) {
-            log.warn("[PairedPost] Call1 failed corrId={} reason={}", corrId, call1.detail());
-            if (resolvedSource != null) {
-                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
-            }
-            return HoldPairResult.fail(
-                    call1.llmInvoked() ? HoldResult.Outcome.LLM_OR_SAFETY : HoldResult.Outcome.GENERATION_SKIPPED,
-                    call1.llmInvoked(),
-                    call1.detail());
-        }
-        Call1Hold heldContent = call1.hold().get();
-        ContentSafetyGuard.GuardResult authorGuard =
-                safetyGuard.check(heldContent.body(), ContentSafetyGuard.ContentType.POST);
-        if (!authorGuard.passed()) {
-            log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
-            if (resolvedSource != null) {
-                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
-            }
-            return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true,
-                    "unsafe author body: " + authorGuard.reason());
-        }
-
-        if (resolvedSource != null) {
-            // persona-diversity-v4 WP2 item5 배선: paired author 본문 경로. 원문(sourceBody)은
-            // 이 검사에서만 메모리로 쓰고 로그·DB에는 절대 남기지 않는다.
-            SourceOverlapGuard.GuardResult overlap = sourceOverlapGuard.check(
-                    heldContent.title() + "\n" + heldContent.body(), resolvedSource.sourceBody());
-            if (!overlap.passed()) {
-                log.error("[PairedPost] {} overlapRatio={} corrId={}",
-                        overlap.reason(), overlap.overlapRatio(), corrId);
-                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
-                return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true, overlap.reason());
-            }
-            // WP2 item5 재배선: 골격을 Call1 프롬프트에 실제로 태웠으므로 여기서 release하지 않는다
-            // (release=미사용 취급). solo의 SOURCE_PROVENANCE_KEY 패턴대로 candidates_json에
-            // reservationKey를 실어 두면, 실제 발행 시 ScheduledPostPublisher가 solo와 동일하게
-            // commitFromCandidatesJson/releaseFromCandidatesJson으로 정상 소비 처리한다.
-        }
-
-        String candidatesJson;
+        // 코드리뷰 #2 대응: claim(위) 이후 구간에서 unchecked 예외(예: generateCall1 내부)가
+        // 나면 기존에는 release 체크포인트가 전부 정상 반환 경로에만 있어 전부 건너뛰고
+        // runPairedPosts()의 바깥 catch로 곧장 전파됐다 — 24h TTL이 있어 영구 누수는 아니지만
+        // 그 사이 소스가 잠긴다. try/finally로 감싸 예외 경로에서도 정확히 한 번 해제되게 한다.
+        // sourceHandled=true는 "이미 명시적으로 release했거나, candidatesJson에 실려 실제로
+        // DB에 저장돼 예약 소유권이 ScheduledPostPublisher로 넘어갔다"는 뜻 — finally는 그
+        // 경우 다시 release하지 않는다(이중 해제 방지). resolvedSource==null이면 애초에 claim한
+        // 것이 없으므로 항상 true(해제할 것 없음)로 시작한다.
+        boolean sourceHandled = resolvedSource == null;
         try {
-            Map<String, Object> payload = new LinkedHashMap<>(heldContent.response());
-            payload.put(PairedHoldMeta.KEY,
-                    PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId)
-                            .get(PairedHoldMeta.KEY));
-            if (resolvedSource != null) {
-                payload.put(AiPostBundleService.SOURCE_PROVENANCE_KEY,
-                        sourceReservationSupport.provenanceWithReservation(resolvedSource, reservationKey));
-                // Call2(PartnerAnswerPublisher)는 다른 lease/row에서 나중에 돈다 — 같은 골격으로
-                // 상대방(B) 본문을 재구성하도록 skeleton 자체도 함께 실어 둔다.
-                Map<String, Object> pairedSkeleton = new LinkedHashMap<>();
-                pairedSkeleton.put("sourceContext", resolvedSource.sourceContext());
-                pairedSkeleton.put("reconstructMode", resolvedSource.reconstructMode());
-                if (resolvedSource.sourceExampleId() != null) {
-                    pairedSkeleton.put("sourceExampleId", resolvedSource.sourceExampleId());
+            if (resolvedSource != null && !isBSideViable(resolvedSource)) {
+                log.warn("[PairedPost] PAIRED_DOWNGRADED_TO_SOLO corrId={} persona={} category={} exampleId={}",
+                        corrId, author.getId(), category, resolvedSource.sourceExampleId());
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                sourceHandled = true;
+                return downgradeToSolo(author, category, corrId, slot, preferredSource, budget);
+            }
+
+            Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId(), resolvedSource);
+            if (call1.llmInvoked() && budget != null) {
+                budget.consume();
+            }
+            if (call1.hold().isEmpty()) {
+                log.warn("[PairedPost] Call1 failed corrId={} reason={}", corrId, call1.detail());
+                if (resolvedSource != null) {
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                    sourceHandled = true;
                 }
-                pairedSkeleton.put("bSideViable", isBSideViable(resolvedSource));
-                payload.put(PAIRED_SKELETON_KEY, pairedSkeleton);
+                return HoldPairResult.fail(
+                        call1.llmInvoked() ? HoldResult.Outcome.LLM_OR_SAFETY : HoldResult.Outcome.GENERATION_SKIPPED,
+                        call1.llmInvoked(),
+                        call1.detail());
             }
-            candidatesJson = objectMapper.writeValueAsString(payload);
-        } catch (Exception e) {
-            log.error("[PairedPost] Could not serialize Call1 hold corrId={}", corrId, e);
-            if (resolvedSource != null) {
-                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            Call1Hold heldContent = call1.hold().get();
+            ContentSafetyGuard.GuardResult authorGuard =
+                    safetyGuard.check(heldContent.body(), ContentSafetyGuard.ContentType.POST);
+            if (!authorGuard.passed()) {
+                log.warn("[PairedPost] Author body blocked: {}", authorGuard.reason());
+                if (resolvedSource != null) {
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                    sourceHandled = true;
+                }
+                return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true,
+                        "unsafe author body: " + authorGuard.reason());
             }
-            return HoldPairResult.fail(HoldResult.Outcome.SERIALIZE, true, e.getMessage());
-        }
 
-        AiScheduledPost held = AiScheduledPost.builder()
-                .personaId(author.getId())
-                .category(category)
-                .title(heldContent.title())
-                .body(heldContent.body())
-                .candidatesJson(candidatesJson)
-                .scheduledPublishAt(slot)
-                .status(ScheduledPostStatus.SCHEDULED)
-                .provider(heldContent.provider())
-                .model(heldContent.model())
-                .origin(PairedHoldMeta.ORIGIN_PAIRED)
-                .build();
-        try {
-            scheduledPostRepository.save(held);
-        } catch (RuntimeException persistFailure) {
-            log.error("[PairedPost] hold persist failed corrId={}", corrId, persistFailure);
             if (resolvedSource != null) {
-                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                // persona-diversity-v4 WP2 item5 배선: paired author 본문 경로. 원문(sourceBody)은
+                // 이 검사에서만 메모리로 쓰고 로그·DB에는 절대 남기지 않는다.
+                SourceOverlapGuard.GuardResult overlap = sourceOverlapGuard.check(
+                        heldContent.title() + "\n" + heldContent.body(), resolvedSource.sourceBody());
+                if (!overlap.passed()) {
+                    log.error("[PairedPost] {} overlapRatio={} corrId={}",
+                            overlap.reason(), overlap.overlapRatio(), corrId);
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                    sourceHandled = true;
+                    return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true, overlap.reason());
+                }
+                // WP2 item5 재배선: 골격을 Call1 프롬프트에 실제로 태웠으므로 여기서 release하지 않는다
+                // (release=미사용 취급). solo의 SOURCE_PROVENANCE_KEY 패턴대로 candidates_json에
+                // reservationKey를 실어 두면, 실제 발행 시 ScheduledPostPublisher가 solo와 동일하게
+                // commitFromCandidatesJson/releaseFromCandidatesJson으로 정상 소비 처리한다. 아래
+                // persist가 실제로 성공해야 소유권이 넘어간 것이므로 sourceHandled는 아직 두지 않는다.
             }
-            return HoldPairResult.fail(HoldResult.Outcome.PERSIST, true, persistFailure.getMessage());
-        }
 
-        log.info("[PairedPost] ⏳ held corrId={} scheduledId={} author={} partner={} cat={} slot={} phase1Items={}",
-                corrId, held.getId(),
-                author.getId().substring(0, Math.min(8, author.getId().length())),
-                partner.getId().substring(0, Math.min(8, partner.getId().length())),
-                category, slot, heldContent.itemCount());
-        return new HoldPairResult(true, held.getId(), HoldResult.Outcome.SAVED, "saved");
+            String candidatesJson;
+            try {
+                Map<String, Object> payload = new LinkedHashMap<>(heldContent.response());
+                payload.put(PairedHoldMeta.KEY,
+                        PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId)
+                                .get(PairedHoldMeta.KEY));
+                if (resolvedSource != null) {
+                    payload.put(AiPostBundleService.SOURCE_PROVENANCE_KEY,
+                            sourceReservationSupport.provenanceWithReservation(resolvedSource, reservationKey));
+                    // Call2(PartnerAnswerPublisher)는 다른 lease/row에서 나중에 돈다 — 같은 골격으로
+                    // 상대방(B) 본문을 재구성하도록 skeleton 자체도 함께 실어 둔다.
+                    Map<String, Object> pairedSkeleton = new LinkedHashMap<>();
+                    pairedSkeleton.put("sourceContext", resolvedSource.sourceContext());
+                    pairedSkeleton.put("reconstructMode", resolvedSource.reconstructMode());
+                    if (resolvedSource.sourceExampleId() != null) {
+                        pairedSkeleton.put("sourceExampleId", resolvedSource.sourceExampleId());
+                    }
+                    pairedSkeleton.put("bSideViable", isBSideViable(resolvedSource));
+                    payload.put(PAIRED_SKELETON_KEY, pairedSkeleton);
+                }
+                candidatesJson = objectMapper.writeValueAsString(payload);
+            } catch (Exception e) {
+                log.error("[PairedPost] Could not serialize Call1 hold corrId={}", corrId, e);
+                if (resolvedSource != null) {
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                    sourceHandled = true;
+                }
+                return HoldPairResult.fail(HoldResult.Outcome.SERIALIZE, true, e.getMessage());
+            }
+
+            AiScheduledPost held = AiScheduledPost.builder()
+                    .personaId(author.getId())
+                    .category(category)
+                    .title(heldContent.title())
+                    .body(heldContent.body())
+                    .candidatesJson(candidatesJson)
+                    .scheduledPublishAt(slot)
+                    .status(ScheduledPostStatus.SCHEDULED)
+                    .provider(heldContent.provider())
+                    .model(heldContent.model())
+                    .origin(PairedHoldMeta.ORIGIN_PAIRED)
+                    .build();
+            try {
+                scheduledPostRepository.save(held);
+            } catch (RuntimeException persistFailure) {
+                log.error("[PairedPost] hold persist failed corrId={}", corrId, persistFailure);
+                if (resolvedSource != null) {
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                    sourceHandled = true;
+                }
+                return HoldPairResult.fail(HoldResult.Outcome.PERSIST, true, persistFailure.getMessage());
+            }
+
+            // 성공: candidatesJson이 실제로 DB에 저장돼 예약 소유권이 row로 넘어갔다 — 여기서는
+            // release하지 않는다(ScheduledPostPublisher가 나중에 commit/release로 소비).
+            sourceHandled = true;
+
+            log.info("[PairedPost] ⏳ held corrId={} scheduledId={} author={} partner={} cat={} slot={} phase1Items={}",
+                    corrId, held.getId(),
+                    author.getId().substring(0, Math.min(8, author.getId().length())),
+                    partner.getId().substring(0, Math.min(8, partner.getId().length())),
+                    category, slot, heldContent.itemCount());
+            return new HoldPairResult(true, held.getId(), HoldResult.Outcome.SAVED, "saved");
+        } finally {
+            if (resolvedSource != null && !sourceHandled) {
+                log.warn("[PairedPost] releasing source reservation after unexpected exception corrId={} exampleId={}",
+                        corrId, resolvedSource.sourceExampleId());
+                try {
+                    sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+                } catch (Exception releaseFailure) {
+                    log.debug("[PairedPost] source release-on-exception failed (non-critical) corrId={}: {}",
+                            corrId, releaseFailure.getMessage());
+                }
+            }
+        }
     }
 
     /**
