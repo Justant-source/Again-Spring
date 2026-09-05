@@ -35,6 +35,12 @@ CONTAINERS = {
 # 계약 1(00-shared.md) — V22__persona_identity_axes.sql로 추가되는 컬럼 중 게이트 a/b가 읽는 것.
 REQUIRED_V22_COLUMNS = {"age_years", "gender", "marital", "married_years", "has_kids", "style_axes"}
 
+# PersonaProfileRegenerator.CURRENT_PROFILE_REV(voice_profile.profile_rev 마커)와 동기화 —
+# 값을 바꾸면 두 곳 모두 갱신할 것. style_axes 유무만으로 "재생성 완료"를 판정하면 오염 상태
+# (축은 채워졌지만 감사/voice_profile 갱신이 실패한 상태, 2026-09 dev 12명 사례)를 완료로
+# 잘못 세게 된다 — 재생성 진척 계측은 반드시 이 마커까지 함께 확인한다.
+CURRENT_PROFILE_REV = "v4"
+
 QUOTA_TOLERANCE = 3  # 계약 2 — 축별 오차 ±3
 DIVERSITY_TOLERANCE = 5  # 계약 3 — style_axes 각 축 분포 오차 ±5
 
@@ -223,6 +229,26 @@ def _regeneration_note(regenerated: int, total: int) -> str:
     return f"재생성 진척: {regenerated}/{total} 완료, {remaining}명 미재생성(컬럼 기본값)"
 
 
+def _voice_profile_dict(row: dict[str, Any]) -> dict[str, Any]:
+    vp = row.get("voice_profile")
+    if isinstance(vp, str):
+        try:
+            vp = json.loads(vp)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return vp if isinstance(vp, dict) else {}
+
+
+def is_profile_regenerated(row: dict[str, Any]) -> bool:
+    """style_axes 존재 여부가 아니라 실제 갱신 완료 여부(voice_profile.profile_rev 마커,
+    PersonaProfileRegenerator.CURRENT_PROFILE_REV와 동일 기준)로 판정한다. style_axes는
+    감사·voice_profile 병합과 무관하게 항상 먼저 채워질 수 있어(오염 12명 사례) 그것만으로는
+    "완료"를 보장하지 못한다."""
+    if extract_style_axes(row) is None:
+        return False
+    return _voice_profile_dict(row).get("profile_rev") == CURRENT_PROFILE_REV
+
+
 def _extract_voice_type(row: dict[str, Any]) -> str | None:
     vp = row.get("voice_profile")
     if isinstance(vp, str):
@@ -253,7 +279,7 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     if not rows:
         return result
 
-    regenerated = sum(1 for row in rows if extract_style_axes(row) is not None)
+    regenerated = sum(1 for row in rows if is_profile_regenerated(row))
     result.note = _regeneration_note(regenerated, len(rows))
 
     gender_counts: dict[str, int] = {}
@@ -359,7 +385,12 @@ def evaluate_gate_b(data: dict[str, Any]) -> GateResult:
 
     style_axes_rows_for_note = list(data.get("style_axes", []))
     total_personas = data.get("total_personas", len(style_axes_rows_for_note))
-    result.note = _regeneration_note(len(style_axes_rows_for_note), total_personas)
+    # regenerated_count(fetch_gate_b_data가 profile_rev 마커까지 확인해 채움)가 있으면 그걸
+    # 우선한다 — style_axes 개수만 쓰면 오염 상태(마커 없이 축만 채워짐)를 완료로 잘못 센다.
+    # 없으면(직접 만든 data dict로 evaluate_gate_b를 호출하는 기존 호출부·테스트) style_axes
+    # 개수로 하위호환.
+    regenerated_count = data.get("regenerated_count", len(style_axes_rows_for_note))
+    result.note = _regeneration_note(regenerated_count, total_personas)
 
     sig = list(data.get("signature_phrases", []))
     result.add(
@@ -497,6 +528,7 @@ def fetch_gate_b_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
     comment_style: list[str] = []
     general_style: list[str] = []
     style_axes: list[dict[str, Any]] = []
+    regenerated_count = 0
 
     for row in rows:
         vp = row.get("voice_profile")
@@ -522,6 +554,9 @@ def fetch_gate_b_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
         if sa is not None:
             style_axes.append(sa)
 
+        if is_profile_regenerated(row):
+            regenerated_count += 1
+
     return {
         "signature_phrases": signature_phrases,
         "reply_style": reply_style,
@@ -529,6 +564,7 @@ def fetch_gate_b_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "general_style": general_style,
         "style_axes": style_axes,
         "total_personas": len(rows),
+        "regenerated_count": regenerated_count,
     }
 
 

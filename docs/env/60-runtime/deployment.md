@@ -83,16 +83,43 @@ E2E_BASE_URL=http://localhost:8090 npm run test:e2e:realbe
 scripts/deploy.sh prod --i-mean-it
 ```
 
-DB 백업(`/home/justant/backups/prod-<timestamp>.sql`) → base+prod 스택 기동 →
-`/api/health/deep` 대기 → `scripts/verify-deploy.sh prod` 순서로 한 번에 실행되며,
-어느 단계든 실패하면 exit 1로 중단한다. 백업만 별도로 다시 뜨고 싶다면:
+DB 백업(`/home/justant/backups/prod-<timestamp>.sql.gz`) → 무결성 검증 → 오래된 백업 정리 →
+base+prod 스택 기동 → `/api/health/deep` 대기 → `scripts/verify-deploy.sh prod` 순서로
+한 번에 실행되며, 어느 단계든 실패하면 exit 1로 중단한다.
+
+### 백업 보관 정책
+
+| 항목 | 값 | 환경변수 |
+|---|---|---|
+| 형식 | `prod-<timestamp>.sql.gz` (gzip 압축) | — |
+| 보관 기간 | 30일 | `BACKUP_RETAIN_DAYS` |
+| 최소 유지 개수 | 5개 (나이 무관) | `BACKUP_MIN_KEEP` |
+| 정리 범위 | `/home/justant/backups` **최상위 파일만** (`-maxdepth 1`) | — |
+
+- **무결성 검증**: 덤프 후 `gzip -t` 통과 + 1MB 이상이어야 배포가 진행된다.
+  빈 껍데기나 중간에 끊긴 덤프를 "백업 완료"로 통과시키지 않기 위함이다.
+- **최소 유지 개수**가 있는 이유: prod 배포가 30일 넘게 없으면 보관 기간만으로는
+  전량 삭제될 수 있다. 나이와 무관하게 최신 5개는 남긴다.
+- **`green-forest/` 하위는 건드리지 않는다.** 그쪽은 `Green-Forest/scripts/backup-prod.sh`가
+  자체 보관 정책(14일)으로 관리한다.
+- 정리는 **prod 배포 시에만** 실행된다. 배포 없이 정리만 하려면 아래 명령을 직접 쓴다.
+
+백업만 별도로 다시 뜨고 싶다면:
 
 ```bash
 BACKUP_DIR=/home/justant/backups
 mkdir -p "$BACKUP_DIR"
 docker exec againspring-mariadb-prod sh -c \
   'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' \
-  > "$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql"
+  | gzip > "$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql.gz"
+```
+
+복원 시에는 `zcat`을 경유한다:
+
+```bash
+zcat /home/justant/backups/prod-<timestamp>.sql.gz \
+  | docker exec -i againspring-mariadb-prod sh -c \
+    'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'
 ```
 
 ## 4단계: shared ai-user / prod-dev-sync

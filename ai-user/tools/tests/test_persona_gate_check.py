@@ -129,9 +129,24 @@ def test_evaluate_gate_a_reports_regeneration_progress_in_note():
     rows = _build_compliant_personas()
     for row in rows[:12]:
         row["style_axes"] = {"directness": "BLUNT"}
+        vp = json.loads(row["voice_profile"])
+        vp["profile_rev"] = mod.CURRENT_PROFILE_REV
+        row["voice_profile"] = json.dumps(vp)
     result = mod.evaluate_gate_a(rows)
     assert "12/150" in result.note
     assert "138" in result.note
+
+
+def test_evaluate_gate_a_does_not_count_style_axes_without_profile_rev_marker_as_regenerated():
+    """오염 상태 재현(2026-09 dev 12명 사례): style_axes만 채워지고 voice_profile에
+    profile_rev 마커가 없으면(PersonaProfileRegenerator의 감사 실패 등으로 롤백되지 않은
+    부분 갱신) 재생성 진척에 포함시키지 않는다."""
+    rows = _build_compliant_personas()
+    for row in rows[:12]:
+        row["style_axes"] = {"directness": "BLUNT"}  # 마커 없이 축만 채움 = 오염 상태
+    result = mod.evaluate_gate_a(rows)
+    assert "0/150" in result.note
+    assert "150명 미재생성" in result.note
 
 
 # --- gate b -------------------------------------------------------------------
@@ -215,6 +230,60 @@ def test_evaluate_gate_b_reports_regeneration_progress_in_note():
     result = mod.evaluate_gate_b(data)
     assert "12/150" in result.note
     assert "138" in result.note
+
+
+def test_evaluate_gate_b_uses_regenerated_count_over_raw_style_axes_when_provided():
+    """style_axes는 채워졌지만(플랜 산출물이라 오염 상태에서도 항상 채워짐) 실제 완료가 아닌
+    건수를 진척에서 빼기 위해, fetch_gate_b_data가 채우는 regenerated_count가 있으면
+    style_axes 리스트 길이보다 그것을 우선한다."""
+    data = {
+        "signature_phrases": [f"phrase_{i}" for i in range(150)],
+        "reply_style": [f"reply_{i}" for i in range(130)],
+        "comment_style": [f"comment_{i}" for i in range(130)],
+        "general_style": DISTINCT_SENTENCES,
+        "style_axes": _balanced_style_axes(12),  # 오염 12명 포함 — 축만 있는 상태
+        "total_personas": 150,
+        "regenerated_count": 0,  # 마커 없는 오염 12명은 완료로 세지 않음
+    }
+    result = mod.evaluate_gate_b(data)
+    assert "0/150" in result.note
+
+
+def test_fetch_gate_b_data_regenerated_count_requires_profile_rev_marker():
+    """fetch_gate_b_data가 만드는 regenerated_count는 style_axes 존재가 아니라
+    voice_profile.profile_rev 마커 기준이어야 한다 — 오염 상태를 완료로 잘못 세지 않기 위함."""
+    done_row = {
+        "id": "p1",
+        "style_axes": {"directness": "BLUNT"},
+        "voice_profile": json.dumps({"profile_rev": mod.CURRENT_PROFILE_REV, "general_style": "x"}),
+    }
+    contaminated_row = {
+        "id": "p2",
+        "style_axes": {"directness": "SOFT"},  # 축만 있고 마커 없음 = 오염
+        "voice_profile": json.dumps({"general_style": "옛 템플릿"}),
+    }
+    pending_row = {"id": "p3", "style_axes": None, "voice_profile": None}
+
+    data = mod.fetch_gate_b_data([done_row, contaminated_row, pending_row])
+
+    assert data["regenerated_count"] == 1
+    assert data["total_personas"] == 3
+    # 다양성 분포용 style_axes 리스트는 여전히 축이 채워진 행 전부(done + contaminated)를 포함한다 —
+    # 진척 계측과 쿼터 분포 계측은 서로 다른 질문이다.
+    assert len(data["style_axes"]) == 2
+
+
+def test_is_profile_regenerated():
+    assert mod.is_profile_regenerated(
+        {"style_axes": {"a": 1}, "voice_profile": json.dumps({"profile_rev": mod.CURRENT_PROFILE_REV})}
+    )
+    assert not mod.is_profile_regenerated(
+        {"style_axes": {"a": 1}, "voice_profile": json.dumps({"general_style": "옛 템플릿"})}
+    )
+    assert not mod.is_profile_regenerated({"style_axes": None, "voice_profile": "{}"})
+    assert not mod.is_profile_regenerated(
+        {"style_axes": {"a": 1}, "voice_profile": json.dumps({"profile_rev": "v3"})}
+    )
 
 
 def test_extract_style_axes_handles_null_dict_and_json_string():
