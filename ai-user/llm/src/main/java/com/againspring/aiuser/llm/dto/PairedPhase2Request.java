@@ -27,6 +27,14 @@ public class PairedPhase2Request {
      * — 이 경우 게이트를 적용하지 않는다.
      */
     private Boolean bSideViable;
+    /**
+     * persona-diversity-v4 WP2 재배선 — Call1과 같은 계약7 골격(뼈대). partner_post는 이 안의
+     * {@code counterpart_claim}으로 같은 사건을 상대방 시점에서 다시 말해야 한다. 골격이 없으면
+     * (freestyle) null — 기존 자유 생성 동작을 유지한다.
+     */
+    private Map<String, Object> sourceContext;
+    private Boolean reconstructMode;
+    private Long sourceExampleId;
     private List<ThreadPlanRequest.Persona> personas;
     /**
      * Up to 5–8 latest published top-level comments (may be empty).

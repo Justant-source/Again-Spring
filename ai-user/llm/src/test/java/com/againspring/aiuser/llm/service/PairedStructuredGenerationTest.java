@@ -200,6 +200,64 @@ class PairedStructuredGenerationTest {
         assertNull(response.getPartnerPost());
     }
 
+    /** persona-diversity-v4 WP2 재배선 — Call1 골격(sourceContext)이 phase1 프롬프트에 실제로 실린다. */
+    @Test
+    void phase1PromptIncludesSkeletonAndReconstructRuleWhenSourceContextPresent() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.PAIRED_PHASE1))).thenReturn(phase1Json(2));
+
+        PairedPhase1Request req = phase1Request();
+        req.setSourceContext(Map.of(
+                "incident", "팀장이 내 기획안을 자기 이름으로 임원 보고함",
+                "author_claim", "내 아이디어인데 인정을 못 받았다",
+                "counterpart_claim", "팀 성과라 대표로 보고했을 뿐이다"));
+        req.setReconstructMode(true);
+        req.setSourceExampleId(777L);
+
+        service.createPairedPhase1(req, "corr-p1-skeleton");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.PAIRED_PHASE1));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("SKELETON="));
+        assertTrue(prompt.contains("팀장이 내 기획안을"));
+        assertTrue(prompt.contains("RECONSTRUCT_MODE=true"));
+        assertTrue(prompt.contains("SOURCE_EXAMPLE_ID=777"));
+        assertTrue(prompt.contains("RECONSTRUCT_RULE="));
+        assertTrue(prompt.contains("counterpart_claim"));
+    }
+
+    /** persona-diversity-v4 WP2 재배선 — Call2도 같은 골격을 받아 counterpart_claim 재구성 규칙을 본다. */
+    @Test
+    void phase2PromptIncludesSkeletonAndReconstructRuleWhenSourceContextPresent() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.PAIRED_PHASE2))).thenReturn(phase2Json(true, 4));
+
+        PairedPhase2Request req = phase2Request(true);
+        req.setSourceContext(Map.of(
+                "incident", "팀장이 내 기획안을 자기 이름으로 임원 보고함",
+                "counterpart_claim", "팀 성과라 대표로 보고했을 뿐이다"));
+        req.setReconstructMode(true);
+        req.setSourceExampleId(777L);
+
+        service.createPairedPhase2(req, "corr-p2-skeleton");
+
+        var promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.PAIRED_PHASE2));
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("SKELETON="));
+        assertTrue(prompt.contains("팀장이 내 기획안을"));
+        assertTrue(prompt.contains("RECONSTRUCT_MODE=true"));
+        assertTrue(prompt.contains("SOURCE_EXAMPLE_ID=777"));
+        assertTrue(prompt.contains("counterpart_claim"));
+    }
+
     private static StructuredGenerationService configured(LlmWorkerPool pool) {
         LlmParseFailureSampler sampler = org.mockito.Mockito.mock(LlmParseFailureSampler.class);
         StructuredSchemaCatalog schemaCatalog = org.mockito.Mockito.mock(StructuredSchemaCatalog.class);

@@ -50,6 +50,20 @@ public class PromptAssembler {
                 : req.getVoiceProfile();
     }
 
+    /** persona-diversity-v4 계약4 — {@link #personaVoice(PostGenRequest)}와 동일 규칙을 댓글에 적용. */
+    private static String personaVoice(CommentGenRequest req) {
+        return (req.getPersonaCard() != null && !req.getPersonaCard().isBlank())
+                ? req.getPersonaCard()
+                : req.getVoiceProfile();
+    }
+
+    /** persona-diversity-v4 계약4 — {@link #personaVoice(PostGenRequest)}와 동일 규칙을 대댓글에 적용. */
+    private static String personaVoice(ReplyGenRequest req) {
+        return (req.getPersonaCard() != null && !req.getPersonaCard().isBlank())
+                ? req.getPersonaCard()
+                : req.getVoiceProfile();
+    }
+
     private String loadResourceOrEmpty(String path) {
         try {
             return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
@@ -407,7 +421,7 @@ SKELETON은 원문이 아니라 사건·역할·시퀀스만 남긴 뼈대다 �
     }
 
     public String assembleCommentPrompt(CommentGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/comment", req.getPromptOverrides()), req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), guide("voice/comment", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요, ~더라고요, ~것 같아요)"
@@ -453,7 +467,7 @@ SKELETON은 원문이 아니라 사건·역할·시퀀스만 남긴 뼈대다 �
     }
 
     public String assembleReplyPrompt(ReplyGenRequest req) {
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guide("voice/reply", req.getPromptOverrides()), req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), guide("voice/reply", req.getPromptOverrides()), req.getFormality(),
                 req.getCorrectionCautions(), req.getGlobalForbidRules(), null, true);
         String toneNote = isPolite(req.getFormality())
             ? "- 존댓말로 작성 (~요, ~어요 등 자연스럽게)"

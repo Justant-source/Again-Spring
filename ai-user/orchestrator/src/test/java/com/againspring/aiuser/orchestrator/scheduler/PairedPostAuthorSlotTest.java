@@ -53,7 +53,8 @@ class PairedPostAuthorSlotTest {
                 mock(com.againspring.aiuser.orchestrator.service.persona.PersonaLottery.class),
                 pairedSourceStoryResolverStub(),
                 mock(com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService.class),
-                new com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard());
+                new com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard(),
+                mock(com.againspring.aiuser.orchestrator.service.threadplan.SourceReservationSupport.class));
     }
 
     @Test

@@ -665,6 +665,18 @@ public class StructuredGenerationService {
         String partnerBlock = wantPartner
                 ? "Include partner_post with body + optional capture_split_after_lines (same rules as author: ≤8 blocks/part, max 4 parts). Stance=PARTNER."
                 : "Set partner_post to null — this is a comment-only micro-batch continuation of logical Call2; do not regenerate the 상대방 body.";
+        // persona-diversity-v4 WP2 재배선 — Call1과 같은 계약7 골격을 partner_post 생성에도 태운다.
+        StringBuilder grounding = new StringBuilder();
+        if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+            grounding.append("\nSKELETON=").append(json(cleanValues(req.getSourceContext())));
+        }
+        if (Boolean.TRUE.equals(req.getReconstructMode())) {
+            grounding.append("\nRECONSTRUCT_MODE=true");
+            if (req.getSourceExampleId() != null) grounding.append("\nSOURCE_EXAMPLE_ID=").append(req.getSourceExampleId());
+            if (req.getSourceContext() != null && !req.getSourceContext().isEmpty()) {
+                grounding.append("\n").append(RECONSTRUCT_RULE);
+            }
+        }
         return """
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE2 (logical Call2).
                 Schema: {"partner_post":{"body":"...","capture_split_after_lines":null}|null,"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
@@ -676,6 +688,7 @@ public class StructuredGenerationService {
                 Use only supplied personaIds. No personal data, internal notes, or AI identity claims. Use 작성자/상대방.
                 STORY_PERSONA_RULE (hard): never assign the 작성자 or 상대방 personaId to any comment or reply. Those accounts already wrote the story sides; comments are other community members only.
                 Partner body line rules: one Korean sentence per newline; short blocks. If >8 non-empty lines, set capture_split_after_lines (semantic cuts, each part ≤8, max 4 parts); else null.
+                When SKELETON is present, partner_post must restate the SAME incident as AUTHOR_POST from the 상대방 side via SKELETON's counterpart_claim — never invent a different conflict.
                 """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase2", req.getPromptOverrides())) +
                 "\nPARTNER_VOICE=\n" + clean(promptAssembler.guide("voice/partner", req.getPromptOverrides())) +
                 "\nCATEGORY=" + clean(req.getCategory()) +
@@ -683,6 +696,7 @@ public class StructuredGenerationService {
                         "title", clean(req.getAuthorPost().getTitle()),
                         "body", clean(req.getAuthorPost().getBody()))) +
                 "\nPARTNER=" + json(personaCardBlock(req.getPartner())) +
+                grounding +
                 "\nPUBLISHED_TOP_LEVEL_COMMENTS=" + json(publishedRows) +
                 "\nINCLUDE_PARTNER_POST=" + wantPartner +
                 "\nPERSONAS=" + json(personaCardList(req.getPersonas())) +
@@ -1340,6 +1354,10 @@ public class StructuredGenerationService {
      * - formality (response style)
      * - voice_type (for community matching)
      * Exclude large fields: example_comments, example_replies, lexicon, writing_quirks, hot_buttons.
+     *
+     * <p>persona-diversity-v4 계약4: {@code personaCard}가 있으면 그것만 싣는다(legacy voiceProfile
+     * 화이트리스트는 카드가 없을 때만 폴백) — {@code HumanReplyBatchService}가 카드를 실어 보내도
+     * 여기서 버려지면 프롬프트 텍스트에 도달하지 못했던 배선 누락 수정.
      */
     private static List<Map<String, Object>> slimResponders(List<ThreadPlanRequest.Persona> personas) {
         if (personas == null || personas.isEmpty()) return List.of();
@@ -1350,20 +1368,24 @@ public class StructuredGenerationService {
             responder.put("personaId", p.getPersonaId());
             if (!blank(p.getNickname())) responder.put("nickname", p.getNickname());
             if (!blank(p.getFormality())) responder.put("formality", p.getFormality());
-            // Include only essential voiceProfile fields, not the full structure
-            Map<String, Object> voice = p.getVoiceProfile();
-            if (voice != null && !voice.isEmpty()) {
-                Map<String, Object> slimVoice = new LinkedHashMap<>();
-                // Whitelist essential fields only
-                String[] essentialFields = {"voice_type", "age", "gender", "slang_level", "tone", "formality"};
-                for (String field : essentialFields) {
-                    Object value = voice.get(field);
-                    if (value != null && !String.valueOf(value).isBlank()) {
-                        slimVoice.put(field, value);
+            if (!blank(p.getPersonaCard())) {
+                responder.put("personaCard", p.getPersonaCard());
+            } else {
+                // Include only essential voiceProfile fields, not the full structure
+                Map<String, Object> voice = p.getVoiceProfile();
+                if (voice != null && !voice.isEmpty()) {
+                    Map<String, Object> slimVoice = new LinkedHashMap<>();
+                    // Whitelist essential fields only
+                    String[] essentialFields = {"voice_type", "age", "gender", "slang_level", "tone", "formality"};
+                    for (String field : essentialFields) {
+                        Object value = voice.get(field);
+                        if (value != null && !String.valueOf(value).isBlank()) {
+                            slimVoice.put(field, value);
+                        }
                     }
-                }
-                if (!slimVoice.isEmpty()) {
-                    responder.put("voiceProfile", slimVoice);
+                    if (!slimVoice.isEmpty()) {
+                        responder.put("voiceProfile", slimVoice);
+                    }
                 }
             }
             slim.add(responder);

@@ -12,6 +12,8 @@ import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.service.GenerationConfigSupport;
 import com.againspring.aiuser.orchestrator.service.llm.LlmGenerationGateService;
 import com.againspring.aiuser.orchestrator.service.persona.PersonaLottery;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,6 +41,14 @@ public class PartnerAnswerPublisher {
     private static final String WORKER = "partner-answer-publisher";
     private static final int CALL2_CAST_MAX = 24;
     private static final int CALL2_COMMENT_CONTEXT = 8;
+    /**
+     * persona-diversity-v4 WP2 재배선 — {@code PairedPostScheduler.PAIRED_SKELETON_KEY}와 동일한
+     * 문자열이어야 한다(패키지가 달라 상수 참조 대신 리터럴을 맞춘다). Call1 hold 시점에
+     * {@code ai_scheduled_posts.candidates_json}에 실린 계약7 골격을, 다른 lease/row로 나중에
+     * 도는 Call2가 {@code scheduled_post_id}로 원본 hold row를 다시 읽어 꺼내 쓴다.
+     */
+    private static final String PAIRED_SKELETON_KEY = "_pairedSkeleton";
+    private static final ObjectMapper SKELETON_JSON = new ObjectMapper();
 
     private final PartnerAnswerLeaseService leases;
     private final PersonaRepository personas;
@@ -187,6 +197,23 @@ public class PartnerAnswerPublisher {
         request.put("minTopLevel", 1);
         request.put("minItems", 1);
 
+        // persona-diversity-v4 WP2 재배선 — Call1이 claim한 계약7 골격을 상대방(B) 재구성에도
+        // 태운다. 골격이 없으면(claim 실패·freestyle) 기존 자유 생성 동작 그대로.
+        loadPairedSkeleton(row.getScheduledPostId()).ifPresent(skeleton -> {
+            if (skeleton.sourceContext() != null && !skeleton.sourceContext().isEmpty()) {
+                request.put("sourceContext", skeleton.sourceContext());
+            }
+            if (skeleton.reconstructMode() != null) {
+                request.put("reconstructMode", skeleton.reconstructMode());
+            }
+            if (skeleton.sourceExampleId() != null) {
+                request.put("sourceExampleId", skeleton.sourceExampleId());
+            }
+            if (skeleton.bSideViable() != null) {
+                request.put("bSideViable", skeleton.bSideViable());
+            }
+        });
+
         // LLM Generation Gate check: skip generation if held
         if (llmGenerationGateService.isHeld()) {
             log.info("[PartnerAnswer] Call2 generation held (LLM gate) corrId={}", corr);
@@ -262,4 +289,43 @@ public class PartnerAnswerPublisher {
 
     private record Call2Result(String partnerBody, List<Integer> captureSplits,
                                Map<String, Object> response, int itemCount) { }
+
+    private record PairedSkeleton(Map<String, Object> sourceContext, Boolean reconstructMode,
+                                   Long sourceExampleId, Boolean bSideViable) { }
+
+    /**
+     * Re-reads the Call1 hold row ({@code ai_scheduled_posts}) by {@code scheduledPostId} and
+     * extracts the {@value #PAIRED_SKELETON_KEY} block {@link com.againspring.aiuser.orchestrator
+     * .scheduler.PairedPostScheduler} embedded in its {@code candidates_json} — the same claimed
+     * 계약7 골격 Call1 used, so Call2 can restate the same incident via {@code counterpart_claim}.
+     * Row missing, JSON unparsable, or key absent → {@link Optional#empty()} (freestyle, unchanged
+     * behavior).
+     */
+    private Optional<PairedSkeleton> loadPairedSkeleton(String scheduledPostId) {
+        if (scheduledPostId == null || scheduledPostId.isBlank()) return Optional.empty();
+        try {
+            String candidatesJson = jdbcTemplate.queryForObject(
+                    "SELECT candidates_json FROM ai_scheduled_posts WHERE id = ?",
+                    String.class, scheduledPostId);
+            if (candidatesJson == null || candidatesJson.isBlank()) return Optional.empty();
+            Map<String, Object> root = SKELETON_JSON.readValue(candidatesJson, new TypeReference<Map<String, Object>>() { });
+            Object raw = root.get(PAIRED_SKELETON_KEY);
+            if (!(raw instanceof Map<?, ?> meta)) return Optional.empty();
+            Object sourceContextRaw = meta.get("sourceContext");
+            Map<String, Object> sourceContext = null;
+            if (sourceContextRaw instanceof Map<?, ?> sc) {
+                Map<String, Object> out = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> e : sc.entrySet()) out.put(String.valueOf(e.getKey()), e.getValue());
+                sourceContext = out;
+            }
+            Boolean reconstructMode = meta.get("reconstructMode") instanceof Boolean b ? b : null;
+            Long sourceExampleId = meta.get("sourceExampleId") instanceof Number n ? n.longValue() : null;
+            Boolean bSideViable = meta.get("bSideViable") instanceof Boolean b2 ? b2 : null;
+            return Optional.of(new PairedSkeleton(sourceContext, reconstructMode, sourceExampleId, bSideViable));
+        } catch (Exception e) {
+            log.debug("[PartnerAnswer] paired skeleton load failed (non-critical) scheduledPostId={}: {}",
+                    scheduledPostId, e.getMessage());
+            return Optional.empty();
+        }
+    }
 }

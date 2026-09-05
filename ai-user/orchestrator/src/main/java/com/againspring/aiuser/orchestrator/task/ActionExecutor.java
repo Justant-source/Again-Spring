@@ -14,6 +14,7 @@ import com.againspring.aiuser.orchestrator.domain.PersonaActionLog;
 import com.againspring.aiuser.orchestrator.domain.PersonaSeenPost;
 import com.againspring.aiuser.orchestrator.engine.ArchetypeCatalog;
 import com.againspring.aiuser.orchestrator.engine.PlannedAction;
+import com.againspring.aiuser.orchestrator.persona.PersonaCard;
 import com.againspring.aiuser.orchestrator.repository.AiGlobalRuleRepository;
 import com.againspring.aiuser.orchestrator.repository.AiUserGenerationConfigRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
@@ -230,6 +231,7 @@ public class ActionExecutor {
         GenDto.CommentRequest genReq = GenDto.CommentRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForComment(persona, stance))
+            .personaCard(PersonaCard.render(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
             .postTitle(postTitle)
             .postBodyExcerpt(postExcerpt)
@@ -322,6 +324,7 @@ public class ActionExecutor {
         GenDto.ReplyRequest genReq = GenDto.ReplyRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForReply(persona))
+            .personaCard(PersonaCard.render(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
             .parentCommentExcerpt(action.parentCommentExcerpt())
             .threadContext(action.threadContext())
@@ -480,6 +483,7 @@ public class ActionExecutor {
         GenDto.PostRequest genReq = GenDto.PostRequest.builder()
             .personaId(persona.getId())
             .voiceProfile(voiceBlockForPost(persona))
+            .personaCard(PersonaCard.render(persona))
             .slangLevel(persona.getSlangLevel().doubleValue())
             .archetype(persona.getArchetype())
             .tier(persona.getTier())

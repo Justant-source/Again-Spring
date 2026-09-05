@@ -20,7 +20,6 @@ public class PairedPhase1Request {
     private Map<String, Object> sourceContext;
     private Boolean reconstructMode;
     private Long sourceExampleId;
-    private String sourceBody;
     private String dynamicExamples;
     private List<String> recentOutputs;
     /** Metaphor ids used too often recently (orchestrator-computed) — LLM should avoid repeating these. */

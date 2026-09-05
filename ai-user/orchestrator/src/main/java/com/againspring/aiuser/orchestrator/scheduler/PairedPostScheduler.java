@@ -29,6 +29,7 @@ import com.againspring.aiuser.orchestrator.service.threadplan.PlanPersonaMapper;
 import com.againspring.aiuser.orchestrator.service.threadplan.PlanSourceStoryResolver;
 import com.againspring.aiuser.orchestrator.service.threadplan.QuietHours;
 import com.againspring.aiuser.orchestrator.service.threadplan.SourceMixPlanner;
+import com.againspring.aiuser.orchestrator.service.threadplan.SourceReservationSupport;
 import com.againspring.aiuser.orchestrator.service.threadplan.StoryPersonaCommentFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -83,9 +84,17 @@ public class PairedPostScheduler {
     private final PlanSourceStoryResolver sourceStoryResolver;
     private final AiPostBundleService aiPostBundleService;
     private final SourceOverlapGuard sourceOverlapGuard;
+    private final SourceReservationSupport sourceReservationSupport;
 
     /** Phase1 cast stays small (author + commenters for ~2–4 top-level). */
     private static final int CALL1_CAST_MAX = 12;
+
+    /**
+     * persona-diversity-v4 WP2 배선 갱신 — Call1에서 실제로 소비한 골격을 {@code ai_scheduled_posts
+     * .candidates_json}에 함께 실어, 나중에(다른 lease/row인) Call2({@link PartnerAnswerPublisher})가
+     * 같은 뼈대로 상대방(B) 본문을 재구성하게 한다. {@link PairedHoldMeta#KEY}와 별개 키.
+     */
+    static final String PAIRED_SKELETON_KEY = "_pairedSkeleton";
 
     private static final Random RNG = new Random();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -312,7 +321,7 @@ public class PairedPostScheduler {
             return downgradeToSolo(author, category, corrId, slot, preferredSource, budget);
         }
 
-        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId());
+        Call1Attempt call1 = generateCall1(author, category, corrId, slot, preferredSource, partner.getId(), resolvedSource);
         if (call1.llmInvoked() && budget != null) {
             budget.consume();
         }
@@ -349,7 +358,10 @@ public class PairedPostScheduler {
                 sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
                 return HoldPairResult.fail(HoldResult.Outcome.LLM_OR_SAFETY, true, overlap.reason());
             }
-            sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            // WP2 item5 재배선: 골격을 Call1 프롬프트에 실제로 태웠으므로 여기서 release하지 않는다
+            // (release=미사용 취급). solo의 SOURCE_PROVENANCE_KEY 패턴대로 candidates_json에
+            // reservationKey를 실어 두면, 실제 발행 시 ScheduledPostPublisher가 solo와 동일하게
+            // commitFromCandidatesJson/releaseFromCandidatesJson으로 정상 소비 처리한다.
         }
 
         String candidatesJson;
@@ -358,9 +370,26 @@ public class PairedPostScheduler {
             payload.put(PairedHoldMeta.KEY,
                     PairedHoldMeta.wrap(partner.getId(), rel.getRelationType(), corrId)
                             .get(PairedHoldMeta.KEY));
+            if (resolvedSource != null) {
+                payload.put(AiPostBundleService.SOURCE_PROVENANCE_KEY,
+                        sourceReservationSupport.provenanceWithReservation(resolvedSource, reservationKey));
+                // Call2(PartnerAnswerPublisher)는 다른 lease/row에서 나중에 돈다 — 같은 골격으로
+                // 상대방(B) 본문을 재구성하도록 skeleton 자체도 함께 실어 둔다.
+                Map<String, Object> pairedSkeleton = new LinkedHashMap<>();
+                pairedSkeleton.put("sourceContext", resolvedSource.sourceContext());
+                pairedSkeleton.put("reconstructMode", resolvedSource.reconstructMode());
+                if (resolvedSource.sourceExampleId() != null) {
+                    pairedSkeleton.put("sourceExampleId", resolvedSource.sourceExampleId());
+                }
+                pairedSkeleton.put("bSideViable", isBSideViable(resolvedSource));
+                payload.put(PAIRED_SKELETON_KEY, pairedSkeleton);
+            }
             candidatesJson = objectMapper.writeValueAsString(payload);
         } catch (Exception e) {
             log.error("[PairedPost] Could not serialize Call1 hold corrId={}", corrId, e);
+            if (resolvedSource != null) {
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            }
             return HoldPairResult.fail(HoldResult.Outcome.SERIALIZE, true, e.getMessage());
         }
 
@@ -376,7 +405,15 @@ public class PairedPostScheduler {
                 .model(heldContent.model())
                 .origin(PairedHoldMeta.ORIGIN_PAIRED)
                 .build();
-        scheduledPostRepository.save(held);
+        try {
+            scheduledPostRepository.save(held);
+        } catch (RuntimeException persistFailure) {
+            log.error("[PairedPost] hold persist failed corrId={}", corrId, persistFailure);
+            if (resolvedSource != null) {
+                sourceStoryResolver.release(resolvedSource.sourceExampleId(), reservationKey);
+            }
+            return HoldPairResult.fail(HoldResult.Outcome.PERSIST, true, persistFailure.getMessage());
+        }
 
         log.info("[PairedPost] ⏳ held corrId={} scheduledId={} author={} partner={} cat={} slot={} phase1Items={}",
                 corrId, held.getId(),
@@ -432,11 +469,21 @@ public class PairedPostScheduler {
 
     Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
                                        String preferredSource) {
-        return generateCall1(author, category, corrId, slot, preferredSource, null);
+        return generateCall1(author, category, corrId, slot, preferredSource, null, null);
     }
 
     Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
                                        String preferredSource, String partnerId) {
+        return generateCall1(author, category, corrId, slot, preferredSource, partnerId, null);
+    }
+
+    /**
+     * @param resolvedSource claim한 계약7 골격(있으면). null이면 기존 freestyle 동작
+     *                       (claim 없음·claim 실패)과 동일 — SKELETON 없이 생성한다.
+     */
+    Call1Attempt generateCall1(Persona author, String category, String corrId, Instant slot,
+                                       String preferredSource, String partnerId,
+                                       PlanSourceStoryResolver.ResolvedSource resolvedSource) {
         AiUserGenerationConfig config = generationConfigRepository.findById(1).orElse(null);
         // Missing row = no admin switch present -> treat kill as false (fail-open only for this
         // flag; provider resolution below still falls back to yml when the row is absent).
@@ -478,6 +525,26 @@ public class PairedPostScheduler {
         request.put("minItems", 2);
         if (preferredSource != null && !preferredSource.isBlank()) {
             request.put("preferredSource", preferredSource);
+        }
+        // persona-diversity-v4 WP2 재배선 — claim한 골격을 실제로 Call1에 실어 보낸다
+        // (AiPostBundleService.baseAiPostRequest의 sourceContext/reconstructMode와 동일 패턴).
+        if (resolvedSource != null) {
+            if (resolvedSource.topicSeed() != null && !resolvedSource.topicSeed().isBlank()) {
+                request.put("topicHint", resolvedSource.topicSeed());
+            }
+            request.put("sourceContext", resolvedSource.sourceContext());
+            request.put("reconstructMode", resolvedSource.reconstructMode());
+            if (resolvedSource.sourceExampleId() != null) {
+                request.put("sourceExampleId", resolvedSource.sourceExampleId());
+            }
+            if (resolvedSource.dynamicExamples() != null && !resolvedSource.dynamicExamples().isBlank()) {
+                request.put("dynamicExamples", resolvedSource.dynamicExamples());
+            }
+            List<String> recentOutputs =
+                    PlanSourceStoryResolver.recentOutputsForRequest(resolvedSource.recentBodies(), 200);
+            if (!recentOutputs.isEmpty()) {
+                request.put("recentOutputs", recentOutputs);
+            }
         }
 
         // LLM Generation Gate check: skip generation if held
