@@ -13,7 +13,8 @@ import java.util.Set;
  *
  * <p><b>배선 상태</b>: 이 클래스는 구현·단위테스트만 완료했다. 문서(item5)가 지정한 실제 호출
  * 지점(AiPostBundleService 홀딩 직전)은 WP2 소유 편집 범위(`:625-640` 요청 조립 구간)
- * 밖이라 이 브랜치에서는 배선하지 않았다 — 다른 WP 에이전트가 같은 파일의 다른 구간을
+ * <p>배선 지점: solo(`AiPostBundleService`) · paired(`PairedPostScheduler`) · 레거시(`ActionExecutor`)
+ * 세 경로의 게시 직전. 레거시 경로는 소스 예약 개념이 없어 거부 시 해제할 예약이 없다.</p>
  * 동시에 수정 중이므로, 병합 시점에 호출부를 붙여야 한다.</p>
  */
 @Slf4j

@@ -43,7 +43,7 @@
   `SourceOverlapGuard`(12-gram·겹침 0.20 초과 시 거부)가 solo(`AiPostBundleService`)·
   paired(`PairedPostScheduler`) 게시 직전 재구성 결과를 원문과 대조한다. 레거시
   `/generate/post` 경로에는 이 겹침 가드가 배선돼 있지 않다 — 골격만 프롬프트에 실린다는
-  방어는 있지만 게시 직전 대조는 solo·paired 두 경로만 커버한다.
+  방어는 있지만 게시 직전 대조는 solo·paired·레거시 세 경로를 모두 커버한다. 다만 레거시 경로는 `claimPopularSource` 예약 개념이 없어(단순 유사 검색만 사용) 거부 시 해제할 예약이 없다.
 - **카테고리 비율 + 시점 제한**(기존 `romanticShare` 대체, `service/threadplan/CategoryMixPlanner`):
 
   | 카테고리 | 비율 | 작성자(A) 하드 필터 | B(상대방) 시점 |

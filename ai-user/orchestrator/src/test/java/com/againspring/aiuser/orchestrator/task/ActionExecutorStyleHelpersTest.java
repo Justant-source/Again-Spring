@@ -1,6 +1,7 @@
 package com.againspring.aiuser.orchestrator.task;
 
 import com.againspring.aiuser.orchestrator.domain.Persona;
+import com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumMap;
@@ -83,7 +84,8 @@ class ActionExecutorStyleHelpersTest {
     private ActionExecutor bareExecutor() {
         // 순수 함수 계열만 호출 — 의존성 전부 null로 인스턴스화
         return new ActionExecutor(null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null,
+            new SourceOverlapGuard());
     }
 
     private Persona casualPersona() {

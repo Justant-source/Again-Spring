@@ -22,6 +22,7 @@ import com.againspring.aiuser.orchestrator.repository.PersonaSeenPostRepository;
 import com.againspring.aiuser.orchestrator.safety.ContentSafetyGuard;
 import com.againspring.aiuser.orchestrator.safety.ProofreadQualityGate;
 import com.againspring.aiuser.orchestrator.safety.SoftProofread;
+import com.againspring.aiuser.orchestrator.safety.SourceOverlapGuard;
 import com.againspring.aiuser.orchestrator.service.PersonaHistoryStore;
 import com.againspring.aiuser.orchestrator.service.llm.LlmCircuitBreaker;
 import com.againspring.aiuser.orchestrator.service.threadplan.AiPostBundleService;
@@ -68,6 +69,7 @@ public class ActionExecutor {
     private final AiPostBundleService aiPostBundleService;
     private final LlmCircuitBreaker circuitBreaker;
     private final com.againspring.aiuser.orchestrator.service.llm.PromptTemplateCache promptTemplateCache;
+    private final SourceOverlapGuard sourceOverlapGuard;
 
     /** 반복 가드 임계 — 생성문 vs 최근 출력의 문자 2-gram Jaccard 최대값이 이 값을 넘으면 1회 재생성. */
     @Value("${ai-user.repetition-threshold:0.45}")
@@ -586,6 +588,24 @@ public class ActionExecutor {
 
         final String body = applySoftProofread(sanitizedBody, corrId);
         String title = extractTitle(body);
+
+        // persona-diversity-v4 WP2 item5 배선 — 레거시 /generate/post 경로도 solo(AiPostBundleService)와
+        // 동일하게 게시 직전 12-gram 대조를 거친다. primarySource.getContent()(원문)는 이 검사에서만
+        // 메모리로 쓰고 로그·DB에는 절대 남기지 않는다 — sourceOriginalBody(BE provenance 컬럼) 저장은
+        // 별개로 아래에서 그대로 유지한다.
+        if (primarySource != null) {
+            SourceOverlapGuard.GuardResult overlapResult =
+                    sourceOverlapGuard.check(title + "\n" + body, primarySource.getContent());
+            if (!overlapResult.passed()) {
+                log.error("legacy executePost rejected: reason={} overlapRatio={} sourceExampleId={} persona={} corr={}",
+                        overlapResult.reason(), overlapResult.overlapRatio(), primarySource.getId(),
+                        persona.getId(), corrId);
+                logAction(persona, action, "FAILED", corrId,
+                        java.util.Map.of("error", overlapResult.reason(), "sourceExampleId", primarySource.getId()));
+                return;
+            }
+        }
+
         CreatePostDto.CreatePostDtoBuilder postBuilder = CreatePostDto.builder()
             .userTitle(title)
             .bodyRaw(body)
