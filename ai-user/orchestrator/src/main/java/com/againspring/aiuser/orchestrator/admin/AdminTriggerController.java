@@ -508,6 +508,10 @@ public class AdminTriggerController {
      * dryRun=true면 QuotaPlanner 분포만 반환하고 LLM 호출이 전혀 없다(게이트 a 검증용).
      * only는 콤마구분 personaId 목록 — 지정 시 QuotaPlanner는 전체 활성 인원 기준으로 계산하되
      * 실제 LLM 호출·DB 갱신은 그 id들에만 수행한다. force=true면 style_axes가 이미 있어도 재생성한다.
+     * only 없이(=force=false) 재호출하면 style_axes가 이미 채워진 페르소나는 건너뛰므로 이 트리거
+     * 자체가 중단·재개 단위다. maxConsecutiveFailures(기본 5)회 연속 실패 시 또는 LLM 계정
+     * 한도·인증·거절 시그니처(LlmErrorSignatures) 감지 시 남은 대상을 시도하지 않고 조기 종료하며,
+     * 응답의 haltedReason에 원인을, remaining에 아직 style_axes가 없는 페르소나 수를 담는다.
      */
     @PostMapping("/regenerate-persona-profiles")
     public ResponseEntity<Map<String, Object>> regeneratePersonaProfiles(
@@ -515,7 +519,8 @@ public class AdminTriggerController {
             @RequestParam(defaultValue = "10") int batch,
             @RequestParam(defaultValue = "false") boolean dryRun,
             @RequestParam(required = false) String only,
-            @RequestParam(defaultValue = "false") boolean force) {
+            @RequestParam(defaultValue = "false") boolean force,
+            @RequestParam(defaultValue = "5") int maxConsecutiveFailures) {
         List<String> onlyIds = (only == null || only.isBlank())
                 ? null
                 : java.util.Arrays.stream(only.split(",")).map(String::trim)
@@ -523,7 +528,7 @@ public class AdminTriggerController {
         try {
             Map<String, Object> result = dryRun
                     ? personaProfileRegenerator.dryRun(seed)
-                    : personaProfileRegenerator.regenerate(seed, batch, onlyIds, force);
+                    : personaProfileRegenerator.regenerate(seed, batch, onlyIds, force, maxConsecutiveFailures);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("[AdminTrigger] regenerate-persona-profiles failed: {}", e.getMessage(), e);

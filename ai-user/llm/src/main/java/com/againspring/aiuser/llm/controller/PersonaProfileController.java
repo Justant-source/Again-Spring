@@ -1,6 +1,7 @@
 package com.againspring.aiuser.llm.controller;
 
 import com.againspring.aiuser.llm.dto.PersonaProfileGenRequest;
+import com.againspring.aiuser.llm.exception.ClaudeCodeException;
 import com.againspring.aiuser.llm.exception.LlmCapacityException;
 import com.againspring.aiuser.llm.exception.LlmTimeoutException;
 import com.againspring.aiuser.llm.service.PersonaProfileService;
@@ -41,10 +42,18 @@ public class PersonaProfileController {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error("CAPACITY", e.getMessage(), corr));
         } catch (LlmTimeoutException e) {
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(error("TIMEOUT", e.getMessage(), corr));
+        } catch (ClaudeCodeException e) {
+            // 호출자(PersonaProfileRegenerator)가 llm-error-signatures.json으로 세션 한도·인증
+            // 오류를 판별해 배치를 즉시 멈춘다. 원문 메시지를 삼키면 그 판별이 불가능해지고
+            // 한도 소진 상태에서 남은 대상을 계속 때린다.
+            log.error("[{}] persona-profile CLI error: {}", corr, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(error("CLAUDE_ERROR", e.getMessage(), corr));
         } catch (Exception e) {
             log.error("[{}] persona-profile generation failed", corr, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(error("GENERATION_FAILED", "generation failed", corr));
+                    .body(error("GENERATION_FAILED",
+                            e.getMessage() == null ? "generation failed" : e.getMessage(), corr));
         }
     }
 

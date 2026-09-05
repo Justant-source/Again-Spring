@@ -12,6 +12,12 @@ public class PostRewriteRequest {
     private String postId;
     private String personaId;
     private String voiceProfile;
+    /**
+     * persona-diversity-v4 계약 4 — WP1 {@code PersonaCard.render()} 출력. 있으면
+     * {@code PromptAssembler.assemblePostRewritePrompt}가 {@link #voiceProfile} 대신
+     * 이 값을 페르소나 특성 섹션에 쓴다. 없으면 기존처럼 voiceProfile 문자열을 그대로 쓴다.
+     */
+    private String personaCard;
     private double slangLevel;
     private String category;
     private String targetCategory;

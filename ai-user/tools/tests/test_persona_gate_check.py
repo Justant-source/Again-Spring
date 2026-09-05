@@ -110,6 +110,30 @@ def test_evaluate_gate_a_empty_rows_fails_persona_count():
     assert result.passed is False
 
 
+def test_evaluate_gate_a_has_kids_as_bit_int_not_treated_as_violation():
+    """실 DB의 has_kids는 BIT(1) — `has_kids + 0` 캐스팅 후 정수 0/1로 들어온다.
+    2026-09-05 실측: 캐스팅 없이 JSON_OBJECT에 BIT을 바로 넣으면 원시 바이트(\\u0000)가
+    나와 JSON_ARRAYAGG 파싱이 깨졌다(json.JSONDecodeError). 정수 0/1로 들어와도
+    bool(has_kids) 판정이 정상 동작해야 한다."""
+    rows = _build_compliant_personas()
+    for row in rows:
+        row["has_kids"] = 1 if row["has_kids"] else 0
+    result = mod.evaluate_gate_a(rows)
+    detail = next(c for c in result.checks if c["check"] == "has_kids_requires_married")
+    assert detail["pass"] is True
+    kids_detail = next(c for c in result.checks if c["check"] == "has_kids_of_married")
+    assert "actual=45/90" in kids_detail["detail"]
+
+
+def test_evaluate_gate_a_reports_regeneration_progress_in_note():
+    rows = _build_compliant_personas()
+    for row in rows[:12]:
+        row["style_axes"] = {"directness": "BLUNT"}
+    result = mod.evaluate_gate_a(rows)
+    assert "12/150" in result.note
+    assert "138" in result.note
+
+
 # --- gate b -------------------------------------------------------------------
 
 
@@ -177,6 +201,28 @@ def test_evaluate_gate_b_fails_on_near_duplicate_general_style():
     assert result.passed is False
     detail = next(c for c in result.checks if c["check"] == "general_style_pairwise_jaccard")
     assert detail["pass"] is False
+
+
+def test_evaluate_gate_b_reports_regeneration_progress_in_note():
+    data = {
+        "signature_phrases": [f"phrase_{i}" for i in range(150)],
+        "reply_style": [f"reply_{i}" for i in range(130)],
+        "comment_style": [f"comment_{i}" for i in range(130)],
+        "general_style": DISTINCT_SENTENCES,
+        "style_axes": _balanced_style_axes(12),
+        "total_personas": 150,
+    }
+    result = mod.evaluate_gate_b(data)
+    assert "12/150" in result.note
+    assert "138" in result.note
+
+
+def test_extract_style_axes_handles_null_dict_and_json_string():
+    assert mod.extract_style_axes({"style_axes": None}) is None
+    assert mod.extract_style_axes({"style_axes": {}}) is None
+    assert mod.extract_style_axes({"style_axes": {"directness": "BLUNT"}}) == {"directness": "BLUNT"}
+    assert mod.extract_style_axes({"style_axes": '{"directness": "SOFT"}'}) == {"directness": "SOFT"}
+    assert mod.extract_style_axes({"style_axes": "not json"}) is None
 
 
 def test_char_ngrams_and_jaccard_basic():

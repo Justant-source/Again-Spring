@@ -30,7 +30,15 @@ public class SkeletonExtractResponse {
     @JsonProperty("counterpart_claim") private final String counterpartClaim;
     private final String emotion;
     @JsonProperty("gray_zone") private final String grayZone;
-    @JsonProperty("b_side_viable") private final Boolean bSideViable;
+    /**
+     * Lombok의 기본 getter-이름 맹글링(연속 대문자 "BS" → "bs")이 필드명 mangling과
+     * 어긋나 Jackson이 이 필드를 두 개의 서로 다른 프로퍼티(필드 쪽 "b_side_viable",
+     * getter 쪽 "bsideViable")로 인식하는 버그가 있었다(persona-diversity-v4 결함).
+     * onMethod_로 getter 자체에 @JsonProperty를 붙여 두 접근자가 같은 이름으로
+     * 병합되게 한다 — 출력 키는 "b_side_viable" 하나만 나와야 한다.
+     */
+    @Getter(onMethod_ = @__(@JsonProperty("b_side_viable")))
+    private final Boolean bSideViable;
     @JsonProperty("source_example_id") private final Long sourceExampleId;
 
     public static SkeletonExtractResponse failure(String reason) {

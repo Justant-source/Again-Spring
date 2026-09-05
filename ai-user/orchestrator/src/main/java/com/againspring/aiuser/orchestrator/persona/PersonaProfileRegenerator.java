@@ -4,6 +4,7 @@ import com.againspring.aiuser.orchestrator.domain.Persona;
 import com.againspring.aiuser.orchestrator.domain.PersonaActionLog;
 import com.againspring.aiuser.orchestrator.repository.PersonaActionLogRepository;
 import com.againspring.aiuser.orchestrator.repository.PersonaRepository;
+import com.againspring.aiuser.orchestrator.safety.LlmErrorSignatures;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,6 +36,8 @@ public class PersonaProfileRegenerator {
     private static final double JACCARD_REJECT_THRESHOLD = 0.30;
     private static final int MAX_ATTEMPTS_PER_PERSONA = 3;
     private static final int USED_PHRASES_WINDOW = 300;
+    /** 한도 소진이 아닌 실패라도 이 횟수 연속되면 배치를 중단한다(무한 실패 반복 방지). */
+    private static final int DEFAULT_MAX_CONSECUTIVE_FAILURES = 5;
 
     private final PersonaRepository personaRepo;
     private final PersonaQuotaPlanner quotaPlanner;
@@ -58,6 +60,18 @@ public class PersonaProfileRegenerator {
      * @param onlyIds null/empty면 전체 활성 대상(단, force=false면 style_axes 이미 있는 행은 skip)
      */
     public Map<String, Object> regenerate(long seed, int batchSize, List<String> onlyIds, boolean force) {
+        return regenerate(seed, batchSize, onlyIds, force, DEFAULT_MAX_CONSECUTIVE_FAILURES);
+    }
+
+    /**
+     * @param onlyIds                null/empty면 전체 활성 대상(단, force=false면 style_axes 이미
+     *                                있는 행은 skip — 재개 시 {@code only} 없이 같은 호출을 반복하면
+     *                                남은 인원만 이어서 처리된다)
+     * @param maxConsecutiveFailures 한도 소진 외의 사유로도 이 횟수만큼 연속 실패하면 배치를 중단한다
+     */
+    public Map<String, Object> regenerate(
+            long seed, int batchSize, List<String> onlyIds, boolean force, int maxConsecutiveFailures) {
+        int failureCap = maxConsecutiveFailures > 0 ? maxConsecutiveFailures : DEFAULT_MAX_CONSECUTIVE_FAILURES;
         List<String> fullIds = personaRepo.findActiveIdsOrderById();
         Map<String, PersonaQuotaPlanner.IdentityAxes> planMap = quotaPlanner.plan(fullIds, seed);
 
@@ -77,6 +91,12 @@ public class PersonaProfileRegenerator {
             if (force || p.getStyleAxes() == null || p.getStyleAxes().isEmpty()) targets.add(id);
         }
 
+        // 진행률 로그·remaining 계산의 기준선 — 루프가 personas를 변형하기 전에 현재 완료분을 먼저 센다.
+        long totalActive = allActive.size();
+        long alreadyDoneBefore = allActive.stream()
+                .filter(p -> p.getStyleAxes() != null && !p.getStyleAxes().isEmpty())
+                .count();
+
         // 고유성 검사 기준 population: DB에 이미 있는 signature_phrases 전부 + 이번 실행에서 새로 생성되는 것
         List<Set<String>> previousPhraseSets = new ArrayList<>();
         for (Persona p : allActive) {
@@ -85,16 +105,27 @@ public class PersonaProfileRegenerator {
         }
         List<String> recentUsedPhrases = new ArrayList<>();
 
-        int succeeded = 0, skipped = 0, processed = 0;
+        int succeeded = 0, skipped = 0, processed = 0, consecutiveFailures = 0;
         List<Map<String, Object>> failures = new ArrayList<>();
+        String haltedReason = null;
 
+        LlmErrorSignatures errorSignatures = LlmErrorSignatures.get();
+
+        outer:
         for (String id : targets) {
             processed++;
             Persona persona = byId.get(id);
             PersonaQuotaPlanner.IdentityAxes axes = planMap.get(id);
             if (axes == null) {
                 skipped++;
+                consecutiveFailures++;
                 failures.add(Map.of("personaId", id, "reason", "NO_AXES_PLANNED"));
+                if (consecutiveFailures >= failureCap) {
+                    haltedReason = "CONSECUTIVE_FAILURES(" + consecutiveFailures + ")";
+                    log.error("[PersonaProfileRegenerator] halting after {} consecutive failures at persona {}",
+                            consecutiveFailures, id);
+                    break;
+                }
                 continue;
             }
             String nickname = lookupNickname(id);
@@ -104,13 +135,23 @@ public class PersonaProfileRegenerator {
             Map<String, Object> accepted = null;
             String lastReason = "UNKNOWN";
             for (int attempt = 1; attempt <= MAX_ATTEMPTS_PER_PERSONA; attempt++) {
-                Optional<Map<String, Object>> respOpt = llmClient.generatePersonaProfile(
+                PersonaProfileLlmClient.ProfileResult result = llmClient.generatePersonaProfile(
                         id, nickname, axes, region, voiceType, capWindow(recentUsedPhrases));
-                if (respOpt.isEmpty()) {
+                if (!result.isSuccess()) {
                     lastReason = "LLM_CALL_FAILED";
+                    String errorText = result.errorText() == null ? "" : result.errorText();
+                    if (errorSignatures.containsSignature(errorText.toLowerCase(Locale.ROOT))) {
+                        // 계정 한도·인증·거절 시그니처 — 재시도해도 낭비이므로 이 페르소나도, 남은
+                        // 대상도 더 이상 시도하지 않고 즉시 배치를 중단한다(절대 규칙 #7).
+                        haltedReason = "LLM_ERROR_SIGNATURE: " + truncate(errorText);
+                        log.error("[PersonaProfileRegenerator] halting on error signature for persona {}: {}",
+                                id, truncate(errorText));
+                        failures.add(Map.of("personaId", id, "reason", lastReason));
+                        break outer;
+                    }
                     continue;
                 }
-                Map<String, Object> resp = respOpt.get();
+                Map<String, Object> resp = result.response();
                 Set<String> phraseSet = extractPhrases(resp);
                 double maxJaccard = previousPhraseSets.stream()
                         .mapToDouble(prev -> jaccard(prev, phraseSet))
@@ -125,9 +166,16 @@ public class PersonaProfileRegenerator {
 
             if (accepted == null) {
                 skipped++;
+                consecutiveFailures++;
                 failures.add(Map.of("personaId", id, "reason", lastReason));
                 log.warn("[PersonaProfileRegenerator] persona {} skipped after {} attempts: {}",
                         id, MAX_ATTEMPTS_PER_PERSONA, lastReason);
+                if (consecutiveFailures >= failureCap) {
+                    haltedReason = "CONSECUTIVE_FAILURES(" + consecutiveFailures + ")";
+                    log.error("[PersonaProfileRegenerator] halting after {} consecutive failures at persona {}",
+                            consecutiveFailures, id);
+                    break;
+                }
                 continue;
             }
 
@@ -139,20 +187,35 @@ public class PersonaProfileRegenerator {
             previousPhraseSets.add(newPhrases);
             recentUsedPhrases.addAll(0, newPhrases);
             succeeded++;
+            consecutiveFailures = 0;
 
             if (batchSize > 0 && processed % batchSize == 0) {
-                log.info("[PersonaProfileRegenerator] progress {}/{} (succeeded={}, skipped={})",
-                        processed, targets.size(), succeeded, skipped);
+                log.info("[PersonaProfileRegenerator] progress {}/{} total done (batch: succeeded={}, skipped={})",
+                        alreadyDoneBefore + succeeded, totalActive, succeeded, skipped);
             }
         }
+
+        long remaining = allActive.stream()
+                .filter(p -> p.getStyleAxes() == null || p.getStyleAxes().isEmpty())
+                .count();
+
+        log.info("[PersonaProfileRegenerator] run finished: {}/{} total done, remaining={}, halted={}",
+                alreadyDoneBefore + succeeded, totalActive, remaining, haltedReason);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dryRun", false);
         out.put("targetCount", targets.size());
+        out.put("processed", processed);
         out.put("succeeded", succeeded);
         out.put("skipped", skipped);
         out.put("failures", failures);
+        out.put("remaining", remaining);
+        out.put("haltedReason", haltedReason);
         return out;
+    }
+
+    private static String truncate(String s) {
+        return s.length() > 200 ? s.substring(0, 200) : s;
     }
 
     // ── voice_profile 병합 (§3 병합 규칙) ────────────────────────────────

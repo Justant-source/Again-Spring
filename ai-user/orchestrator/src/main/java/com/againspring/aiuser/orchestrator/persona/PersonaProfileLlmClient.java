@@ -5,11 +5,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * llm 워커 {@code POST /generate/persona-profile} 전용 클라이언트 (01-wp1-persona-data.md §4).
@@ -26,7 +26,18 @@ public class PersonaProfileLlmClient {
         this.restClient = restClient;
     }
 
-    public Optional<Map<String, Object>> generatePersonaProfile(
+    /**
+     * llm 워커 호출 결과. 실패 시 {@code response}는 null이고 {@code errorText}에 원인 텍스트
+     * (HTTP 오류 응답 본문 또는 예외 메시지)를 담는다 — 호출자(PersonaProfileRegenerator)가
+     * {@code LlmErrorSignatures}로 한도·인증·거절 오류인지 판별해 배치 중단 여부를 정한다.
+     */
+    public record ProfileResult(Map<String, Object> response, String errorText) {
+        public boolean isSuccess() {
+            return response != null;
+        }
+    }
+
+    public ProfileResult generatePersonaProfile(
             String personaId, String nickname, PersonaQuotaPlanner.IdentityAxes axes,
             String region, String voiceType, List<String> usedPhrases) {
         try {
@@ -55,14 +66,24 @@ public class PersonaProfileLlmClient {
                     .retrieve()
                     .body(new ParameterizedTypeReference<Map<String, Object>>() {
                     });
-            if (resp == null || resp.containsKey("errorCode")) {
-                log.warn("persona-profile generation failed for {}: {}", personaId, resp);
-                return Optional.empty();
+            if (resp == null) {
+                log.warn("persona-profile generation failed for {}: empty response", personaId);
+                return new ProfileResult(null, "empty response");
             }
-            return Optional.of(resp);
+            if (resp.containsKey("errorCode")) {
+                log.warn("persona-profile generation failed for {}: {}", personaId, resp);
+                String errorText = resp.get("errorCode") + ": " + resp.get("message");
+                return new ProfileResult(null, errorText);
+            }
+            return new ProfileResult(resp, null);
+        } catch (RestClientResponseException e) {
+            String body2 = e.getResponseBodyAsString();
+            String errorText = (body2 == null || body2.isBlank()) ? e.getMessage() : body2;
+            log.warn("persona-profile call failed for {}: {}", personaId, e.getMessage());
+            return new ProfileResult(null, errorText);
         } catch (Exception e) {
             log.warn("persona-profile call failed for {}: {}", personaId, e.getMessage());
-            return Optional.empty();
+            return new ProfileResult(null, e.getMessage());
         }
     }
 }

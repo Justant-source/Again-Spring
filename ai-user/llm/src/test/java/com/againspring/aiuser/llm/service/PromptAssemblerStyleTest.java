@@ -140,6 +140,29 @@ class PromptAssemblerStyleTest {
         assertEquals(prefixWithCard, prefixWithoutCard, "personaCard는 PERSONA_SECTION 뒤 가변 영역에만 영향을 줘야 함");
     }
 
+    /** persona-diversity-v4 계약4 — rewrite 경로도 personaCard가 있으면 voiceProfile 대신 카드를 쓴다. */
+    @Test
+    void rewritePromptPrefersPersonaCardOverVoiceProfileWhenPresent() {
+        PostRewriteRequest withCard = PostRewriteRequest.builder()
+            .personaId("p1").voiceProfile("v-원본-voiceProfile-문자열").slangLevel(0.3)
+            .personaCard("[페르소나] 야근일상 · 34세 남 · 기혼 6년차")
+            .category("WORK").targetCategory("WORK").formality("casual")
+            .originalTitle("제목").originalBody("본문")
+            .build();
+        String system = assembler.assemblePostRewritePrompt(withCard).split("<<<USER_PROMPT>>>", 2)[0];
+
+        assertTrue(system.contains("야근일상"), "personaCard 텍스트가 페르소나 특성에 실려야 함");
+        assertFalse(system.contains("v-원본-voiceProfile-문자열"), "personaCard가 있으면 voiceProfile 문자열은 쓰지 않음");
+
+        PostRewriteRequest withoutCard = PostRewriteRequest.builder()
+            .personaId("p1").voiceProfile("v-원본-voiceProfile-문자열").slangLevel(0.3)
+            .category("WORK").targetCategory("WORK").formality("casual")
+            .originalTitle("제목").originalBody("본문")
+            .build();
+        String fallbackSystem = assembler.assemblePostRewritePrompt(withoutCard).split("<<<USER_PROMPT>>>", 2)[0];
+        assertTrue(fallbackSystem.contains("v-원본-voiceProfile-문자열"), "personaCard 없으면 기존 voiceProfile 문자열 유지");
+    }
+
     @Test
     void authorPairedPromptLeavesCounterpartAnchors() {
         PostGenRequest req = PostGenRequest.builder()

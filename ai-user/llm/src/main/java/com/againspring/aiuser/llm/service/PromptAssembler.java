@@ -64,6 +64,13 @@ public class PromptAssembler {
                 : req.getVoiceProfile();
     }
 
+    /** persona-diversity-v4 계약4 — {@link #personaVoice(PostGenRequest)}와 동일 규칙을 rewrite 경로에 적용. */
+    private static String personaVoice(PostRewriteRequest req) {
+        return (req.getPersonaCard() != null && !req.getPersonaCard().isBlank())
+                ? req.getPersonaCard()
+                : req.getVoiceProfile();
+    }
+
     private String loadResourceOrEmpty(String path) {
         try {
             return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
@@ -179,7 +186,7 @@ public class PromptAssembler {
     public String assemblePostRewritePrompt(PostRewriteRequest req) {
         String guideText = guide("voice/post", req.getPromptOverrides());
         if (guideText.isBlank()) guideText = "기존 갈등 사연을 자연스럽게 교정한다";
-        String system = buildSystem(req.getVoiceProfile(), req.getSlangLevel(), guideText, req.getFormality(),
+        String system = buildSystem(personaVoice(req), req.getSlangLevel(), guideText, req.getFormality(),
             req.getCorrectionCautions(), req.getGlobalForbidRules(), null);
         String sourceCategory = req.getCategory() != null ? req.getCategory() : "OTHER";
         String targetCategory = req.getTargetCategory() != null ? req.getTargetCategory() : sourceCategory;

@@ -176,7 +176,7 @@ def fetch_persona_rows(target: DbTarget) -> list[dict[str, Any]]:
     sql = (
         "SELECT JSON_ARRAYAGG(JSON_OBJECT("
         "'id', id, 'age_years', age_years, 'gender', gender, 'marital', marital, "
-        "'married_years', married_years, 'has_kids', has_kids, 'tier', tier, "
+        "'married_years', married_years, 'has_kids', has_kids + 0, 'tier', tier, "
         "'voice_profile', voice_profile, 'style_axes', style_axes"
         ")) FROM personas WHERE active = 1;"
     )
@@ -201,6 +201,26 @@ def age_band(age_years: int) -> str:
 
 def marital_group(marital: str) -> str:
     return "MARRIED" if marital == "MARRIED" else "SINGLE_GROUP"
+
+
+def extract_style_axes(row: dict[str, Any]) -> dict[str, Any] | None:
+    """style_axes 컬럼이 채워졌으면(=PersonaProfileRegenerator가 이 페르소나를 재생성했으면)
+    dict를 반환하고, 컬럼 기본값(NULL)이면 None을 반환한다. 재생성 진척 계측(계약 밖, 운영
+    편의)과 게이트 b 데이터 추출이 공유하는 정규화 로직이다."""
+    sa = row.get("style_axes")
+    if isinstance(sa, str):
+        try:
+            sa = json.loads(sa)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    if isinstance(sa, dict) and sa:
+        return sa
+    return None
+
+
+def _regeneration_note(regenerated: int, total: int) -> str:
+    remaining = total - regenerated
+    return f"재생성 진척: {regenerated}/{total} 완료, {remaining}명 미재생성(컬럼 기본값)"
 
 
 def _extract_voice_type(row: dict[str, Any]) -> str | None:
@@ -232,6 +252,9 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     result.add("persona_count", len(rows) > 0, f"active personas={len(rows)}")
     if not rows:
         return result
+
+    regenerated = sum(1 for row in rows if extract_style_axes(row) is not None)
+    result.note = _regeneration_note(regenerated, len(rows))
 
     gender_counts: dict[str, int] = {}
     age_band_counts: dict[str, int] = {}
@@ -330,8 +353,13 @@ def jaccard(a: set[str], b: set[str]) -> float:
 
 def evaluate_gate_b(data: dict[str, Any]) -> GateResult:
     """data 키: signature_phrases(list[str]), reply_style(list[str]), comment_style(list[str]),
-    general_style(list[str], 150명 각각의 문체 텍스트), style_axes(list[dict])."""
+    general_style(list[str], 150명 각각의 문체 텍스트), style_axes(list[dict]),
+    total_personas(int, 참고 — 전체 활성 페르소나 수, 재생성 진척 표시용)."""
     result = GateResult(gate="b", passed=True)
+
+    style_axes_rows_for_note = list(data.get("style_axes", []))
+    total_personas = data.get("total_personas", len(style_axes_rows_for_note))
+    result.note = _regeneration_note(len(style_axes_rows_for_note), total_personas)
 
     sig = list(data.get("signature_phrases", []))
     result.add(
@@ -425,14 +453,16 @@ def fetch_gate_c_stats(target: DbTarget, days: int) -> dict[str, Any]:
 
     posting_sql = (
         "SELECT COUNT(DISTINCT p.author_id) FROM posts p JOIN users u ON u.id = p.author_id "
-        f"WHERE u.synthetic = 1 AND p.created_at >= NOW() - INTERVAL {int(days)} DAY;"
+        "WHERE u.synthetic = 1 AND p.deleted_at IS NULL "
+        f"AND p.created_at >= NOW() - INTERVAL {int(days)} DAY;"
     )
     posting = int(run_mariadb_sql(target, posting_sql).strip() or 0)
 
     per_author_sql = (
         "SELECT JSON_ARRAYAGG(cnt) FROM ("
         "SELECT COUNT(*) AS cnt FROM posts p JOIN users u ON u.id = p.author_id "
-        f"WHERE u.synthetic = 1 AND p.created_at >= NOW() - INTERVAL {int(days)} DAY "
+        "WHERE u.synthetic = 1 AND p.deleted_at IS NULL "
+        f"AND p.created_at >= NOW() - INTERVAL {int(days)} DAY "
         "GROUP BY p.author_id ORDER BY cnt DESC"
         ") t;"
     )
@@ -488,13 +518,8 @@ def fetch_gate_b_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
             if vp.get("general_style"):
                 general_style.append(str(vp["general_style"]))
 
-        sa = row.get("style_axes")
-        if isinstance(sa, str):
-            try:
-                sa = json.loads(sa)
-            except (json.JSONDecodeError, TypeError):
-                sa = None
-        if isinstance(sa, dict):
+        sa = extract_style_axes(row)
+        if sa is not None:
             style_axes.append(sa)
 
     return {
@@ -503,6 +528,7 @@ def fetch_gate_b_data(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "comment_style": comment_style,
         "general_style": general_style,
         "style_axes": style_axes,
+        "total_personas": len(rows),
     }
 
 
