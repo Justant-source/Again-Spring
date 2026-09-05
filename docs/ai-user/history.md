@@ -50,7 +50,7 @@
 
 | 항목 | 결과 |
 |---|---|
-| 백업 | `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql` |
+| 백업 | `prod-pre-corpus-unify-20260801-163820.sql` — 2026-09-05 보관 정책(30일)으로 삭제됨 |
 | 삭제 | clien·ruliweb·theqoo·dcinside **4346건** · `BLIND`→`blind` 정규화 |
 | popularity 게이트 | `popularity_gate.py` — 지표·절대하한·상대 pct≥0.50 · COMMENT는 인기 부모만 (영구) |
 | WP1B | 전원 `voice_type` ∈ {NATEPAN:113, BLIND:37} · 인기 앵커로 example 재생성 · strengthener 재오염 차단 |

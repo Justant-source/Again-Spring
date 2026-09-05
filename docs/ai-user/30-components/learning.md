@@ -108,7 +108,8 @@ learning container가 뜨면 아래가 항상 실행된다.
 `naver_comments` · `daum_comments` 및 `*_backup`은 코드에서 삭제했다.
 
 **2026-08-01**: prod `example_bank`에서 clien·ruliweb·theqoo·dcinside **4,346건 삭제** 완료
-(백업: `/home/justant/backups/prod-pre-corpus-unify-20260801-163820.sql`).
+(백업: `prod-pre-corpus-unify-20260801-163820.sql` — **2026-09-05 백업 30일 보관 정책으로 삭제됨**.
+이 시점으로의 롤백은 더 이상 불가하다).
 `BLIND` → `blind` source 정규화. 잔여: natepan · blind · SELF_GENERATED.
 
 ### 현재 스케줄

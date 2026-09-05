@@ -128,12 +128,36 @@ case "$TARGET_ENV" in
   prod)
     PORT=8091
     BACKUP_DIR="/home/justant/backups"
-    echo "▶ prod DB 백업 (mariadb-prod) → ${BACKUP_DIR}" >&2
+    # 보관 정책: 30일 경과분 삭제. 단 BACKUP_MIN_KEEP개는 나이와 무관하게 남긴다
+    # — prod 배포가 30일 넘게 없으면 전량 삭제되는 사고를 막기 위한 바닥값이다.
+    BACKUP_RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-30}"
+    BACKUP_MIN_KEEP="${BACKUP_MIN_KEEP:-5}"
+    BACKUP_FILE="$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql.gz"
+
+    echo "▶ prod DB 백업 (mariadb-prod) → ${BACKUP_FILE}" >&2
     mkdir -p "$BACKUP_DIR"
+    # pipefail이 켜져 있어 덤프가 실패하면 여기서 배포가 중단된다
     docker exec againspring-mariadb-prod sh -c \
       'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines "$MARIADB_DATABASE"' \
-      > "$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql"
-    echo "✅ 백업 완료" >&2
+      | gzip > "$BACKUP_FILE"
+
+    # 빈 껍데기·잘린 덤프를 "백업 완료"로 통과시키지 않는다
+    if ! gzip -t "$BACKUP_FILE" 2>/dev/null; then
+      echo "🚨 백업 파일이 손상됐다 (gzip -t 실패): $BACKUP_FILE" >&2
+      exit 1
+    fi
+    BACKUP_BYTES=$(stat -c %s "$BACKUP_FILE")
+    if (( BACKUP_BYTES < 1048576 )); then
+      echo "🚨 백업이 비정상적으로 작다 (${BACKUP_BYTES} bytes < 1MB): $BACKUP_FILE" >&2
+      echo "   덤프가 중간에 끊겼을 수 있다. prod 배포를 중단한다." >&2
+      exit 1
+    fi
+    echo "✅ 백업 완료 ($(du -h "$BACKUP_FILE" | cut -f1))" >&2
+
+    # 보관 정책 집행은 scripts/prune-backups.sh 하나로 통일한다 — 야간 cron도 같은
+    # 스크립트를 부르므로 로직이 두 벌로 갈라지지 않는다.
+    BACKUP_DIR="$BACKUP_DIR" BACKUP_RETAIN_DAYS="$BACKUP_RETAIN_DAYS" \
+      BACKUP_MIN_KEEP="$BACKUP_MIN_KEEP" bash "$SCRIPT_DIR/prune-backups.sh" >&2
 
     echo "▶ prod 스택 기동" >&2
     docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build

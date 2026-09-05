@@ -9,7 +9,7 @@
 
 | 경로 | 설명 |
 |---|---|
-| `ai-user/tools/snapshots/wp1b-voice_profiles-YYYYMMDD-HHMMSS.json` | **정화 전** 스냅샷 (복원용). 동일본 `/home/justant/backups/` |
+| `ai-user/tools/snapshots/wp1b-voice_profiles-YYYYMMDD-HHMMSS.json` | **정화 전** 스냅샷 (복원용). 여기가 유일본 — `/home/justant/backups/` 사본은 30일 보관 정책으로 삭제됐다 |
 | `ai-user/tools/snapshots/wp1b-voice_profiles-latest.json` | 최신 스냅샷 복사 |
 | `ai-user/tools/snapshots/wp1b-corpus-anchors.tsv` | natepan\|blind COMMENT/POST 앵커 export |
 | `ai-user/tools/snapshots/wp1b-purified-latest.json` | 정화 결과 dump |

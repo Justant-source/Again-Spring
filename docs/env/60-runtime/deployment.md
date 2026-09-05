@@ -102,7 +102,26 @@ base+prod 스택 기동 → `/api/health/deep` 대기 → `scripts/verify-deploy
   전량 삭제될 수 있다. 나이와 무관하게 최신 5개는 남긴다.
 - **`green-forest/` 하위는 건드리지 않는다.** 그쪽은 `Green-Forest/scripts/backup-prod.sh`가
   자체 보관 정책(14일)으로 관리한다.
-- 정리는 **prod 배포 시에만** 실행된다. 배포 없이 정리만 하려면 아래 명령을 직접 쓴다.
+
+정리 로직의 권위본은 **`scripts/prune-backups.sh`** 한 파일이다. 두 곳에서 호출된다:
+
+| 호출자 | 시점 | 비고 |
+|---|---|---|
+| `scripts/deploy.sh prod` | 백업을 새로 뜬 직후 | 배포 경로 |
+| 야간 cron | 매일 04:30 KST | 배포가 없는 날에도 정리가 돌게 하기 위함 |
+
+```bash
+scripts/prune-backups.sh --dry-run   # 무엇이 지워질지만 확인
+scripts/prune-backups.sh             # 압축 + 정리 실행
+```
+
+cron 등록:
+
+```
+30 4 * * * /home/justant/Data/Again-Spring/scripts/prune-backups.sh >> /home/justant/Data/Again-Spring/env/logs/prune-backups.cron.log 2>&1
+```
+
+수동으로 뜬 비압축 `*.sql`이 섞여 들어와도 이 스크립트가 gzip으로 만든다.
 
 백업만 별도로 다시 뜨고 싶다면:
 
