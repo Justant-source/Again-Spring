@@ -134,18 +134,18 @@ public class PersonaQuotaPlanner {
         // 그래서 프로필 LLM이 job_title을 자유롭게 지어냈고 prod 실측에서 6명 중 4명이
         // 마케팅·구매팀으로 몰렸다. 직군을 명시 쿼터로 올려 갈라놓는다(2026-09-06).
         Map<String, String> jobField = zip(sortedIds, weightedLabels(n, linked(
-                "OFFICE", 22.0,          // 일반 사무·기획·총무
-                "DEV", 20.0,             // 개발·IT
-                "SALES", 16.0,           // 영업·영업관리
-                "MANUFACTURING", 14.0,   // 제조·생산·품질
-                "SERVICE", 12.0,         // 고객서비스·판매·요식
-                "DESIGN", 11.0,          // 디자인·크리에이티브
-                "FINANCE", 11.0,         // 회계·재무·금융
-                "LOGISTICS", 10.0,       // 물류·유통·구매
-                "HEALTHCARE", 10.0,      // 의료·간호·복지
-                "EDUCATION", 9.0,        // 교육·강사
-                "CONSTRUCTION", 8.0,     // 건설·토목·설비
-                "RESEARCH", 7.0          // 연구·엔지니어링
+                "OFFICE", 26.0,          // 사무·기획·총무·인사 (사무종사자 약 18%)
+                "MANUFACTURING", 20.0,   // 제조·생산·품질·기능 (제조업 약 16%)
+                "SERVICE", 18.0,         // 서비스·요식·숙박·미용 (서비스종사자 약 12%)
+                "SALES", 17.0,           // 판매·영업 (판매종사자 약 10% + 영업직)
+                "HEALTHCARE", 14.0,      // 의료·간호·복지 (보건복지업 약 11%)
+                "EDUCATION", 11.0,       // 교육·강사 (교육서비스업 약 7%)
+                "CONSTRUCTION", 10.0,    // 건설·토목·설비 (건설업 약 7.5%)
+                "LOGISTICS", 10.0,       // 물류·운수·유통·구매 (운수창고업 약 6%)
+                "DEV", 10.0,             // 개발·IT (정보통신업 약 4% + 타 산업 개발직)
+                "FINANCE", 6.0,          // 회계·재무·금융 (금융보험업 약 3%)
+                "DESIGN", 4.0,           // 디자인·크리에이티브 (예술·여가 약 2%)
+                "RESEARCH", 4.0          // 연구·엔지니어링
         ), new Random(seed ^ 0x1B0F1E1DL)));
 
         Map<String, IdentityAxes> out = new LinkedHashMap<>();
@@ -216,44 +216,73 @@ public class PersonaQuotaPlanner {
         Map<String, String> jobType = new LinkedHashMap<>();
         Set<String> used = new HashSet<>();
 
-        // PARENT_LEAVE(10/150) — MARRIED + has_kids 전용 풀
+        // 2026-09-06 개정: 한국 23~49세 경제활동 실태에 맞춘 비율.
+        // 이전에는 전원이 취업자였고 학생·무직·전업주부가 아예 없었다. 20대 초중반은 재학
+        // 중일 수 있고 30~40대도 무직·전업주부일 수 있다.
+        //   임금근로자 88 (대기업 18·중소중견 40·스타트업 8·공공 12·전문직 10)
+        //   비임금 28 (자영업 18·프리랜서 10)
+        //   비경제활동·실업 34 (재학 8·구직 8·무직 4·육아휴직 8·전업주부 6)
+        // 대기업 종사자가 임금근로자의 약 20%인 것은 실제(약 14%)보다 높지만, 온라인
+        // 직장인 커뮤니티라는 성격을 감안한 상향이다.
+
+        // PARENT_LEAVE(8) — MARRIED + has_kids 전용
         List<String> parentLeaveEligible = sortedIds.stream()
                 .filter(id -> "MARRIED".equals(marital.get(id)) && Boolean.TRUE.equals(hasKids.get(id)))
                 .collect(Collectors.toList());
-        int parentLeaveCount = scaledCount(10, n);
-        List<String> parentLeavePicked = pickShuffled(parentLeaveEligible, parentLeaveCount, rng);
-        parentLeavePicked.forEach(id -> {
+        pickShuffled(parentLeaveEligible, scaledCount(8, n), rng).forEach(id -> {
             jobType.put(id, "PARENT_LEAVE");
             used.add(id);
         });
 
-        // JOBSEEKER(10/150) — 23~32세, 아직 미배정
-        List<String> jobseekerEligible = sortedIds.stream()
-                .filter(id -> !used.contains(id) && ageYears.get(id) >= 23 && ageYears.get(id) <= 32)
+        // HOMEMAKER(6) — 전업주부. MARRIED 전용(자녀 유무는 묻지 않는다)
+        List<String> homemakerEligible = sortedIds.stream()
+                .filter(id -> !used.contains(id) && "MARRIED".equals(marital.get(id)))
                 .collect(Collectors.toList());
-        int jobseekerCount = scaledCount(10, n);
-        List<String> jobseekerPicked = pickShuffled(jobseekerEligible, jobseekerCount, rng);
-        jobseekerPicked.forEach(id -> {
+        pickShuffled(homemakerEligible, scaledCount(6, n), rng).forEach(id -> {
+            jobType.put(id, "HOMEMAKER");
+            used.add(id);
+        });
+
+        // STUDENT(8) — 23~26세 재학생(학부 고학년·대학원)
+        List<String> studentEligible = sortedIds.stream()
+                .filter(id -> !used.contains(id) && ageYears.get(id) <= 26)
+                .collect(Collectors.toList());
+        pickShuffled(studentEligible, scaledCount(8, n), rng).forEach(id -> {
+            jobType.put(id, "STUDENT");
+            used.add(id);
+        });
+
+        // JOBSEEKER(8) — 23~35세 취업준비·구직
+        List<String> jobseekerEligible = sortedIds.stream()
+                .filter(id -> !used.contains(id) && ageYears.get(id) <= 35)
+                .collect(Collectors.toList());
+        pickShuffled(jobseekerEligible, scaledCount(8, n), rng).forEach(id -> {
             jobType.put(id, "JOBSEEKER");
             used.add(id);
         });
 
-        // PROFESSIONAL(15/150) — 27세 이상, 아직 미배정
+        // UNEMPLOYED(4) — 무직·쉬었음. 나이 제약 없음(30~40대도 해당된다)
+        List<String> unemployedEligible = sortedIds.stream()
+                .filter(id -> !used.contains(id)).collect(Collectors.toList());
+        pickShuffled(unemployedEligible, scaledCount(4, n), rng).forEach(id -> {
+            jobType.put(id, "UNEMPLOYED");
+            used.add(id);
+        });
+
+        // PROFESSIONAL(10) — 27세 이상(자격·수련 기간을 감안)
         List<String> professionalEligible = sortedIds.stream()
                 .filter(id -> !used.contains(id) && ageYears.get(id) >= 27)
                 .collect(Collectors.toList());
-        int professionalCount = scaledCount(15, n);
-        List<String> professionalPicked = pickShuffled(professionalEligible, professionalCount, rng);
-        professionalPicked.forEach(id -> {
+        pickShuffled(professionalEligible, scaledCount(10, n), rng).forEach(id -> {
             jobType.put(id, "PROFESSIONAL");
             used.add(id);
         });
 
-        // 나머지 6종 — 무제약, 남은 인원에 비례 배분
+        // 나머지 — 무제약, 남은 인원에 비례 배분
         List<String> remaining = sortedIds.stream().filter(id -> !used.contains(id)).collect(Collectors.toList());
         List<String> remainingLabels = weightedLabels(remaining.size(), linked(
-                "CORP_LARGE", 30.0, "CORP_MID", 25.0, "STARTUP", 20.0,
-                "PUBLIC", 15.0, "SELF_EMPLOYED", 15.0, "FREELANCER", 10.0), rng);
+                "CORP_MID", 40.0, "CORP_LARGE", 18.0, "SELF_EMPLOYED", 18.0,
+                "PUBLIC", 12.0, "FREELANCER", 10.0, "STARTUP", 8.0), rng);
         for (int i = 0; i < remaining.size(); i++) jobType.put(remaining.get(i), remainingLabels.get(i));
 
         return jobType;

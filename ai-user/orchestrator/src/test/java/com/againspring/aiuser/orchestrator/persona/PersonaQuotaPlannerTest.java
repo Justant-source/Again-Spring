@@ -101,15 +101,19 @@ class PersonaQuotaPlannerTest {
     void plan_jobTypeQuotaExact() {
         var result = planner.plan(ids150(), 7L);
         Map<String, Long> counts = countBy(result.values(), PersonaQuotaPlanner.IdentityAxes::jobType);
-        assertThat(counts).containsEntry("CORP_LARGE", 30L)
-                .containsEntry("CORP_MID", 25L)
-                .containsEntry("STARTUP", 20L)
-                .containsEntry("PUBLIC", 15L)
-                .containsEntry("PROFESSIONAL", 15L)
-                .containsEntry("SELF_EMPLOYED", 15L)
+        // 2026-09-06: 한국 23~49세 경제활동 실태 기준으로 개정. 학생·무직·전업주부 신설.
+        assertThat(counts).containsEntry("CORP_MID", 40L)
+                .containsEntry("CORP_LARGE", 18L)
+                .containsEntry("SELF_EMPLOYED", 18L)
+                .containsEntry("PUBLIC", 12L)
                 .containsEntry("FREELANCER", 10L)
-                .containsEntry("JOBSEEKER", 10L)
-                .containsEntry("PARENT_LEAVE", 10L);
+                .containsEntry("PROFESSIONAL", 10L)
+                .containsEntry("STARTUP", 8L)
+                .containsEntry("STUDENT", 8L)
+                .containsEntry("JOBSEEKER", 8L)
+                .containsEntry("PARENT_LEAVE", 8L)
+                .containsEntry("HOMEMAKER", 6L)
+                .containsEntry("UNEMPLOYED", 4L);
         assertThat(counts.values().stream().mapToLong(Long::longValue).sum()).isEqualTo(150L);
     }
 
@@ -119,7 +123,14 @@ class PersonaQuotaPlannerTest {
         for (var e : result.entrySet()) {
             var axes = e.getValue();
             if ("JOBSEEKER".equals(axes.jobType())) {
-                assertThat(axes.ageYears()).as("JOBSEEKER age " + e.getKey()).isBetween(23, 32);
+                assertThat(axes.ageYears()).as("JOBSEEKER age " + e.getKey()).isBetween(23, 35);
+            }
+            if ("STUDENT".equals(axes.jobType())) {
+                // 재학생은 20대 초중반만 — 학부 고학년·대학원
+                assertThat(axes.ageYears()).as("STUDENT age " + e.getKey()).isBetween(23, 26);
+            }
+            if ("HOMEMAKER".equals(axes.jobType())) {
+                assertThat(axes.marital()).as("HOMEMAKER marital " + e.getKey()).isEqualTo("MARRIED");
             }
             if ("PROFESSIONAL".equals(axes.jobType())) {
                 assertThat(axes.ageYears()).as("PROFESSIONAL age " + e.getKey()).isGreaterThanOrEqualTo(27);

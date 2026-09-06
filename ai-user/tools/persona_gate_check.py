@@ -64,9 +64,16 @@ VOICE_TYPE_QUOTA = {"NATEPAN": 75, "BLIND": 75}
 # 직군(V23, 2026-09-06). job_type이 "어떤 조직"이라면 이쪽은 "무슨 일"이다. 이 축이 없던
 # 시절 prod 실측에서 하루치 6건 중 4건이 마케팅·구매팀으로 몰렸다.
 JOB_FIELD_QUOTA = {
-    "OFFICE": 22, "DEV": 20, "SALES": 16, "MANUFACTURING": 14, "SERVICE": 12,
-    "DESIGN": 11, "FINANCE": 11, "LOGISTICS": 10, "HEALTHCARE": 10,
-    "EDUCATION": 9, "CONSTRUCTION": 8, "RESEARCH": 7,
+    "OFFICE": 26, "MANUFACTURING": 20, "SERVICE": 18, "SALES": 17, "HEALTHCARE": 14,
+    "EDUCATION": 11, "CONSTRUCTION": 10, "LOGISTICS": 10, "DEV": 10, "FINANCE": 6,
+    "DESIGN": 4, "RESEARCH": 4,
+}
+# 고용 형태(2026-09-06 개정). 한국 23~49세 경제활동 실태 기준 — 전원이 취업자였던
+# 이전 배정에는 학생·무직·전업주부가 아예 없었다.
+JOB_TYPE_QUOTA = {
+    "CORP_MID": 40, "CORP_LARGE": 18, "SELF_EMPLOYED": 18, "PUBLIC": 12,
+    "FREELANCER": 10, "PROFESSIONAL": 10, "STARTUP": 8, "STUDENT": 8,
+    "JOBSEEKER": 8, "PARENT_LEAVE": 8, "HOMEMAKER": 6, "UNEMPLOYED": 4,
 }
 HAS_KIDS_OF_MARRIED_QUOTA = 45  # MARRIED 90명 중 45명
 
@@ -235,7 +242,8 @@ def fetch_persona_rows(target: DbTarget) -> list[dict[str, Any]]:
         "SELECT JSON_ARRAYAGG(JSON_OBJECT("
         "'id', id, 'age_years', age_years, 'gender', gender, 'marital', marital, "
         "'married_years', married_years, 'has_kids', has_kids + 0, 'tier', tier, "
-        "'voice_profile', voice_profile, 'style_axes', style_axes, 'job_field', job_field"
+        "'voice_profile', voice_profile, 'style_axes', style_axes, 'job_field', job_field, "
+        "'job_type', job_type"
         ")) FROM personas WHERE active = 1;"
     )
     raw = run_mariadb_sql(target, sql).strip()
@@ -341,6 +349,7 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     tier_counts: dict[str, int] = {}
     voice_type_counts: dict[str, int] = {}
     job_field_counts: dict[str, int] = {}
+    job_type_counts: dict[str, int] = {}
     kids_of_married = 0
     married_total = 0
 
@@ -390,6 +399,9 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
         job_field = row.get("job_field")
         if job_field:
             job_field_counts[job_field] = job_field_counts.get(job_field, 0) + 1
+        job_type = row.get("job_type")
+        if job_type:
+            job_type_counts[job_type] = job_type_counts.get(job_type, 0) + 1
 
     _quota_check(result, "gender", gender_counts, GENDER_QUOTA)
     _quota_check(result, "age_band", age_band_counts, AGE_BAND_QUOTA)
@@ -398,6 +410,7 @@ def evaluate_gate_a(rows: list[dict[str, Any]]) -> GateResult:
     _quota_check(result, "tier", tier_counts, TIER_QUOTA)
     _quota_check(result, "voice_type", voice_type_counts, VOICE_TYPE_QUOTA)
     _quota_check(result, "job_field", job_field_counts, JOB_FIELD_QUOTA)
+    _quota_check(result, "job_type", job_type_counts, JOB_TYPE_QUOTA)
 
     result.add(
         "has_kids_of_married",

@@ -36,6 +36,7 @@ def _build_compliant_personas() -> list[dict]:
     voice_types = ["NATEPAN"] * 75 + ["BLIND"] * 75
     # 직군 쿼터(V23, 합 150)를 그대로 펼친다 — 계약이 바뀌면 여기도 같이 바뀐다.
     job_fields = [f for f, cnt in mod.JOB_FIELD_QUOTA.items() for _ in range(cnt)]
+    job_types = [t for t, cnt in mod.JOB_TYPE_QUOTA.items() for _ in range(cnt)]
 
     married_indices = [i for i, m in enumerate(married_flags) if m]
     kids_indices = set(married_indices[:45])  # married 90 중 45명 has_kids
@@ -55,6 +56,7 @@ def _build_compliant_personas() -> list[dict]:
                 "voice_profile": json.dumps({"voice_type": voice_types[i]}),
                 "style_axes": None,
                 "job_field": job_fields[i],
+                "job_type": job_types[i],
                 "idx": idx,
             }
         )
