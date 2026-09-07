@@ -85,6 +85,8 @@ public class PersonaProfileService {
         String marital = maritalKorean(axes);
         String jobType = jobTypeKorean(String.valueOf(axes.getOrDefault("job_type", "CORP_LARGE")));
         String region = axes.get("region") != null ? String.valueOf(axes.get("region")) : "";
+        String jobField = axes.get("job_field") != null
+                ? jobFieldKorean(String.valueOf(axes.get("job_field"))) : "";
         Object styleAxesRaw = axes.get("style_axes");
         String styleKorean = styleAxesRaw instanceof Map
                 ? styleAxesToKorean((Map<String, Object>) styleAxesRaw) : "정보 없음";
@@ -93,6 +95,7 @@ public class PersonaProfileService {
         parts.add(ageYears + "세 " + gender);
         parts.add(marital);
         parts.add(jobType);
+        if (!jobField.isBlank()) parts.add("직군: " + jobField);
         if (!region.isBlank()) parts.add(region);
         parts.add("말투: " + styleKorean);
         return String.join(" / ", parts);
@@ -113,6 +116,25 @@ public class PersonaProfileService {
         };
     }
 
+    /** 직군을 한글로. 일하지 않는 상태에서는 전공·희망 분야·이전 경력을 가리킨다. */
+    private String jobFieldKorean(String jobField) {
+        return switch (jobField) {
+            case "DEV" -> "개발·IT";
+            case "DESIGN" -> "디자인";
+            case "OFFICE" -> "사무·기획·총무·인사";
+            case "MANUFACTURING" -> "제조·생산·품질";
+            case "CONSTRUCTION" -> "건설·토목·설비";
+            case "SALES" -> "판매·영업";
+            case "FINANCE" -> "회계·재무·금융";
+            case "HEALTHCARE" -> "의료·간호·복지";
+            case "EDUCATION" -> "교육·강사";
+            case "LOGISTICS" -> "물류·운수·유통·구매";
+            case "SERVICE" -> "서비스·요식·숙박·미용";
+            case "RESEARCH" -> "연구·엔지니어링";
+            default -> "";
+        };
+    }
+
     private String jobTypeKorean(String jobType) {
         return switch (jobType) {
             case "CORP_LARGE" -> "대기업 직장인";
@@ -122,8 +144,14 @@ public class PersonaProfileService {
             case "PROFESSIONAL" -> "전문직";
             case "SELF_EMPLOYED" -> "자영업자";
             case "FREELANCER" -> "프리랜서";
-            case "JOBSEEKER" -> "구직중";
+            case "JOBSEEKER" -> "구직중(취업준비)";
             case "PARENT_LEAVE" -> "육아휴직중";
+            // 아래 3종이 빠져 있어 전부 default("직장인")로 번역됐다. LLM은 직장인이라고
+            // 들었으니 현직 직함을 썼고, 직함 가드가 3회 걸러 건너뛰면서 전업주부 0명·
+            // 재학 2명·무직 1명으로 쿼터가 무너졌다(2026-09-08 실측).
+            case "STUDENT" -> "재학생(직장 없음)";
+            case "UNEMPLOYED" -> "무직·쉬는 중(직장 없음)";
+            case "HOMEMAKER" -> "전업주부(직장 없음)";
             default -> "직장인";
         };
     }
