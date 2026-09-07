@@ -23,7 +23,8 @@ last_updated: 2026-09-05
 | `marital` | VARCHAR(16) NOT NULL DEFAULT 'SINGLE' | `SINGLE` `DATING` `ENGAGED` `MARRIED` | 미혼 = MARRIED 외 전부 |
 | `married_years` | TINYINT NULL | 1~24, `≤ age_years−23` | MARRIED만. 결혼 최소 연령 23세 — 단 `married_years=0`(0년차)은 부자연스러워 금지하므로 **MARRIED 배정 가능 최소 연령은 24세**(24−23=1)다. 23세는 SINGLE·DATING·ENGAGED만 가능(2026-09-05 개정: 최초안 25세는 계약2의 23~29세 밴드 MARRIED 15명 요구와 상충해 `married_years=0` 기혼이 나오던 설계 결함이 있었음) |
 | `has_kids` | BIT(1) NOT NULL DEFAULT 0 | | MARRIED만 1 가능. 자녀는 고등학생까지. 자녀 나이 < `married_years`(프로필 생성 프롬프트 제약, 결혼 1년차의 신생아 0세도 성립) |
-| `job_type` | VARCHAR(24) NOT NULL DEFAULT 'CORP_LARGE' | 9종, 아래 표 | V22 SQL 주석의 "8종"은 오기 — `PersonaQuotaPlanner.assignJobTypes` 실측 기준 9종 |
+| `job_type` | VARCHAR(24) NOT NULL DEFAULT 'CORP_LARGE' | 12종, 아래 표 | **고용 형태**. 2026-09-06 개정 — 이전 9종은 전원이 취업자여서 재학·무직·전업주부가 없었다 |
+| `job_field` | VARCHAR(24) NULL (V23) | 12종, 아래 표 | **직군**. `job_type`이 "어떤 조직"이라면 이쪽은 "무슨 일". 이 축이 없던 시절 하루치 6건 중 4건이 마케팅으로 몰렸다 |
 | `job_title` | VARCHAR(80) NULL | 예: "중견 제조업 구매팀 5년차 대리" | LLM 생성 |
 | `style_axes` | JSON NULL | 계약 3 | `PersonaQuotaPlanner`가 채움 |
 | `last_post_at` | DATETIME(3) NULL | | 선택 가중치(계약 6)가 갱신 |
@@ -32,10 +33,45 @@ last_updated: 2026-09-05
 기존 `voice_profile.age`(밴드)·`gender`·`job`은 **호환용으로 동시 갱신**한다(밴드 매핑: 23~29 `20s_late`,
 30~36 `30s_early`, 37~39 `30s_late`, 40~49 `40s`). `voice_type`·`tier`·`interests`·`slang_level`은 유지.
 
-`job_type` 9종과 150명 쿼터: `CORP_LARGE` 30 · `CORP_MID` 25 · `STARTUP` 20 · `PUBLIC` 15 ·
-`PROFESSIONAL` 15 · `SELF_EMPLOYED` 15 · `FREELANCER` 10 · `JOBSEEKER` 10 · `PARENT_LEAVE` 10.
+### 고용 형태(`job_type`) 12종 — 한국 23~49세 경제활동 실태 기준
 
-코드: `ai-user/orchestrator/src/main/resources/db/migration/V22__persona_identity_axes.sql`.
+| 구분 | 값 : 인원 |
+|---|---|
+| 임금근로자 88 | `CORP_MID` 40 · `CORP_LARGE` 18 · `PUBLIC` 12 · `PROFESSIONAL` 10 · `STARTUP` 8 |
+| 비임금 28 | `SELF_EMPLOYED` 18 · `FREELANCER` 10 |
+| 비경제활동·실업 34 | `STUDENT` 8 · `JOBSEEKER` 8 · `PARENT_LEAVE` 8 · `HOMEMAKER` 6 · `UNEMPLOYED` 4 |
+
+제약: `STUDENT`는 23~26세 · `JOBSEEKER`는 35세 이하 · `PROFESSIONAL`은 27세 이상 ·
+`PARENT_LEAVE`는 MARRIED+자녀에 **여성 7 : 남성 1** · `HOMEMAKER`는 MARRIED **전원 여성** ·
+`UNEMPLOYED`는 나이 제약 없음(30~40대 무직이 실재한다).
+
+대기업이 임금근로자의 약 20%로 실제(약 14%)보다 높은데, 온라인 직장인 커뮤니티라는 성격을
+감안한 의도적 상향이다.
+
+### 직군(`job_field`) 12종 — 산업·직업별 취업자 분포 기준
+
+`OFFICE` 26 · `MANUFACTURING` 20 · `SERVICE` 18 · `SALES` 17 · `HEALTHCARE` 14 ·
+`EDUCATION` 11 · `CONSTRUCTION` 10 · `LOGISTICS` 10 · `DEV` 10 · `FINANCE` 6 ·
+`DESIGN` 4 · `RESEARCH` 4.
+
+일하지 않는 상태(`STUDENT`·`JOBSEEKER`·`UNEMPLOYED`·`HOMEMAKER`·`PARENT_LEAVE`)에서는
+직군이 전공·희망 분야·이전 경력을 가리킨다. `job_title`은 고용 형태별로 형태가 다르며
+(전업주부는 그 단어로 시작, 재학생은 학년, 구직자는 준비 상태, 무직은 퇴사·공백),
+`PersonaProfileRegenerator`가 코드로 검사해 어긋나면 재시도한다.
+
+### 기간과 나이의 정합
+
+연애 기간 ≤ (나이−19)년 · 직장 경력 ≤ (나이−22)년 · 자녀 나이 < `married_years`.
+프로필 생성과 글 생성 양쪽 프롬프트에 걸려 있다. 23세가 6년차 연애를 말하던 사례를 막는다.
+
+### 재생성 대상 판정
+
+`PersonaProfileRegenerator`는 `voice_profile.profile_rev` 마커와 **계획된 축 전체**를 저장값과
+비교해 하나라도 다르면 다시 만든다. 프로필 본문(직함·생활 배경·시그니처)이 축을 전제로
+쓰이므로 값만 갈아끼우면 앞뒤가 맞지 않는다. 따라서 **축을 바꾸면 150명 전량 재생성**이
+일어난다(Sonnet 150회, 약 2.5시간) — 축 변경은 이 비용을 감수할 때만 한다.
+
+코드: `V22__persona_identity_axes.sql` · `V23__persona_job_field.sql`.
 
 ## 계약 2 — 150명 쿼터 그리드 (`PersonaQuotaPlanner` 배정, 게이트 a 검증, 오차 ±3)
 

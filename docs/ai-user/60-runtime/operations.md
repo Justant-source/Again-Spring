@@ -531,6 +531,11 @@ python3 ai-user/tools/persona_gate_check.py --env-file env/.env.dev --gate d
   집계 쿼리는 `deleted_at IS NULL`을 반드시 걸어야 한다(2026-09-05 감사에서 이 필터 누락으로
   soft-delete된 글이 회전율에 섞이는 버그를 발견·수정 — `docs/_active/persona-diversity-v4.md`
   §6 게이트 집계 결함).
+- 게이트 a는 신원 축 쿼터를 본다 — 성별·연령대·결혼·연령대별 기혼·자녀·tier·voice_type에
+  더해 **고용 형태(`job_type`, 12종)와 직군(`job_field`, 12종)**까지 검사한다(2026-09-06 추가).
+  두 축의 값과 비율은 [persona-identity-contract.md](../30-components/persona-identity-contract.md)가
+  권위본이다. 쿼터를 바꾸면 150명 전량 재생성(Sonnet 150회, 약 2.5시간)이 뒤따른다 —
+  재생성 대상 판정이 계획된 축 전체를 저장값과 비교하기 때문이다.
 - 게이트 d(관계)는 `PersonaRelationshipFiller` 실행 결과를 검증한다. 기준은 관계를 하나도
   갖지 못한 활성 페르소나 0명, 성별·나이 제약 위반 0건, `marital`과 관계 유형의 정합성 위반
   0건이다(SINGLE인데 MARRIAGE 관계 등). 2026-09-05 dev 실측에서 위반 20건이 나왔는데 전부

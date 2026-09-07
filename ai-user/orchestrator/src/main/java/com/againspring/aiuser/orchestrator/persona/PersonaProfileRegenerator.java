@@ -334,17 +334,27 @@ public class PersonaProfileRegenerator {
         String title = String.valueOf(t);
         String jobType = axes.jobType();
         if (jobType == null) return null;
+        // 표현을 넓게 받는다. 목적은 "현직 직함이 붙는 것"을 막는 것이지 특정 문구를 강요하는
+        // 게 아니다. 좁게 잡았더니(전업주부로 시작할 것 등) 18명이 3회 재시도 후 건너뛰어져
+        // 전업주부 0명·재학 2명·무직 1명으로 쿼터가 무너졌다(2026-09-07 실측).
         return switch (jobType) {
-            case "HOMEMAKER" -> title.startsWith("전업주부") ? null : "HOMEMAKER는 '전업주부'로 시작해야 한다";
-            case "STUDENT" -> (title.contains("학년") || title.contains("대학원") || title.contains("재학"))
-                    ? null : "STUDENT는 학교급·전공·학년이 드러나야 한다";
-            case "JOBSEEKER" -> (title.contains("준비") || title.contains("구직"))
-                    ? null : "JOBSEEKER는 준비·구직 상태가 드러나야 한다";
-            case "UNEMPLOYED" -> (title.contains("퇴사") || title.contains("쉬는") || title.contains("공백"))
-                    ? null : "UNEMPLOYED는 퇴사·공백 상태가 드러나야 한다";
-            case "PARENT_LEAVE" -> title.contains("육아휴직") ? null : "PARENT_LEAVE는 육아휴직이 드러나야 한다";
+            case "HOMEMAKER" -> containsAny(title, "전업주부", "주부", "살림", "가사")
+                    ? null : "HOMEMAKER인데 주부 상태가 드러나지 않는다";
+            case "STUDENT" -> containsAny(title, "학년", "대학원", "재학", "학부", "휴학", "졸업예정", "학생", "수료")
+                    ? null : "STUDENT인데 학생 신분이 드러나지 않는다";
+            case "JOBSEEKER" -> containsAny(title, "준비", "구직", "취준", "공시", "시험", "지망")
+                    ? null : "JOBSEEKER인데 준비·구직 상태가 드러나지 않는다";
+            case "UNEMPLOYED" -> containsAny(title, "퇴사", "쉬는", "쉬고", "공백", "무직", "실직", "그만", "백수", "쉼")
+                    ? null : "UNEMPLOYED인데 퇴사·공백 상태가 드러나지 않는다";
+            case "PARENT_LEAVE" -> containsAny(title, "육아휴직", "휴직")
+                    ? null : "PARENT_LEAVE인데 휴직 상태가 드러나지 않는다";
             default -> null;
         };
+    }
+
+    private static boolean containsAny(String text, String... needles) {
+        for (String n : needles) if (text.contains(n)) return true;
+        return false;
     }
 
     private static List<String> findMissingRequiredKeys(Map<String, Object> resp) {
