@@ -118,6 +118,17 @@ class PersonaQuotaPlannerTest {
     }
 
     @Test
+    void plan_parentLeaveIsMostlyFemale() {
+        var result = planner.plan(ids150(), 7L);
+        long female = result.values().stream()
+                .filter(a -> "PARENT_LEAVE".equals(a.jobType()) && "F".equals(a.gender())).count();
+        long total = result.values().stream().filter(a -> "PARENT_LEAVE".equals(a.jobType())).count();
+        // 한국 육아휴직 사용자는 여성이 약 70% — 남성도 있지만 소수다.
+        assertThat(total).isEqualTo(8L);
+        assertThat(female).isEqualTo(7L);
+    }
+
+    @Test
     void plan_jobTypeConstraintsHold() {
         var result = planner.plan(ids150(), 7L);
         for (var e : result.entrySet()) {
@@ -131,6 +142,9 @@ class PersonaQuotaPlannerTest {
             }
             if ("HOMEMAKER".equals(axes.jobType())) {
                 assertThat(axes.marital()).as("HOMEMAKER marital " + e.getKey()).isEqualTo("MARRIED");
+                // 한국 전업주부는 사실상 여성이다. 남성이 배정되면 직함·서사가 어색해진다
+                // (2026-09-06 prod 실측에서 6명 중 4명이 남성이었다).
+                assertThat(axes.gender()).as("HOMEMAKER gender " + e.getKey()).isEqualTo("F");
             }
             if ("PROFESSIONAL".equals(axes.jobType())) {
                 assertThat(axes.ageYears()).as("PROFESSIONAL age " + e.getKey()).isGreaterThanOrEqualTo(27);

@@ -111,7 +111,7 @@ public class PersonaQuotaPlanner {
         }
 
         // 8) job_type — 제약 있는 3종 먼저 배정(전용 풀), 나머지 6종은 남은 인원에 배분
-        Map<String, String> jobType = assignJobTypes(sortedIds, n, ageYears, marital, hasKids, rng);
+        Map<String, String> jobType = assignJobTypes(sortedIds, n, ageYears, gender, marital, hasKids, rng);
 
         // 9) tier: HEAVY 20 · REGULAR 80 · LIGHT 50
         Map<String, String> tier = zip(sortedIds, weightedLabels(n, linked(
@@ -211,7 +211,8 @@ public class PersonaQuotaPlanner {
 
     private Map<String, String> assignJobTypes(
             List<String> sortedIds, int n,
-            Map<String, Integer> ageYears, Map<String, String> marital, Map<String, Boolean> hasKids,
+            Map<String, Integer> ageYears, Map<String, String> gender,
+            Map<String, String> marital, Map<String, Boolean> hasKids,
             Random rng) {
         Map<String, String> jobType = new LinkedHashMap<>();
         Set<String> used = new HashSet<>();
@@ -225,23 +226,17 @@ public class PersonaQuotaPlanner {
         // 대기업 종사자가 임금근로자의 약 20%인 것은 실제(약 14%)보다 높지만, 온라인
         // 직장인 커뮤니티라는 성격을 감안한 상향이다.
 
-        // PARENT_LEAVE(8) — MARRIED + has_kids 전용
-        List<String> parentLeaveEligible = sortedIds.stream()
-                .filter(id -> "MARRIED".equals(marital.get(id)) && Boolean.TRUE.equals(hasKids.get(id)))
-                .collect(Collectors.toList());
-        pickShuffled(parentLeaveEligible, scaledCount(8, n), rng).forEach(id -> {
-            jobType.put(id, "PARENT_LEAVE");
-            used.add(id);
-        });
+        // PARENT_LEAVE(8) — MARRIED + has_kids. 여성 7 : 남성 1.
+        // 한국 육아휴직 사용자는 여성이 약 70%다(남성 비중이 늘고 있어 1명은 남성으로 둔다).
+        assignGendered(sortedIds, jobType, used, "PARENT_LEAVE",
+                id -> "MARRIED".equals(marital.get(id)) && Boolean.TRUE.equals(hasKids.get(id)),
+                gender, scaledCount(7, n), scaledCount(1, n), rng);
 
-        // HOMEMAKER(6) — 전업주부. MARRIED 전용(자녀 유무는 묻지 않는다)
-        List<String> homemakerEligible = sortedIds.stream()
-                .filter(id -> !used.contains(id) && "MARRIED".equals(marital.get(id)))
-                .collect(Collectors.toList());
-        pickShuffled(homemakerEligible, scaledCount(6, n), rng).forEach(id -> {
-            jobType.put(id, "HOMEMAKER");
-            used.add(id);
-        });
+        // HOMEMAKER(6) — 전업주부. MARRIED + 전원 여성.
+        // 한국 전업주부는 사실상 여성이다 — 남성 전업주부를 배정하면 직함·서사가 어색해진다.
+        assignGendered(sortedIds, jobType, used, "HOMEMAKER",
+                id -> "MARRIED".equals(marital.get(id)),
+                gender, scaledCount(6, n), 0, rng);
 
         // STUDENT(8) — 23~26세 재학생(학부 고학년·대학원)
         List<String> studentEligible = sortedIds.stream()
@@ -286,6 +281,23 @@ public class PersonaQuotaPlanner {
         for (int i = 0; i < remaining.size(); i++) jobType.put(remaining.get(i), remainingLabels.get(i));
 
         return jobType;
+    }
+
+    /** 성별 쿼터가 있는 고용 형태 배정 — 여성 femaleCount명, 남성 maleCount명을 각각 뽑는다. */
+    private void assignGendered(List<String> sortedIds, Map<String, String> jobType, Set<String> used,
+                                String label, java.util.function.Predicate<String> baseFilter,
+                                Map<String, String> gender, int femaleCount, int maleCount, Random rng) {
+        for (String g : List.of("F", "M")) {
+            int want = "F".equals(g) ? femaleCount : maleCount;
+            if (want <= 0) continue;
+            List<String> pool = sortedIds.stream()
+                    .filter(id -> !used.contains(id) && g.equals(gender.get(id)) && baseFilter.test(id))
+                    .collect(Collectors.toList());
+            pickShuffled(pool, want, rng).forEach(id -> {
+                jobType.put(id, label);
+                used.add(id);
+            });
+        }
     }
 
     private Map<String, Map<String, String>> assignStyleAxes(List<String> sortedIds, int n, Random rng) {

@@ -211,6 +211,13 @@ public class PersonaProfileRegenerator {
                     lastReason = "INCOMPLETE_PROFILE(" + String.join(",", missingKeys) + ")";
                     continue;
                 }
+                String titleIssue = checkJobTitleMatchesEmployment(resp, axes);
+                if (titleIssue != null) {
+                    // 프롬프트만으로는 새어 나갔다 — prod 실측에서 전업주부에게 "매장관리팀 대리
+                    // 7년차" 같은 현직 직함이 붙고, 구직자의 직군과 준비 분야가 어긋났다.
+                    lastReason = "JOB_TITLE_MISMATCH(" + titleIssue + ")";
+                    continue;
+                }
                 Set<String> phraseSet = extractPhrases(resp);
                 double maxJaccard = previousPhraseSets.stream()
                         .mapToDouble(prev -> jaccard(prev, phraseSet))
@@ -306,6 +313,27 @@ public class PersonaProfileRegenerator {
 
     /** 필수 키가 없거나(null) "비어 있으면" 그 키 이름을 반환한다(빈 리스트=전부 있음). */
     @SuppressWarnings("unchecked")
+    /** 일하지 않는 상태(재학·구직·무직·전업주부·육아휴직)에 현직 직함이 붙었는지 본다. */
+    private static String checkJobTitleMatchesEmployment(Map<String, Object> resp,
+                                                        PersonaQuotaPlanner.IdentityAxes axes) {
+        Object t = resp.get("job_title");
+        if (t == null) return null;
+        String title = String.valueOf(t);
+        String jobType = axes.jobType();
+        if (jobType == null) return null;
+        return switch (jobType) {
+            case "HOMEMAKER" -> title.startsWith("전업주부") ? null : "HOMEMAKER는 '전업주부'로 시작해야 한다";
+            case "STUDENT" -> (title.contains("학년") || title.contains("대학원") || title.contains("재학"))
+                    ? null : "STUDENT는 학교급·전공·학년이 드러나야 한다";
+            case "JOBSEEKER" -> (title.contains("준비") || title.contains("구직"))
+                    ? null : "JOBSEEKER는 준비·구직 상태가 드러나야 한다";
+            case "UNEMPLOYED" -> (title.contains("퇴사") || title.contains("쉬는") || title.contains("공백"))
+                    ? null : "UNEMPLOYED는 퇴사·공백 상태가 드러나야 한다";
+            case "PARENT_LEAVE" -> title.contains("육아휴직") ? null : "PARENT_LEAVE는 육아휴직이 드러나야 한다";
+            default -> null;
+        };
+    }
+
     private static List<String> findMissingRequiredKeys(Map<String, Object> resp) {
         List<String> missing = new ArrayList<>();
         if (resp == null) {
