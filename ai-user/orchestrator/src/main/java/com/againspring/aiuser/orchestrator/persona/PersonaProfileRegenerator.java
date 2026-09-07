@@ -118,15 +118,11 @@ public class PersonaProfileRegenerator {
             }
             Persona p = byId.get(id);
             PersonaQuotaPlanner.IdentityAxes planned = planMap.get(id);
-            boolean voiceMatches = planned == null || planned.voiceType() == null
-                    || planned.voiceType().equals(voiceTypeOf(p));
-            // 직군도 같은 이유로 프로필 본문과 짝이 맞아야 한다 — job_title·life_context가
-            // 직군을 전제로 쓰이므로 값만 갈아끼우면 앞뒤가 안 맞는다.
-            boolean fieldMatches = planned == null || planned.jobField() == null
-                    || planned.jobField().equals(p.getJobField());
-            // voice_type이 계획과 다르면 미완료로 본다. 이 축은 크롤 예시 풀 소스를 가르므로
-            // 프로필 본문과 짝이 맞아야 한다 — 값만 갈아끼우면 옛 소스로 쓴 문체가 남는다.
-            if (force || !isProfileCurrent(p) || !voiceMatches || !fieldMatches) targets.add(id);
+            // 저장된 축이 현재 계획과 하나라도 다르면 미완료로 본다. 프로필 본문(직함·생활
+            // 배경·시그니처)이 축을 전제로 쓰이므로 값만 갈아끼우면 앞뒤가 안 맞는다.
+            // voice_type·job_field만 보던 시절, 성별·고용형태 배정을 바꿨는데도 재생성
+            // 대상이 0으로 나왔다(2026-09-07).
+            if (force || !isProfileCurrent(p) || !axesMatch(planned, p)) targets.add(id);
         }
 
         // 진행률 로그·remaining 계산의 기준선 — 루프가 personas를 변형하기 전에 현재 완료분을 먼저 센다.
@@ -313,6 +309,23 @@ public class PersonaProfileRegenerator {
 
     /** 필수 키가 없거나(null) "비어 있으면" 그 키 이름을 반환한다(빈 리스트=전부 있음). */
     @SuppressWarnings("unchecked")
+    /** 저장된 페르소나의 축이 현재 계획과 일치하는지. 하나라도 다르면 프로필을 다시 만들어야 한다. */
+    private static boolean axesMatch(PersonaQuotaPlanner.IdentityAxes planned, Persona p) {
+        if (planned == null) return true;
+        if (planned.ageYears() != p.getAgeYears()) return false;
+        if (!eq(planned.gender(), p.getGender())) return false;
+        if (!eq(planned.marital(), p.getMarital())) return false;
+        if (!java.util.Objects.equals(planned.marriedYears(), p.getMarriedYears())) return false;
+        if (planned.hasKids() != p.isHasKids()) return false;
+        if (!eq(planned.jobType(), p.getJobType())) return false;
+        if (!eq(planned.tier(), p.getTier())) return false;
+        if (planned.jobField() != null && !planned.jobField().equals(p.getJobField())) return false;
+        if (planned.voiceType() != null && !planned.voiceType().equals(voiceTypeOf(p))) return false;
+        return planned.styleAxes() == null || planned.styleAxes().equals(p.getStyleAxes());
+    }
+
+    private static boolean eq(String a, String b) { return a == null ? b == null : a.equals(b); }
+
     /** 일하지 않는 상태(재학·구직·무직·전업주부·육아휴직)에 현직 직함이 붙었는지 본다. */
     private static String checkJobTitleMatchesEmployment(Map<String, Object> resp,
                                                         PersonaQuotaPlanner.IdentityAxes axes) {

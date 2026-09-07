@@ -59,7 +59,8 @@ public class OutboundDraftGuard {
     private static final List<Rule> CHAIN = List.of(
         OutboundDraftGuard::tooLong,
         OutboundDraftGuard::laughSpam,
-        OutboundDraftGuard::echo
+        OutboundDraftGuard::echo,
+        OutboundDraftGuard::habitEcho
     );
 
     public Optional<String> firstViolation(String body, List<String> peerReplies) {
@@ -113,6 +114,18 @@ public class OutboundDraftGuard {
         int len = body.length();
         if (len > 0 && laugh >= len * config.laughRatio()) {
             return "LAUGH_SPAM";
+        }
+        return null;
+    }
+
+    /**
+     * Persona seed lists {@code 힘빠지긴 할듯} as a tired-day habit. Haiku generalizes
+     * that into {@code [관찰]이긴 할듯} (e.g. 미친놈이긴 할듯) on unrelated posts.
+     */
+    static String habitEcho(String body, List<String> peerReplies, Config config) {
+        String compact = compact(body);
+        if (compact.contains("이긴할듯") && !compact.contains("힘빠지긴할듯")) {
+            return "HABIT_ECHO";
         }
         return null;
     }

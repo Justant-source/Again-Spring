@@ -1,6 +1,6 @@
 ---
 title: Justant-Bot — X 선댓글·대댓글·의식·원글·페르소나 학습
-last_updated: 2026-09-02
+last_updated: 2026-09-07
 ---
 
 # Justant-Bot — X 성장 루프
@@ -106,7 +106,7 @@ flowchart TD
 - `hasPhoto`인데 `photoJpegBase64` 없음 → `VISION_FAIL`. AS는 x.com CDN을 직접 받지 않음(ASM Playwright JPEG, 첫 장·긴 변 ~768).
 - 작문: `composeOutbound` — 프롬프트 + persona JSON + TIMELINE few-shot + DELETED_AUTO avoid + 선택 JPEG(`LlmImage`) + `peerReplies` 최대 10.
 - 자신 없으면 게시하지 않음 (`UNSURE`). ㅋㅋ로 채우지 않음.
-- 가드 `OutboundDraftGuard` + `marketing.x.outbound_guards`: `TOO_LONG`(기본 비공백 40자, 최대 2줄) / `LAUGH_SPAM` / `ECHO` / `LANG_MISMATCH`.
+- 가드 `OutboundDraftGuard` + `marketing.x.outbound_guards`: `TOO_LONG`(기본 비공백 40자, 최대 2줄) / `LAUGH_SPAM` / `ECHO` / `HABIT_ECHO`(`힘빠지긴 할듯`이 아닌 `~이긴 할듯` 템플릿, 예: 미친놈이긴 할듯) / `LANG_MISMATCH`.
 - 안전: LLM 오류 시그니처(`docs/shared/policies/llm-error-signatures.json`). 오류 문자열은 본문으로 게시 금지. 표현 denylist는 없다.
 - 게시: ASM `POST /api/v1/x/publish`. 성공 시 Telegram (`XOpsTelegramAlerts.posted`).
 

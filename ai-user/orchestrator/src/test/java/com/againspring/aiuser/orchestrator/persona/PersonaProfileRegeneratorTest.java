@@ -84,10 +84,19 @@ class PersonaProfileRegeneratorTest {
      * 셋이 다 맞아야 재개가 건너뛴다 — 축이 계획과 어긋나면 프로필 본문과 짝이 안 맞는다.
      */
     private static Persona donePersona(String id) {
-        Persona p = persona(id, Map.of("speech", "BANMAL"),
+        // axes()와 모든 축이 일치해야 재개가 건너뛴다 — 하나라도 다르면 프로필 본문과
+        // 짝이 안 맞으므로 다시 만들어야 한다.
+        Persona p = persona(id, Map.of("speech", "BANMAL", "emoticon", "LOW", "profanity", "NONE"),
                 Map.of(PersonaProfileRegenerator.PROFILE_REV_KEY, PersonaProfileRegenerator.CURRENT_PROFILE_REV,
                         "voice_type", "NATEPAN"));
         p.setJobField("DEV");
+        p.setAgeYears(30);
+        p.setGender("F");
+        p.setMarital("SINGLE");
+        p.setMarriedYears(null);
+        p.setHasKids(false);
+        p.setJobType("CORP_LARGE");
+        p.setTier("REGULAR");
         return p;
     }
 

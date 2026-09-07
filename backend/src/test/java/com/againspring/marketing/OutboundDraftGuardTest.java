@@ -73,4 +73,19 @@ class OutboundDraftGuardTest {
         assertThat(guard.firstViolation("lmao that peeler", "this apple peeler is wild", List.of()))
             .isEmpty();
     }
+
+    @Test
+    void habitEcho_generalizedIginHaldutBlocked() {
+        assertThat(guard.firstViolation("9번 당한다니 미친놈이긴 할듯 ㅠㅠ", List.of()))
+            .contains("HABIT_ECHO");
+        assertThat(guard.firstViolation("30년을 모르고 산다니 미친놈이긴 할듯 ㅋㅋ", List.of()))
+            .contains("HABIT_ECHO");
+        assertThat(guard.firstViolation("미친놈이긴 할듯 ㅋㅋ", List.of()))
+            .contains("HABIT_ECHO");
+    }
+
+    @Test
+    void habitEcho_operatorTiredPhraseStillAllowed() {
+        assertThat(guard.firstViolation("퇴근하고와서 힘빠지긴 할듯", List.of())).isEmpty();
+    }
 }
