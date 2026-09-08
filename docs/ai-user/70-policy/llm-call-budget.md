@@ -99,7 +99,7 @@ Sonnet)은 **매 tick이 아니라 페르소나 1명당 평생 1회**(재생성 
   응답에 `processed`·`remaining`·`haltedReason`을 실어 진척을 볼 수 있다.
 - **완료 판정**: `style_axes IS NOT NULL` 같은 축 유무가 아니라 `voice_profile.profile_rev`
   마커(현재 값 `"v4"`)로 판정한다 — 트랜잭션 중단으로 축만 채워지고 감사가 유실된 페르소나가
-  "완료"로 오판되는 것을 막는다(§6 `docs/_active/persona-diversity-v4.md` 데이터 무결성 결함 참고).
+  "완료"로 오판되는 것을 막는다([history.md](../history.md) persona-diversity-v4 데이터 무결성 결함 참고).
   필수 11개 키 중 하나라도 응답에 없으면 `INCOMPLETE_PROFILE`로 실패 처리하고 마커를 찍지 않는다.
 
 ---

@@ -2,7 +2,7 @@
 
 > **권위본**: 이 문서 — **사연 스크린샷 체인** (`x_thread`). 선댓글·대댓글·의식·페르소나 학습은 [`justant-bot-x-ops.md`](justant-bot-x-ops.md).
 > 플랫폼 일반 사양은 [`platforms.md`](platforms.md), 발행기 운영은 [`social-poster.md`](../30-components.md) 참조.
-> **작성**: 2026-07-31 · 레퍼런스 실측 30건 기반
+> **작성**: 2026-07-31 · 레퍼런스 실측 30건 기반 · last_updated: 2026-09-09
 
 ---
 
@@ -121,9 +121,11 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 ### 2.1 캡처 사양
 
 모바일 뷰포트 `430×932`, `deviceScaleFactor: 3`, 로케일 `ko-KR`.
+출력 JPEG는 가로 상한 1290px(`430×3`), sharp `withoutEnlargement`(업스케일 없음), quality 90(이전 80).
+2026-08-14에 타일 버그를 피하려 `deviceScaleFactor`를 1로 내린 회귀가 있었고, 2026-09-09에 3으로 복구했다 — 직렬 context + MAE 타일 가드가 있으므로 DPR을 다시 낮추지 않는다.
 캡처 전 상단 베타 배너(`베타 서비스 —`로 시작하고 높이 80px 미만인 요소)를 `display:none` 처리한다.
 
-**동시성 (2026-08-10)**: 작성자 본문 · 상대방 본문 · 상세(댓글/비율) 캡처는 **각각 별도 Playwright browser context**에서 **직렬** 실행한다. 동일 context에서 `Promise.all` 병렬 + `deviceScaleFactor:3`이면 파트너 본문 JPEG가 가로로 같은 띠가 반복되는(세로 3등분) 깨짐이 간헐 재현됐다. 본문 JPEG는 가로 self-similarity 가드로 한 번 재시도한다. 가드는 **mid-band MAE + 같은 period의 full-frame MAE**가 둘 다 낮을 때만 타일로 판정한다(2026-08-14) — 짧은 중간 장(피치 여백)의 mid-only 오탐을 막기 위함.
+**동시성 (2026-08-10)**: 작성자 본문 · 상대방 본문 · 상세(댓글/비율) 캡처는 **각각 별도 Playwright browser context**에서 **직렬** 실행한다. 동일 context에서 `Promise.all` 병렬 + `deviceScaleFactor:3`이면 파트너 본문 JPEG가 가로로 같은 띠가 반복되는(세로 3등분) 깨짐이 간헐 재현됐다. 본문 JPEG는 가로 self-similarity 가드로 한 번 재시도한다. 가드는 **mid-band MAE + 같은 period의 full-frame MAE**가 둘 다 낮을 때만 타일로 판정한다(2026-08-14) — 짧은 중간 장(피치 여백)의 mid-only 오탐을 막기 위함. 타일 가드는 DPR 3과 함께 유지한다(DPR을 1로 내리는 우회는 폐기).
 
 **컷 지점 (2026-08-04~)** — 의미 단락(개행 블록) · 장당 최대 8:
 

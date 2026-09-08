@@ -42,7 +42,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
   성별·결혼·자녀·직업 축과 `style_axes`(10개 문체 축)가 추가되고, 프롬프트는 `voiceProfile`
   전체 JSON 대신 400자 `PersonaCard`를 쓴다. 작성자·댓글자 선택은 `tierW × (1 +
   hoursSinceLast/24)^1.5` 가중 비복원 추첨으로 바뀐다. 150명 쿼터·게이트 검증 상세:
-  `docs/_active/persona-diversity-v4.md`.
+  [persona-identity-contract.md](30-components/persona-identity-contract.md).
 - **크롤 원문 커뮤니티명 정규화 (2026-08-14)**: 외부 크롤의 제목·본문은 `example_bank` 적재 전 특정 커뮤니티명(예: 네이트판·블라인드)을 `온라인/인터넷 커뮤니티` 등 범용 표현으로 바꾼다. 내부 provenance인 `source`·`source_url`은 유지한다. 기존 데이터·연결된 재구성 글은 prod SoT를 읽기 전용으로 확인하는 `ai-user/tools/sanitize_crawled_community_references.py` dry-run 후 정리한다.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)
@@ -50,7 +50,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 | Wave | 내용 | 진입 문서 |
 |---|---|---|
 | WP1 / WP1B | 코퍼스·register를 **NATEPAN/BLIND**로 단일화, 인기 앵커 voice 정화 | [history.md](history.md), [learning.md](30-components/learning.md) |
-| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) — **2026-09 persona-diversity-v4로 폐기됨**(`PersonaCapsuleSearchService`·`PersonaMatcherService`·`engine/PersonaSelector`·`service/match/**`·`service/capsule/**`·`PersonaAutoProvisionService` 코드에서 삭제 완료, 신규 정체성 축·`PersonaCard`·`PersonaLottery`로 대체, 상세: `docs/_active/persona-diversity-v4.md`) |
+| WP2 | Persona v3 slim facts · semantic capsules · LLM-free search | [architecture.md](30-components/architecture.md), [orchestrator.md](30-components/orchestrator.md) — **2026-09 persona-diversity-v4로 폐기됨**(`PersonaCapsuleSearchService`·`PersonaMatcherService`·`engine/PersonaSelector`·`service/match/**`·`service/capsule/**`·`PersonaAutoProvisionService` 코드에서 삭제 완료, 신규 정체성 축·`PersonaCard`·`PersonaLottery`로 대체, 상세: [history.md](history.md)) |
 | WP3 | `StoryProfile` matcher · 최소형 auto-persona | [orchestrator.md](30-components/orchestrator.md), [operations.md](60-runtime/operations.md) — **2026-09 persona-diversity-v4로 폐기됨**(선택 알고리즘이 `PersonaLottery` 가중 비복원 추첨으로 교체 완료) |
 | WP4 | micro-batch(4~6) 생성 · `parsePlan` 하한 이동 · `ThreadQualityGate` READY | [thread-planning.md](60-runtime/thread-planning.md), [llm.md](30-components/llm.md) |
 | WP5 | human reply 0~3 responders · 예산 · idempotency · 관심 pool · `hr_*` admin SSOT | [thread-planning.md](60-runtime/thread-planning.md) |

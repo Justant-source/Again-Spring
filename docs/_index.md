@@ -109,7 +109,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 
 등급: **M**=필수 · **C**=조건부.
 
-> persona-diversity-v4(`docs/_active/persona-diversity-v4.md`) 신규 클래스(`PersonaLottery`·
+> persona-diversity-v4 신규 클래스(`PersonaLottery`·
 > `CategoryMixPlanner`·`SourceOverlapGuard`·`PersonaQuotaPlanner`·`PersonaCard`·
 > `PersonaProfileRegenerator`·`PersonaRelationshipFiller` 등, 전부 `ai-user/orchestrator/`
 > 하위)는 이미 규칙 #12(`ai-user/orchestrator/**`)에 포함되므로 별도 glob을 추가하지 않는다 —
@@ -119,7 +119,7 @@ history/README로 핵심을 요약 승격한 뒤 `_active/`에서 그 파일을 
 > 이 트랙의 신원 축·쿼터·문체 축·`PersonaCard`·카테고리 비율·추첨 가중치·소스 골격 JSON 계약
 > 원문은 원래 gitignore 대상 작업 지시 경로에만 있었으나
 > `docs/ai-user/30-components/persona-identity-contract.md`로 승격돼 트랙 완료 여부와 무관하게
-> 남는다 — `docs/_active/persona-diversity-v4.md`는 트랙 완료 시 삭제되지만 이 문서는 남는다.
+> 남는다 — 트랙 진행 문서는 완료 후 삭제됐고 계약·이력은 이 두 문서가 보존한다.
 
 ## §6. Code → Docs 역인덱스
 

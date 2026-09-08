@@ -228,7 +228,7 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
   바뀌었다(아래 § `lexicon`/`general_style`은 이제 오케스트레이터 전용 참고 — 애초 계획했던
   "문체 필드만 남기고 신원 축만 제외"보다 범위가 넓다). 표절 방어 `services/ngram_guard.py`
   (위 §)와 동일한 n-gram 겹침 로직이 orchestrator 쪽에도 Java로 포팅되어
-  (`SourceOverlapGuard`, `docs/_active/persona-diversity-v4.md` §6) 런타임 생성 단계에서도
+  (`SourceOverlapGuard`, [history.md](../history.md) persona-diversity-v4) 런타임 생성 단계에서도
   검사한다 — 이 문서의 Python 구현과 Java 포팅본은 별도 유지보수 대상이다.
 
 ### `lexicon`/`general_style`은 이제 오케스트레이터 전용 (persona-diversity-v4 / WP1, 2026-09-05)

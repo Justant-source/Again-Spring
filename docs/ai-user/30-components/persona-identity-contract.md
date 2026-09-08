@@ -7,7 +7,7 @@ last_updated: 2026-09-05
 
 > 이 문서는 `persona-diversity-v4` 트랙(WP1~WP4)의 원 작업 지시 문서(gitignore 대상 경로에만 있어
 > 유실 가능했던 WP 공용 계약 파일)에 담겼던 계약 1~7의 **git 추적 권위본**이다. 트랙 진행 상태·Phase 4
-> prod 배포 절차는 `docs/_active/persona-diversity-v4.md`(트랙 완료 시 삭제 예정)를 보고, 이 문서는
+> 트랙 경위와 배포 이력은 [history.md](../history.md)를 보고, 이 문서는
 > 트랙 완료 여부와 무관하게 남는 **기술 계약 레퍼런스**다. 코드가 SSOT이며 이 문서와 어긋나면 코드를
 > 믿는다 — 갱신은 `ai-user/orchestrator/**` Doc-Sync 규칙(`docs/_index.md` §5 #12)을 따른다.
 >

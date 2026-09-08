@@ -26,9 +26,9 @@
 
 ## persona-diversity-v4 — 소스 골격·카테고리 비율·캐스트 추첨 (WP1~WP4 병합 완료, 2026-09-05)
 
-상세 계약: `docs/_active/persona-diversity-v4.md`. WP1~WP4는 commit `81ba5dc9`에서 병합됐고,
+상세 계약: [persona-identity-contract.md](../30-components/persona-identity-contract.md). WP1~WP4는 commit `81ba5dc9`에서 병합됐고,
 병합 후 감사에서 나온 결함(계약 위반 3건·미배선 3건·데이터 무결성 2건·게이트 집계 2건)도
-모두 수정됐다(§6 defect 목록은 `docs/_active/persona-diversity-v4.md` §6 참고). 아래는
+모두 수정됐다(결함 목록은 [history.md](../history.md) 참고). 아래는
 현재 코드 기준 실제 클래스명·경로다.
 
 - **소스 골격 추출**: claim source(크롤 원문)를 그대로 프롬프트에 넣지 않고, `llm-ai-user`

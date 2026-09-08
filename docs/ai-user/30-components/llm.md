@@ -29,7 +29,7 @@
 > `PersonaCard.render(Persona)` 출력, 계약 4)를 쓴다. `voiceProfile` 필드 자체는 레거시 호환용으로
 > DTO에 남아 있고, `personaCard`가 비어 있을 때만 `PersonaCardFallback`이 거기서 5개 필드만
 > 축약해 쓴다(폴백 발동 시 경고 로그 — 신원축 marital/job_type/style_axes는 복원 못 함). 상세:
-> `docs/_active/persona-diversity-v4.md`.
+> [persona-identity-contract.md](persona-identity-contract.md).
 
 ## PLAN 모드 bridge
 

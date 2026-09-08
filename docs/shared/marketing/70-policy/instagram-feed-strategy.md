@@ -3,7 +3,7 @@
 > **권위본**: 이 문서. `instagram_feed` 채널의 콘텐츠 포맷·캡션·구현 위치 결정을 담는다.
 > 플랫폼 일반 사양은 [`platforms.md`](platforms.md), X 캡처 소스는 [`x-thread-strategy.md`](x-thread-strategy.md),
 > 발행기 운영은 [`social-poster.md`](../30-components.md) 참조.
-> **작성**: 2026-08-02 · 레퍼런스 `@issue_archive` / `@salonbleuciel` / `@knowing_sister` + 그릴링 확정
+> **작성**: 2026-08-02 · 레퍼런스 `@issue_archive` / `@salonbleuciel` / `@knowing_sister` + 그릴링 확정 · last_updated: 2026-09-09
 
 ---
 
@@ -27,7 +27,7 @@
 
 ### 2.1 장수·순서
 
-X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**).
+X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**). 공유 캡처 파이프(권위: [`x-thread-strategy.md`](x-thread-strategy.md) §2.1): 뷰포트 `430×932` · `deviceScaleFactor: 3` · `ko-KR` · JPEG 가로 상한 1290 · sharp `withoutEnlargement` · quality 90 · author/partner/detail는 직렬 별도 context. 2026-08-14에 타일 버그를 피하려 DPR을 1로 내린 회귀가 있었고, 2026-09-09에 3으로 복구했다 — 직렬 context + MAE 타일 가드가 있으므로 DPR을 다시 낮추지 않는다.
 
 | IG | 솔로 짧은 | 솔로 긴(N장) | 양면 |
 |---|---|---|---|
@@ -136,7 +136,7 @@ X `/capture/x-thread` 산출물 기준 (X의 `ratio` 스크린샷은 **폐기**)
 | 전략 문서 | 이 파일 |
 | AS 필드·생성 | `Post` 훅 필드(`promoTitle`/`hook*`) · `PromoTitleService` 또는 동등 · compose/PLAN |
 | ASM 빌더 | `app/worker/pipeline.py` → `_run_instagram_feed_pipeline` |
-| 캡처 소스 | ASM `services/social-poster` `POST /capture/x-thread` (X와 공유) |
+| 캡처 소스 | ASM `services/social-poster` `POST /capture/x-thread` (X와 공유, DPR 3·JPEG 1290/q90) |
 | 발행 | ASM social-poster `POST /publish/instagram` (단건 수동) |
 
 구 7장 카드뉴스(`COVER→SCENE→SIDE_A…`)는 `instagram_feed`에서 **사용하지 않는다**.

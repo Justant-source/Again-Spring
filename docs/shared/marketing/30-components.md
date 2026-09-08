@@ -49,7 +49,7 @@ services/social-poster/
 
 ### POST /capture/x-thread
 
-광장 사연·댓글·비율을 JPEG로 캡처한다. X·IG 파이프가 공유한다.
+광장 사연·댓글·비율을 JPEG로 캡처한다. X·IG 파이프가 공유한다. 뷰포트 `430×932` · `deviceScaleFactor: 3` · `ko-KR`. 출력 가로 상한 1290px(`430×3`), sharp `withoutEnlargement`, JPEG quality 90. 2026-08-14에 타일 버그를 피하려 DPR을 1로 내린 회귀가 있었고, 2026-09-09에 3으로 복구했다 — 직렬 context + MAE 타일 가드가 있으므로 DPR을 다시 낮추지 않는다.
 
 ```json
 {
@@ -61,7 +61,7 @@ services/social-poster/
 
 - 기본(X): 댓글 **최대 4장 고정**.
 - `commentsReadableBudget: true`(IG만): 누적 crop 높이 ≤530 CSS가 되도록 상위 N(1~4)만 자름 — 상세 [`instagram-feed-strategy.md`](70-policy/instagram-feed-strategy.md) §2.1.2.
-- **동시성**: author / partner / detail 캡처는 별도 browser context · 직렬. 동일 context 병렬은 파트너 본문 가로 타일 깨짐을 유발할 수 있음(2026-08-10 수정). 본문 JPEG 가로 self-similarity 가드(mid-band + full-frame MAE, 2026-08-14) + 1회 재시도.
+- **동시성**: author / partner / detail 캡처는 별도 browser context · 직렬. 동일 context 병렬은 파트너 본문 가로 타일 깨짐을 유발할 수 있음(2026-08-10 수정). 본문 JPEG 가로 self-similarity 가드(mid-band + full-frame MAE, 2026-08-14) + 1회 재시도. 비율 카드는 `RATIO_SAFE_ASPECT` 1.91 + `RATIO_SIDE_PADDING_CSS` 32.
 
 ### POST /publish/x
 
