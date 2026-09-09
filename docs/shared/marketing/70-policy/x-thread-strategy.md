@@ -55,7 +55,7 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 
 ## 2. 확정 사양 — 가변 체인 (솔로 3~4단 / 양면 최대 6단, 2026-08-04 갱신 · Phase 1 훅 계약)
 
-메인 트윗 텍스트 = **마스터 훅** (`hook_text` / 재정의 `promo_title`). 광장 `title` 낭독·복제 아님 (Phase 1).
+메인 트윗 텍스트 = **광장 `title`** (한 줄). `promo_title`은 IG 훅 카드용(줄당 ≤10자 패킹)이라 개행을 공백으로 이어 붙이면 띄어쓰기가 깨진다(2026-09-09 실측: `앞접\n시만` → `앞접 시만`). 광장 제목이 비면 그때만 평탄화 훅 폴백. IG 카드·캡션의 마스터 훅은 그대로 `promo_title`.
 사연 링크는 **첫 답글**(`steps[1]`)에 붙인다(2026-08-29 갱신 — §2.3). 그 외 트윗(reply)은 텍스트 없이
 이미지 단독. 이미지는 다시봄 실제 화면의 무보정 캡처.
 해시태그(브랜드 2만): 메인 또는 체인 말미에 `#다시봄` `#againspring` — 카테고리 태그 없음 ([`platforms.md`](platforms.md)).
@@ -259,7 +259,7 @@ publication을 `PENDING`으로 되돌린 뒤 **5분 후** 처음부터 재시도
 BE(Again-Spring)의 24시간 트리거 + 마케팅 잡 생성(플랫폼 `"x_thread"` / `"instagram_feed"` 각각 alone),
 ASM(Again-Spring-Marketing, WSL)의 Playwright 캡처+슬라이스 및 순차 답글 발행 — 둘 다 구현 완료,
 prod에서 자동 발행 중(2026-08-02 기준). 짧은 사연 3단/긴 사연 4단 분기, 컷 지점 로직,
-메인 트윗 텍스트는 §2(Phase 1 = **마스터 훅**)·§6·§7 참고.
+메인 트윗 텍스트는 §2(광장 `title`)·§6·§7 참고.
 **실발행은 렌더 READY 즉시**(커밋≠publish 시계 슬롯 없음) — [`platforms.md`](platforms.md).
 **구현 세부사항은 이 문서가 아닌 실제 코드(BE 잡 생성 로직, ASM 발행 서비스)에서 확인하십시오.**
 
@@ -335,7 +335,7 @@ Spring의 기본값(`${ASM_X_THREAD_PUBLISH_TRIGGER_ENABLED:false}`)으로 조�
 - 공감 비율 막대 좌우 여백(`RATIO_SIDE_PADDING_CSS`) 추가
 - **메인 트윗에 사연 제목을 텍스트로 추가**(2026-08-02 결정, 그 전까지 전 구간 이미지 단독) —
   `upload.json`의 `title` 필드(BE의 `MarketingJob` brief에서 옴)를 메인 스텝 텍스트로 사용.
-  **Phase 1 계약**: 메인 텍스트는 **마스터 훅**으로 교체(광장 `title` 아님). brief `hook`/`promo_title` 경로.
+  **2026-09-09**: 메인 텍스트는 다시 **광장 `title`**. IG 패킹 `promo_title`을 개행→공백으로 붙이면 한국어 띄어쓰기가 깨져 훅 경로를 폐기. 코드: ASM `linear_plaza_title` (`ig_feed_pipeline.py`) · `pipeline.py` · `comment_notify._story_label`.
 
 **정리**: job146·147·153의 기존 오발행 트윗(각 3~4개, 총 12개)을 삭제 후 새 코드로 재발행.
 삭제 라우트(`publish/x/delete`)·존재 확인 라우트(`publish/x/check`)를 이 작업을 위해 새로 추가함 —
