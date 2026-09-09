@@ -478,7 +478,8 @@ public class MarketingJobService {
         return failureCode != null && (failureCode.startsWith("SIBOM_")
             || failureCode.startsWith("VARIANT_")
             || failureCode.startsWith("DURATION_")
-            || failureCode.startsWith("LAYOUT_"));
+            || failureCode.startsWith("LAYOUT_")
+            || "INFRA_IMPORT_ERROR".equals(failureCode));
     }
 
     /**
