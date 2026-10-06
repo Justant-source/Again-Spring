@@ -2,7 +2,7 @@
 
 **작성일**: 2026-08-12
 **작성자**: Claude Code (Claude Design 세션 기반)
-**상태**: **2/2 배치 완료(60/60장), 배포됨**(2026-08-21, §10). 매칭 실측 기반 키워드 전면 재설계 포함 — 코퍼스 커버리지 5%→99.2%. 경위: `docs/_active/sibom-character.md`
+**상태**: **2/2 배치 완료(60/60장), 배포됨**(2026-08-21, §10). 매칭 실측 기반 키워드 전면 재설계 포함 — 코퍼스 커버리지 5%→99.2%. 자산 위치는 이 폴더(`docs/frontend/assets/sprout-character-system/`).
 **목적**: 컨텍스트가 완전히 초기화돼도 이 폴더 하나만으로 작업을 그대로 이어갈 수 있게 한다.
 
 > ⚠️ 이 문서는 **`docs/frontend/design/specs/metaphor-illustration-system.md`(기존 60종 사물 메타포)를 대체하지 않는다.**
@@ -15,14 +15,14 @@
 - **무엇을 만드는가**: 다시봄 Shorts 영상(WaggleBot 파이프라인)에 쓸 자체 캐릭터 "시봄이" 일러스트 60장. 카카오 이모티콘 문법(단일 캐릭터 + 과장된 리액션 + 짧은 상황 라벨)을 차용하되 그림은 100% 자체 제작.
 - **왜 새로 만드는가**: 기존 사물 은유 60종(`metaphor-illustration-system.md`)은 prod 실사용률 17%(332건 중 57건)로 사실상 실패했다. 원인은 ① 은유가 너무 추상적이고 ② 카테고리(연인/친구/직장/가족)로 쪼개져 같은 감정을 5번씩 그려 커버리지가 얇았고 ③ AI-user가 사연 작성 시점에 메타포를 고르는데 대본 LLM은 그 선택을 참고하지 않아 미스매치가 났기 때문. 이 세 문제를 전부 설계로 풀었다(§2 결정 로그 참고).
 - **지금 어디까지 됐는가**: 60/60장 완성. 그림체 리파인(§9) → 모션 배선(WaggleBot `layout.py`, 완료) → **2배치 31~60장 + 매칭 실측 재설계 완료·5곳 배포**(2026-08-21, §10). 코퍼스 실측 커버리지 5%→99.2%.
-- **다음에 할 일**: 없음(60/60 완료). Claude Design 게시(§6)와 커밋만 남음 — 진행 상황은 `docs/_active/sibom-character.md` 참고. §7 체크리스트는 1배치 시절 기준이라 낡았다.
+- **다음에 할 일**: 없음(60/60 완료). §7 체크리스트는 1배치 시절 기준이라 낡았다.
 
 ---
 
 ## 1. 이 폴더의 파일
 
 ```
-docs/frontend/design/specs/sprout-character-system/
+docs/frontend/assets/sprout-character-system/
 ├── README.md          # 이 문서
 ├── catalog.json        # 30장 메타데이터 SSOT (사연→영상 매칭용, §4 참고)
 ├── gen.py               # SVG 생성기 — 부품 조립식 (몸통·팔·눈·입·소품을 함수로 분리)
@@ -222,10 +222,10 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 
 컨텍스트가 없는 상태에서 이 작업을 재개하라는 요청을 받으면:
 
-> ⚠️ 2026-08-20 갱신: 아래 2·3번(30장 리뷰 확인 → 31–60장 설계)은 **이미 지나간 단계다.** 30장 리뷰는 완료됐고, 사용자 판단은 "장수를 늘리기 전에 그림체·모션부터"였다. **31–60장은 보류 상태**이며 현행 우선순위는 `docs/_active/sibom-character.md` 를 따른다.
+> ⚠️ 2026-08-20에 적힌 2·3번(30장 리뷰 → 31–60장 설계)은 지나간 단계다. 60/60은 §10에서 완료됐다. 이 체크리스트는 당시 기록이다.
 
 1. 이 README를 처음부터 읽는다 (§0 요약 → §2 결정 로그 순).
-2. ~~사용자에게 "30장 리뷰를 마쳤는지" 확인~~ → 완료(2026-08-20 승인). 대신 **§9 리파인 로그**와 `docs/_active/sibom-character.md` 를 읽는다.
+2. ~~사용자에게 "30장 리뷰를 마쳤는지" 확인~~ → 완료(2026-08-20 승인). 그림체 변경 기록은 §9.
 3. 안 읽히는 이미지 피드백이 없으면: §4.3 "알려진 갭"부터 메운다(각 `sibling_bottom: null` 항목에 대응하는 `bottom` 프리셋 형제 이미지 10장 정도를 우선 설계 후보로 제안).
 4. `gen.py`를 이 폴더에서 로컬 스크래치패드로 복사해 이어서 실행(원본은 이 폴더에 남기고, 작업은 스크래치패드에서).
 5. 31–60번 완성되면 §6.2 런타임 이관 계획을 순서대로 실행 — **사용자의 명시적 승인 없이 WSL/WaggleBot 리포에 파일을 쓰거나 AS의 `metaphor_id` 관련 코드를 수정하지 말 것.** 이 문서는 계획이지 실행 허가가 아니다.
@@ -242,8 +242,6 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 ---
 
 ## 9. 그림체 리파인 1차 (2026-08-20 · 배포 완료)
-
-계획·경위 권위본: `docs/_active/sibom-character.md`
 
 ### 왜 했나
 사용자 피드백 "귀엽긴 한데 확 끌리는 매력은 없다". 원인을 눈 12종 전수 렌더로 특정했다:
@@ -289,8 +287,6 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 
 ## 10. 2배치(31~60) — 매칭 실측 기반 재설계 (2026-08-21 · 배포 완료)
 
-계획·실측 근거 권위본: `docs/_active/sibom-character.md`
-
 ### 착수 전 실측이 뒤집은 것
 
 31~60장을 그리기 전, "그림 커버리지가 아니라 **매칭이 실제로 동작하는지**"부터 실측했다. 코드(`SibomCandidateService.java`)를 읽어보니 이미지 선택은 **순수 부분문자열 검사**(`text.contains(keyword)`, 형태소 분석 전혀 없음)였다. prod 사연 265건에 당시(1배치) keywords를 그대로 돌리자 **252건(95%)에서 후보 0개**였다 — 조사·어미가 붙은 문장형 키워드(`"말을 안 한 지"`)가 실제 사연 문장과 거의 일치하지 않았기 때문. soft_fill 풀 7개가 항상 최소조건을 채워줘서 발행은 안 막혔지만, **265건 중 252건이 조용히 범용 7장으로만 영상이 만들어지는 상태**였다(에러 없음).
@@ -325,7 +321,7 @@ Claude Design에 올린 리뷰 페이지(`.dc.html`)만 파일 크기 때문에 
 
 지금까지 "3곳 동기화"(AS SSOT·WSL 런타임·WSL 생성기)로 충분한 줄 알았는데, **AS 백엔드가 실제 매칭에 쓰는 catalog는 이 중 어디도 아니었다.** `SibomCatalog.java`가 읽는 경로는 `ClassPathResource("sibom/catalog.json")` — 즉 **`backend/src/main/resources/sibom/catalog.json`** (별도 빌드 리소스 사본). 이 사본이 1배치 키워드 교체 이전 상태로 굳어 있었다 — **동기화가 안 됐으면 이번 매칭 개선 전체가 실제 운영에 반영되지 않을 뻔했다.**
 
-→ **동기화 대상은 5곳**: AS SSOT(`docs/frontend/design/specs/sprout-character-system/catalog.json`) · **AS 백엔드 리소스**(`backend/src/main/resources/sibom/catalog.json`) · WSL 런타임(`assets/sprouts/catalog.json`) · WSL 생성기 2곳(`assets/sprouts_design/catalog.json`, `assets/sprouts_design/svg/catalog.json`). 백엔드 리소스는 `JsonNode` 트리로 느슨하게 파싱해서 WaggleBot 전용 필드(`motion`·`leaf_rule`·`motion_kinds`)가 섞여 있어도 무해하다 — 5곳 전부 **동일 파일**을 그대로 복사하면 된다.
+→ **동기화 대상은 5곳**: AS SSOT(`docs/frontend/assets/sprout-character-system/catalog.json`) · **AS 백엔드 리소스**(`backend/src/main/resources/sibom/catalog.json`) · WSL 런타임(`assets/sprouts/catalog.json`) · WSL 생성기 2곳(`assets/sprouts_design/catalog.json`, `assets/sprouts_design/svg/catalog.json`). 백엔드 리소스는 `JsonNode` 트리로 느슨하게 파싱해서 WaggleBot 전용 필드(`motion`·`leaf_rule`·`motion_kinds`)가 섞여 있어도 무해하다 — 5곳 전부 **동일 파일**을 그대로 복사하면 된다.
 
 ### 검증
 

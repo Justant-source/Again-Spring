@@ -3,7 +3,6 @@ package com.againspring.marketing;
 import com.againspring.domain.ai.SystemSetting;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.repository.ai.SystemSettingRepository;
-import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,13 +67,8 @@ public class MarketingQuotaService {
     private static final int QUOTA_WINDOW_HOURS = 24;
 
     private final SystemSettingRepository systemSettingRepository;
-    private final MarketingHoldingRepository holdingRepository;
     private final MarketingJobRepository jobRepository;
     private final ObjectMapper objectMapper;
-
-    /** @deprecated Phase 1 shape. */
-    @Deprecated
-    public record Caps(int dailyTextCap, int dailyVideoCap) {}
 
     public record PlatformCap(String platform, int cap, long usedToday, long remaining) {}
 
@@ -138,11 +132,6 @@ public class MarketingQuotaService {
                 Map.of(),
                 Map.of());
         }
-    }
-
-    public Caps getCaps() {
-        PlatformCaps p = getPlatformCaps();
-        return new Caps(p.xThread() + p.instagramFeed(), p.instagramReels() + p.youtubeShorts());
     }
 
     public PlatformCaps getPlatformCaps() {

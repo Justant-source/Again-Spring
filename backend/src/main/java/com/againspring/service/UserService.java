@@ -1,17 +1,13 @@
 package com.againspring.service;
 
 import com.againspring.api.dto.request.DeleteAccountRequest;
-import com.againspring.api.dto.request.OnboardingRequest;
 import com.againspring.api.dto.request.UpdateUserRequest;
-import com.againspring.api.dto.response.OnboardingResponse;
 import com.againspring.api.dto.response.UserResponse;
 import com.againspring.common.exception.BusinessException;
 import com.againspring.domain.User;
 import com.againspring.repository.EmailVerificationRepository;
 import com.againspring.repository.UserRepository;
-import com.againspring.service.StyleCalculator.CommunicationStyle;
 import java.time.Instant;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * User service for profile management and onboarding.
+ * User service for profile management.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final StyleCalculator styleCalculator;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerificationRepository emailVerificationRepository;
 
@@ -85,82 +80,6 @@ public class UserService {
         log.info("User profile updated: {}", userId);
 
         return mapToUserResponse(updated);
-    }
-
-
-    /**
-     * Complete onboarding: save 10 answers and calculate communication style.
-     *
-     * @param userId the user ID
-     * @param request onboarding request
-     * @return onboarding response with style info
-     * @throws BusinessException if user not found or invalid answers
-     */
-    public OnboardingResponse completeOnboarding(String userId, OnboardingRequest request) {
-        User user = userRepository
-                .findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
-
-        // MBTI path: communicationStyle provided directly (no answers required)
-        if (request.getAnswers() == null && request.getCommunicationStyle() != null) {
-            user.setCommunicationStyle(request.getCommunicationStyle());
-            if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
-            if (request.getMbtiProfile() != null) user.setMbtiProfile(request.getMbtiProfile());
-            user.setOnboardingCompletedAt(Instant.now());
-            user.setUpdatedAt(Instant.now());
-            userRepository.save(user);
-            log.info("Onboarding completed via MBTI for user: {}", userId);
-
-            CommunicationStyle style;
-            try {
-                style = CommunicationStyle.valueOf(request.getCommunicationStyle().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException("ONBOARDING_INVALID_STYLE", "올바르지 않은 소통 스타일이에요: " + request.getCommunicationStyle());
-            }
-            return OnboardingResponse.builder()
-                    .communicationStyle(style.getValue())
-                    .styleInfo(OnboardingResponse.StyleInfo.builder()
-                            .emoji(style.getEmoji())
-                            .label(style.getLabel())
-                            .description(style.getDescription())
-                            .strengths(style.getStrengths())
-                            .caution(style.getCaution())
-                            .build())
-                    .build();
-        }
-
-        // 10-question path
-        if (request.getAnswers() == null) {
-            throw new BusinessException("ONBOARDING_INVALID_ANSWERS", "답변 또는 소통 스타일 중 하나를 입력해주세요.");
-        }
-
-        try {
-            CommunicationStyle style = styleCalculator.calculateStyle(request.getAnswers());
-
-            user.setOnboardingAnswers(request.getAnswers());
-            user.setCommunicationStyle(style.getValue());
-            if (request.getMbtiType() != null) user.setMbtiType(request.getMbtiType());
-            if (request.getMbtiProfile() != null) user.setMbtiProfile(request.getMbtiProfile());
-            user.setOnboardingCompletedAt(Instant.now());
-            user.setUpdatedAt(Instant.now());
-
-            userRepository.save(user);
-            log.info("Onboarding completed for user: {}", userId);
-
-            return OnboardingResponse.builder()
-                    .communicationStyle(style.getValue())
-                    .styleInfo(OnboardingResponse.StyleInfo.builder()
-                            .emoji(style.getEmoji())
-                            .label(style.getLabel())
-                            .description(style.getDescription())
-                            .strengths(style.getStrengths())
-                            .caution(style.getCaution())
-                            .build())
-                    .build();
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(
-                    "ONBOARDING_INVALID_ANSWERS", "Invalid onboarding answers: " + e.getMessage());
-        }
     }
 
     /**
@@ -246,15 +165,6 @@ public class UserService {
         User saved = userRepository.save(user);
         log.info("Password changed for user {}", saved.getId());
         return mapToUserResponse(saved);
-    }
-
-    public void completeTutorial(String userId) {
-        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "사용자를 찾을 수 없어요."));
-        if (user.getTutorialCompletedAt() == null) {
-            user.setTutorialCompletedAt(Instant.now());
-            userRepository.save(user);
-        }
     }
 
     private UserResponse mapToUserResponse(User user) {

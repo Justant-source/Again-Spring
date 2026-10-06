@@ -43,7 +43,7 @@ class ClaudeCliInvokerTest {
 
     @Test
     void llmStatsLoggerWithFailure() {
-        String stats = new LlmStatsLogger("INVOKE", "claude-sonnet-4-6", "fail-id")
+        String stats = new LlmStatsLogger("INVOKE", "claude-sonnet-5-5", "fail-id")
             .attempt(2)
             .retryReason("TIMEOUT")
             .tokens(500, 0)

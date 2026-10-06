@@ -569,8 +569,6 @@ class MarketingJobServiceTest {
         assertThat(req.getBrief().getMaxDurationReelsSec()).isEqualTo(30);
         assertThat(req.getBrief().getMaxDurationShortsSec()).isEqualTo(45);
         assertThat(req.getBrief().getMaxDurationSec()).isNull(); // dual → per-platform fields
-        assertThat(req.getBrief().getMetaphorId()).isNull();
-        assertThat(req.getBrief().getMetaphorIds()).isNull();
         assertThat(req.getBrief().getSibomPlan()).isNull(); // dual → channel fields only
         assertThat(req.getBrief().getSibomPlanReels()).hasSize(4);
         assertThat(req.getBrief().getSibomPlanShorts()).hasSize(5);
@@ -612,8 +610,6 @@ class MarketingJobServiceTest {
         ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
         verify(asmClient).createJob(captor.capture(), any(String.class));
         CreateJobRequest.BriefDto brief = captor.getValue().getBrief();
-        assertThat(brief.getMetaphorId()).isNull();
-        assertThat(brief.getMetaphorIds()).isNull();
         assertThat(brief.getSibomCandidates()).containsExactly("waiting-reply", "drained");
         assertThat(brief.getSibomPlan()).hasSize(5);
         assertThat(brief.getSibomPlan().get(0).getImageId()).isEqualTo("waiting-reply");
@@ -680,7 +676,6 @@ class MarketingJobServiceTest {
         verify(asmClient).createJob(captor.capture(), any(String.class));
         assertThat(captor.getValue().getBrief().getHookReels()).isNull();
         assertThat(captor.getValue().getBrief().getScriptShorts()).isNull();
-        assertThat(captor.getValue().getBrief().getMetaphorId()).isNull();
         assertThat(captor.getValue().getBrief().getSibomPlan()).isNull();
     }
 

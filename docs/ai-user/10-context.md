@@ -31,7 +31,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
 - **양면 author-public-first (2026-08-04)**: 작성자는 홀딩 후 **즉시 PUBLIC**(KST 02–06 밴). 파트너는 Δ 10m–2h(median ~50–60m) 뒤. `WAIT_FOR_PARTNER` private-until-partner 폐기(enum 호환만). LLM Call1=author+phase1, Call2=partner+phase2(+ live top-level 5–8).
 - **양면 댓글 phase1/phase2**: phase1은 파트너 전(author-only). 파트너 도착 시 미게시 cancel + phase2 both-context(게시된 phase1 보존). `provider_*=OFF`면 해당 워크로드 생성이 실제로 멈춘다 — yml 폴백 없음(config row가 없을 때만 yml 기본값 적용), 낮 시간 생성을 원하면 `/admin/ai-user`에서 provider를 켠다.
 - 사람 파트너가 **기존 공개 글에 나중에 답**해 revision이 생기는 경우의 PLAN 재생성은 paired 스케줄과 동일 replan 계약.
-- `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 tick, daily planner, paired posts, crawl trigger가 모두 skip된다.
+- `AI_USER_ENABLED`는 orchestrator의 **하드 게이트**다. false면 engagement 디스패치, daily planner, paired posts, crawl trigger가 모두 skip된다.
 - 실제 2차 kill-switch는 DB `ai_user_generation_config.ai_user_kill_switch`다.
 - **LLM 생성 게이트 (2026-08-08)**: `llm_generation_gate` 테이블(singleton)로 GENERATION(생성)만 차단. PUBLISHING(기존 콘텐츠 발행)은 계속 진행. LLM 세션 장애 시 admin이 `POST /admin/trigger/llm-generation-hold?reason=<text>` 호출 → 다음 생성 틱부터 skip (3-attempt 재시도는 여전히 적용됨). `LlmAvailabilityGate`(5분)가 워커 `AUTH_DOWN`이면 `auto:` 접두 hold, 복구되면 auto hold만 resume. 수동 hold는 `llm-generation-resume`으로만. `GET /admin/trigger/llm-generation-status`로 상태 조회. 상세: [operations.md](60-runtime/operations.md) §9.
 - `ai-learning`은 `AI_LEARNING_ENABLED=false`면 scheduler를 올리지 않고, `AI_LEARNING_CRAWL_ENABLED=false`면 일일 crawl/strengthen/topic 작업을 등록하지 않는다. 크롤 ingest 전 **popularity gate**가 UNRANKED를 차단하고, 상대 순위는 **광장별** 상위 50%(+ source 절대 하한)다.
@@ -102,7 +102,7 @@ flowchart LR
 ## 문서 안내
 
 - [architecture.md](30-components/architecture.md): 서비스 토폴로지와 데이터 흐름
-- [orchestrator.md](30-components/orchestrator.md): tick, paired posts, 실행 파이프라인
+- [orchestrator.md](30-components/orchestrator.md): engagement, paired posts, 실행 파이프라인
 - [llm.md](30-components/llm.md): 생성/분석 API와 프롬프트 조립
 - [llm-call-budget.md](70-policy/llm-call-budget.md): **솔로 글·SelfCritique·proofread·숏폼 variant의 LLM 호출 횟수** (2026-08-18 토큰 절감 SSOT)
 - [learning.md](30-components/learning.md): example bank, 크롤링, topic, strengthen

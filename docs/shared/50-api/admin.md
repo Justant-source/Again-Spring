@@ -1,6 +1,6 @@
 # Admin API — 관리자 전용 API
 
-> 대시보드 통계·사용자 관리·피드백 관리·시스템 상태 모니터링·프롬프트 핫리로드·테스트 데이터 조작·세션 컨텍스트 디버그를 담당하는 API.
+> 대시보드 통계·사용자 관리·피드백·시스템 상태·프롬프트 리로드를 담당하는 API.
 > **모든 엔드포인트는 ADMIN 권한 필요** (Spring Security 경로 기반 제한 + 일부 `@PreAuthorize`).
 
 ## Source of truth
@@ -14,9 +14,7 @@
 | Crawl Status 서비스 | `backend/src/main/java/com/againspring/service/admin/AdminCrawlStatusService.java` |
 | Feedback 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminFeedbackController.java` |
 | Prompts 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminPromptsController.java` |
-| Test 컨트롤러 | `backend/src/main/java/com/againspring/api/AdminTestController.java` |
-| Debug 컨트롤러 | `backend/src/main/java/com/againspring/api/SessionContextDebugController.java` |
-| 관리자 가이드 | `docs/shared/admin-dashboard.md` |
+| 대시보드 응답 | `backend/src/main/java/com/againspring/api/dto/response/AdminDashboardSummaryResponse.java` |
 
 ## 환경별 활성화 규칙
 | 단계 | 결과 |
@@ -24,10 +22,7 @@
 | Spring Security admin 경로 미인증 | 401 |
 | 인증됐으나 ADMIN 아님 | 403 |
 | AdminDashboard / User / Health / Feedback | 항상 활성 |
-| AdminPrompts / SessionContextDebug 이고 `app.admin.enabled=false` | 404 (빈 등록) |
-| 위 컨트롤러이고 `app.admin.enabled=true` | 활성 |
-| AdminTest 이고 prod 프로파일 | 404 |
-| AdminTest 이고 `@Profile(dev)` | 활성 |
+| AdminPrompts | `POST /api/admin/prompts/reload` |
 
 
 ## Dashboard API — PMF 통계 · 리텐션 · 위기 모니터링
@@ -36,22 +31,30 @@
 
 | Method | Path | 설명 | 응답 |
 |---|---|---|---|
-| `GET` | `/summary` | PMF 핵심 지표 (DAU·세션 수·완료율·평균 턴) | `Map<String, Object>` |
+| `GET` | `/summary` | 회원·글·투표·댓글·신고·문의·오늘 피드백/투표 | `AdminDashboardSummaryResponse` |
 | `GET` | `/daily-stats` | 최근 30일 일별 통계 | `List<Map<String, Object>>` |
 | `GET` | `/retention` | 최근 14일 코호트별 리텐션 | `List<Map<String, Object>>` |
-| `GET` | `/crisis-recent?limit=20` | 위기 감지된 최근 메시지 | `List<CrisisMessageResponse>` |
 | `GET` | `/llm-failure-rate?days=7` | LLM 호출 실패율 (일별) | `List<Map<String, Object>>` |
+| `POST` | `/stats/backfill?from=&to=` | 통계 역산 | `{ message, from, to }` |
+| `GET` | `/action-center` | 즉시 조치 항목 | `ActionCenterDto` |
+| `GET` | `/kpis` | 운영 KPI | `KpiDto` |
+| `GET` | `/pulse` | 펄스 | `PulseDto` |
+| `GET` | `/hot-posts` | 뜨거운 글 | `HotPostsDto` |
+| `GET` | `/insights` | 인사이트 | `InsightsDto` |
+| `GET` | `/traffic` | 트래픽 | `TrafficDto` |
 
 ```json
-// GET /summary 응답 예시
+// GET /summary 응답 (AdminDashboardSummaryResponse)
 {
-  "todayTotalSessions": 42,
-  "todayCompletedSessions": 18,
-  "finalizeRate": 42.9,
-  "avgTurnsToday": 7.3,
   "todayNewUsers": 12,
-  "todayGuestSessions": 8,
-  "totalFeedbacks": 156
+  "totalUsers": 1234,
+  "totalPosts": 567,
+  "totalVotes": 8900,
+  "totalComments": 3456,
+  "pendingReports": 5,
+  "openInquiries": 3,
+  "todayFeedback": 2,
+  "todayVotes": 234
 }
 ```
 
@@ -230,19 +233,18 @@
 
 | 컨트롤러 | 엔드포인트 수 | 활성 조건 |
 |---|---|---|
-| AdminDashboardController | 5 | 항상 |
-| AdminUserController | 5 | 항상 |
-| AdminHealthController | 1 | 항상 |
-| AdminFeedbackController | 2 | 항상 |
-| AdminPromptsController | 1 | `app.admin.enabled=true` |
-| AdminTestController | 2 | `@Profile("dev")` |
-| SessionContextDebugController | 1 | `app.admin.enabled=true` |
-| AdminAiUserController | 9 | 항상 |
-| SocialPublishController | 7 | `app.features.marketing.enabled=true` (dev) |
-| **합계** | **33** | |
+| AdminDashboardController | summary·daily-stats·retention·llm-failure-rate·backfill·action-center·kpis·pulse·hot-posts·insights·traffic | 항상 |
+| AdminUserController · AdminUserManagementController | 사용자 검색·상세·역할 | 항상 |
+| AdminHealthController | 시스템 헬스 | 항상 |
+| AdminFeedbackController | 피드백 | 항상 |
+| AdminPromptsController | 프롬프트 리로드 | 항상 |
+| AdminAiUserController · AdminAiRulesController | AI-user·규칙 | 항상 |
+| AdminMarketing* · AdminContent* · AdminReport* · AdminInquiry* · Announcement* | 마케팅·콘텐츠·신고·문의·공지 | 항상 |
+
+`AdminTestController`, `SessionContextDebugController`, `SocialPublishController` 는 없다.
 
 ## 변경 시 절차
 
-- 신규 admin 엔드포인트 추가: 이 문서 + `docs/shared/admin-dashboard.md` 동시 갱신
+- 신규 admin 엔드포인트 추가: 이 문서와 `docs/shared/50-api/rest-spec.md` 를 같이 갱신
 - TESTER role 지정: `PATCH /api/admin/users/{id}/roles { "roles": ["USER", "TESTER"] }`
 - 역할 체계 변경: `docs/shared/policies/user-permissions.md` 권위본 + `AdminRoleAssigner.java`

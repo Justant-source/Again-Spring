@@ -8,7 +8,6 @@ import { DailyLimitModal } from '@/components/shared/DailyLimitModal';
 import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 import { ForcePasswordChangeModal } from '@/components/auth/ForcePasswordChangeModal';
 import { BetaBanner } from '@/components/shared/BetaBanner';
-import { LegalFooter } from '@/components/shared/LegalFooter';
 import { BottomNav } from '@/components/shared/BottomNav';
 import { VisitTracker } from '@/components/VisitTracker';
 
@@ -73,7 +72,6 @@ export default function RootLayout({
           <BetaBanner />
           <FeedbackModal />
           <ForcePasswordChangeModal />
-          <LegalFooter />
           <BottomNav />
           <Suspense fallback={null}>
             <VisitTracker />

@@ -74,14 +74,6 @@ class PromoTitleServiceTest {
     }
 
     @Test
-    void normalizeAgainstTitle_blankFallsBackToWrap() {
-        String title = "원제입니다 그대로";
-        String got = PromoTitleService.normalizeAgainstTitle(null, title);
-        assertEquals(PromoTitleService.collapseWs(title),
-                PromoTitleService.collapseWs(got.replace("\n", "")));
-    }
-
-    @Test
     void validateEmotion_acceptsAllowedValues() {
         for (String e : PromoTitleService.HOOK_EMOTIONS) {
             assertEquals(e, PromoTitleService.validateEmotion(e));

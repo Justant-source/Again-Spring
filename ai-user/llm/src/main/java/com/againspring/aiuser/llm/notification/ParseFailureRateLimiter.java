@@ -14,8 +14,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * <p>Tracks failures in a sliding time window, alerts when count crosses threshold,
  * then suppresses alerts for a cooldown period. Thread-safe for concurrent LLM invocations.
  *
- * <p>Note: This is a duplicate of the orchestrator-side rate limiter, following the LlmStatsLogger
- * precedent of not crossing module boundaries. Usage is identical to the orchestrator version.
+ * <p>Note: Local to the llm module so it does not depend on the orchestrator.
  *
  * <p>Usage:
  * <pre>

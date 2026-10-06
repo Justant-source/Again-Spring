@@ -24,9 +24,7 @@ frontend/
 │   ├── (admin)/
 │   │   └── admin/
 │   │       ├── community/      # 광장 관리
-│   │       └── marketing/      # 마케팅 대시보드
-│   │           ├── calendar/, contents/, costs/, hashtags/, settings/
-│   │           ├── simulations/, stories/, templates/
+│   │       └── marketing/      # page.tsx + jobs/[id] + youtube-oauth/callback
 │   │
 │   ├── (auth)/                 # 라우트 그룹 (인증 관련)
 │   │   ├── forgot-password/page.tsx
@@ -74,13 +72,12 @@ frontend/
 │   │       └── index.ts
 │   │
 │   ├── feedback/
-│   ├── icons/                  # DasibomLogo, Phone, CrisisResources, etc.
+│   ├── icons/                  # 비어 있음. 화면 아이콘은 lucide-react
 │   ├── legal/
 │   ├── profile/
 │   ├── shared/                 # 공유 컴포넌트
 │   │   ├── MSWProvider.tsx
 │   │   ├── Logo.tsx
-│   │   ├── LegalFooter.tsx
 │   │   └── ...
 │   │
 │   └── ui/                     # 기본 UI 컴포넌트 (shadcn-ish)
@@ -159,7 +156,7 @@ frontend/
     │   │   └── README.md       # 시각 정본 HTML 포인터
     │   └── specs/
     │       ├── metaphor-illustration-system.md  # 메타포 일러스트 60종 레지스트리 (레거시)
-    │       └── sprout-character-system/         # 시봄이 캐릭터 60종(진행중 30/60) + catalog.json + gen.py
+    │       └── sprout-character-system/         # 이동: docs/frontend/assets/sprout-character-system/ (60/60)
     └── policies/
         ├── README.md
         └── (기타 정책 문서)
@@ -202,8 +199,10 @@ frontend/
 ### 부재하는 것 (삭제됨)
 - `app/(onboarding)/**` — 온보딩 페이지 (광장형 모델로 변경)
 - `app/(dashboard)/history/` — 기존 세션 이력 (광장형에서 비관련)
-- `components/chat/`, `components/result/` — 구 카톡 채팅/결과 (광장형 전환)
+- `components/chat/`, `components/result/` — 구 카톡 채팅/결과 (광장형 전환). `ChatLayout` 포함
 - `components/onboarding/` — 온보딩 컴포넌트
+- `components/auth/OnboardingModal.tsx`, `components/auth/GuestUpgradeModal.tsx`
+- `components/shared/LegalFooter.tsx`, `components/shared/LegalNoticeBox.tsx`
 - `lib/constants/onboardingQuestions.ts`, `communicationStyles.ts`, `mbtiMapping.ts`
 - `lib/utils/keywordGuard.ts` — 클라이언트 사이드 검사 (서버만 사용)
 - `lib/store/sessionStore.ts`, `communityStore.ts` — 삭제됨 (uiStore로 통합)

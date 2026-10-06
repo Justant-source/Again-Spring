@@ -19,8 +19,7 @@ public final class AiUserIdentity {
     public static final String REAL_USER_PREDICATE = "(synthetic = 0 OR synthetic IS NULL)";
 
     /**
-     * {@code NOT IN} 서브쿼리: 실유저 저자만 포함 (봇 제외).
-     * InteractionScanner 등에서 봇 댓글을 스캔 대상에서 제외할 때 사용.
+     * 실유저 저자만 포함 (봇 제외).
      * {@code OR synthetic IS NULL} 포함 — V59 마이그레이션 이전에 생성된 실유저 계정 보호.
      */
     public static final String REAL_USER_AUTHOR_CONDITION =

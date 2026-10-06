@@ -9,7 +9,7 @@
 | 컨트롤러 | `backend/src/main/java/com/againspring/api/**/*Controller.java` |
 | 서비스 | `backend/src/main/java/com/againspring/service/**/*.java` |
 | 도메인 | `backend/src/main/java/com/againspring/domain/**/*.java` |
-| 마이그레이션 | `backend/src/main/resources/db/migration/V1~V56.sql` |
+| 마이그레이션 | `backend/src/main/resources/db/migration/` (최신 V126) |
 
 ## 패키지 계층 개요
 
@@ -32,12 +32,12 @@ flowchart TD
     subgraph DOM["domain/ — JPA 엔티티"]
         direction LR
         D1["User · Post · PostComment\nVote · PostLike\nCommunityReport"]
-        D2["Notification · Marketing\nFeedback · GuestSession\nRevokedToken"]
+        D2["Notification · Marketing\nFeedback · RevokedToken"]
     end
 
     subgraph INF["인프라"]
         direction LR
-        I1["llm/: RemoteLlmProvider\nPromptSanitizer\nconfig/ · fallback/ · monitoring/"]
+        I1["llm/: RemoteLlmProvider\nPromptSanitizer · PromptLoader"]
         I2["safety/: CrisisKeywordGuard\nsecurity/: JWT · SecurityConfig\nconfig/: OpenAPI · CORS · Async"]
     end
 
@@ -67,11 +67,8 @@ flowchart TD
 | `repository/community/` | PostRepository · PostCommentRepository · VoteRepository |
 | `llm/` | `LLMProvider` 인터페이스 + RemoteLlmProvider (기본) |
 | `llm/remote/` | HTTP 클라이언트 → againspring-llm 워커 |
-| `llm/config/` | LLM 설정 |
-| `llm/prompt/` | 프롬프트 어셈블 + 로더 |
-| `llm/fallback/` | 로컬 fallback (개발 전용) |
-| `llm/monitoring/` | LLM 호출 지표 수집 |
-| `safety/` | CrisisKeywordGuard · SafetyAuditLogger |
+| `llm/` | `RemoteLlmProvider` · `PromptSanitizer` · `prompt/PromptLoader` |
+| `safety/` | CrisisKeywordGuard · CrisisScanResult · SafetyAuditLogger |
 | `security/` | JwtFilter · SecurityConfig · RateLimitFilter · UserDetailsService |
 | `config/` | 빈 설정 (CORS · Async · Scheduling · OpenAPI) |
 | `common/` | 공통 예외 (BusinessException · GlobalExceptionHandler) |
@@ -84,36 +81,21 @@ com.againspring/
 ├── AgainSpringApplication              # @SpringBootApplication 진입점
 │
 ├── api/
-│   ├── admin/
-│   │   ├── AdminDashboardController    # GET /api/admin/dashboard/{summary,daily-stats,retention}
-│   │   ├── AdminHealthController       # GET /api/admin/health/system
-│   │   └── AdminUserController         # GET/DELETE/PATCH /api/admin/users/**
 │   ├── AdminFeedbackController         # GET/PATCH /api/admin/feedbacks/**
-│   ├── AdminPromptsController          # POST /api/admin/prompts/reload (app.admin.enabled)
+│   ├── AdminPromptsController          # POST /api/admin/prompts/reload
 │   ├── AuthController                  # /api/auth/{signup,login,guest,logout,agree,forgot-password,reset-password}
-│   ├── CommunityPostController         # /api/community/posts (CRUD, voting)
-│   ├── CommunityCommentController      # /api/posts/{id}/comments
-│   ├── PostInviteController            # /api/posts/{id}/invite
 │   ├── NotificationController          # /api/notifications
 │   ├── FeedbackController              # POST /api/feedbacks
 │   ├── HealthController                # GET /api/health
 │   ├── OAuth2Controller                # POST /api/auth/oauth2/{provider}
-│   ├── UserController                  # /api/users/me, /password, /onboarding
-│   ├── CalendarController              # /api/calendar/* (marketing)
-│   ├── ContentController               # /api/content/* (marketing)
-│   ├── CostController                  # /api/cost/* (marketing)
-│   ├── DashboardController             # /api/dashboard/* (marketing)
-│   ├── HashtagController               # /api/hashtags/* (marketing)
-│   ├── MarketingImageController        # /api/marketing-images/* (marketing)
-│   ├── MarketingModuleController       # /api/marketing-modules/* (marketing)
-│   ├── RepurposeController             # /api/repurpose/* (marketing)
-│   ├── SimulationController            # /api/simulation/* (marketing)
-│   ├── SocialPublishController         # /api/social-publish/* (marketing)
-│   ├── StoryController                 # /api/stories/* (marketing)
-│   ├── TemplateController              # /api/templates/* (marketing)
-│   ├── community/
-│   │   └── dto/                        # Community-specific request/response DTOs
-│   ├── dto/
+│   ├── UserController                  # /api/users/me, /password (onboarding 엔드포인트 없음)
+│   ├── AnnouncementPublicController
+│   ├── InquiryController
+│   ├── community/                      # CommunityPostController · CommunityCommentController · PostInviteController · CommunityStatsController
+│   ├── admin/                          # 대시보드·사용자·콘텐츠·마케팅·크롤·신고·문의·공지·시크릿·AI-user
+│   ├── internal/                       # AiUserInternalController · PersonaExportController · MarketingCallbackController
+│   ├── visits/PublicVisitController
+│   └── dto/
 │   │   ├── request/
 │   │   │   ├── SignupRequest
 │   │   │   ├── LoginRequest
@@ -152,35 +134,24 @@ com.againspring/
 │   │   ├── OAuthProviderService
 │   │   └── OAuthUserInfo
 │   ├── retention/
-│   │   ├── AccessLogService
-│   │   ├── DailyStatsAggregator
-│   │   ├── GuestSessionCleanupScheduler
-│   │   ├── RetentionScheduler
-│   │   └── UserDeletionService
-│   ├── util/
-│   │   └── (유틸리티 서비스들)
-│   ├── AdminRoleAssigner
+│   │   └── AccessLogService
+│   ├── DailyStatsAggregatorService     # 자정(Asia/Seoul) 일별 통계
+│   ├── RevokedTokenCleanupScheduler    # 매일 04:00 UTC, 만료 revoked_tokens
 │   ├── AuthService
 │   ├── EmailVerificationService
 │   ├── FeedbackService
-│   ├── GuestSessionRateLimiter
 │   ├── LogoutService
 │   ├── PasswordResetService
-│   ├── RevokedTokenCleanupScheduler
-│   ├── SessionRoleResolver
-│   ├── SessionService
-│   ├── SessionStateMachine
-│   ├── StyleCalculator
-│   └── UserService
+│   └── UserService                     # 프로필·비밀번호·탈퇴. onboarding/tutorial 메서드 없음
 │
 ├── domain/                             # JPA 엔티티 (Lombok @Entity)
 │   ├── DailyStats
 │   ├── EmailVerification
 │   ├── Feedback
-│   ├── GuestSession
 │   ├── PasswordResetToken
 │   ├── RevokedToken
 │   ├── User
+│   ├── VisitEvent
 │   ├── community/
 │   │   ├── Post
 │   │   ├── PostComment
@@ -192,20 +163,14 @@ com.againspring/
 │   │   └── (마케팅 엔티티들)
 │   ├── notification/
 │   │   └── (알림 엔티티들)
-│   ├── enums/
-│   │   ├── ConflictType
-│   │   ├── RelationType
-│   │   └── ReportStatus
-│   └── relationship/
-│       ├── LlmCallLog
-│       └── UserRelationship
+│   └── enums/
+│       ├── PostStatus · PublishMode · PostVisibility · PostCategory
+│       ├── CommentStatus · ReportStatus · NotificationType
 │
 ├── repository/                         # 모두 JpaRepository<Entity, ID>
 │   ├── DailyStatsRepository
 │   ├── EmailVerificationRepository
 │   ├── FeedbackRepository
-│   ├── GuestSessionRepository
-│   ├── LlmCallLogRepository
 │   ├── PasswordResetTokenRepository
 │   ├── RevokedTokenRepository
 │   ├── UserRelationshipRepository
@@ -220,25 +185,20 @@ com.againspring/
 │
 ├── llm/
 │   ├── PromptSanitizer.java            # 사용자 입력 검증 + <user_input> 태그
-│   ├── config/
-│   │   └── LlmProperties                # application.yml 설정 매핑
-│   ├── remote/                          # ← 기본 provider
+│   ├── remote/                          # ← 유일한 provider
 │   │   ├── RemoteLlmProvider            # HTTP POST /v1/invoke
 │   │   └── dto/
-│   │       ├── InvocationRequest
-│   │       └── InvocationResponse
-│   ├── fallback/
-│   │   └── FallbackResponses            # Claude 불가 시 안전 기본값
-│   ├── monitoring/
-│   │   └── LLMCallLogger                # llm_call_logs 기록
+│   │       ├── WorkerInvokeRequest
+│   │       └── WorkerInvokeResponse
+│   ├── PromptSanitizer
+│   ├── LlmImage
 │   └── prompt/
-│       ├── PromptAssembler
-│       └── PromptLoader
+│       └── PromptLoader                 # 구조화 프롬프트 조립(StructuredPrompt)은 없음
 │
 ├── safety/
 │   ├── CrisisDetectedEvent
 │   ├── CrisisKeywordGuard
-│   ├── RatioEnforcer
+│   ├── CrisisScanResult
 │   └── SafetyAuditLogger
 │
 ├── security/
@@ -318,8 +278,8 @@ backend/src/main/resources/
 | Admin API | `api/admin/*Controller.java` | `docs/shared/50-api/admin.md` |
 | 광장 게시글 | `service/community/CommunityPostService.java` | `docs/shared/50-api/rest-spec.md` · `docs/shared/50-api/flows.md` |
 | 보안 정책 | `safety/*.java` + `security/*.java` | `docs/shared/policies/` |
-| 프롬프트 변경 | `docs/shared/prompts/*.md` | `docs/shared/prompts/README.md` |
-| LLM 브릿지 | `llm/remote/*.java` | `docs/backend/llm-bridge.md` |
+| 프롬프트 변경 | `docs/shared/prompts/*.md` | `docs/shared/prompts/` |
+| LLM 브릿지 | `llm/remote/*.java` | `docs/backend/30-components/llm-bridge.md` |
 | 역할/권한 | `config/UserPermissionsConfig.java` | `docs/shared/policies/user-permissions.md` |
 
 ---

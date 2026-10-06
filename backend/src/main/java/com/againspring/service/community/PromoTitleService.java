@@ -194,13 +194,6 @@ public class PromoTitleService {
         return generateTraced(title, body).result();
     }
 
-    /** @deprecated prefer {@link #generate(String, String)} */
-    @Deprecated
-    public String generate(String title) {
-        HookResult r = generate(title, "");
-        return r != null ? r.promoTitle() : null;
-    }
-
     private String buildPrompt(String title, String body) {
         String safeTitle = promptSanitizer.sanitize(title != null ? title : "");
         String rawBody = body != null ? body : "";
@@ -281,18 +274,6 @@ public class PromoTitleService {
         }
         lines = mergeOrphans(lines);
         return clampStore(String.join("\n", lines));
-    }
-
-    /**
-     * @deprecated use {@link #normalizeHook(String)}; title equality no longer enforced.
-     * blank promo → wrapSemantic(title) fallback for compose callers.
-     */
-    @Deprecated
-    static String normalizeAgainstTitle(String promo, String title) {
-        if (promo == null || promo.isBlank()) {
-            return wrapSemantic(title != null ? title : "");
-        }
-        return normalizeHook(promo);
     }
 
     /** 1자 줄이 전체의 25% 이상이면 나쁜 줄바꿈으로 본다. */
@@ -486,14 +467,5 @@ public class PromoTitleService {
         String t = s.trim();
         if (t.length() <= MAX_STORE_LEN) return t;
         return t.substring(0, MAX_STORE_LEN);
-    }
-
-    /** @deprecated use clampStore / wrapSemantic */
-    @Deprecated
-    static String truncate(String s, int max) {
-        if (s == null) return "";
-        String t = s.trim();
-        if (t.length() <= max) return t;
-        return t.substring(0, max);
     }
 }

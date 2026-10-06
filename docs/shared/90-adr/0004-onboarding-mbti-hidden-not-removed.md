@@ -93,10 +93,10 @@ if (shouldShowOnboarding) {
 
 ### Backend Changes
 
-**No changes** to code or schema:
-- `UserController.POST /me/onboarding` still exists (no calls, unused)
-- `User.mediator_style`, `User.mbti_type` columns remain (unused, not dropped)
-- `StyleCalculator` class not deleted (dormant, available for reactivation)
+**2026-10-06 현재 코드** (당시 “숨기고 유지” 이후 잔여 클래스는 삭제됨):
+- `UserController`에 `POST /me/onboarding` 매핑이 없다. `UserService.completeOnboarding` / `completeTutorial`도 없다.
+- `StyleCalculator`, `OnboardingRequest`, `OnboardingResponse`, `StyleCalculatorTest`는 삭제됐다. 재활성화는 이 파일들을 복원하는 작업이다.
+- `User.mbti_type`, `onboarding_*`, `mediator_default_*` 컬럼과 프로필 응답 필드는 남아 있다. 컬럼 drop 마이그레이션은 없다.
 
 **Mark as deprecated** (optional, in code comment):
 ```java
@@ -136,9 +136,9 @@ When personalizing jurors per user style:
 
 ## Related Assets
 
-- **Deprecated controller**: `backend/src/main/java/com/againspring/api/UserController.java` (POST /me/onboarding)
-- **Deprecated service**: `backend/src/main/java/com/againspring/service/StyleCalculator.java`
-- **Deprecated component**: `frontend/components/auth/OnboardingModal.tsx`
+- **Removed mapping**: `POST /me/onboarding` is not on `UserController`
+- **삭제됨**: `StyleCalculator.java` (2026-10-06)
+- **Removed component**: `OnboardingModal.tsx` is not in `frontend/`
 - **User entity**: `backend/src/main/java/com/againspring/domain/User.java` (mediator_style, mbti_type columns)
 - **Disabled tests**: `backend/src/test/.../UserControllerTest.java::testOnboarding`
 

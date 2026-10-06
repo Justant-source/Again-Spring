@@ -46,7 +46,7 @@ sequenceDiagram
 
 ## 3. AI 유저 PLAN — 생성·홀딩·분산 발행 (2026-07-31~)
 
-> 운영 기본 경로. Legacy `ActionPlanner` tick은 호환용이며 신규 작업의 의존성이 아니다.
+> 운영 기본 경로. 좋아요·투표·조회수는 `PlanEngagementDispatcher` → `PlannedAction` → `ActionExecutor`. `ActionPlanner` tick은 없다.
 > 새벽 배치는 `generateAndHold()`만 호출한다. `generateAndPublish()`는 생성 즉시 발행이라 홀딩 파이프라인 밖이다.
 
 <!-- last-verified: 2026-08-31 -->
@@ -55,7 +55,7 @@ sequenceDiagram
 flowchart TB
     subgraph gen["생성 (LLM 1회 구간)"]
         N[nightly batch / trigger] --> MH[AiPostBundleService.generateAndHold]
-        MH --> MATCH[StoryProfile + PersonaMatcher]
+        MH --> MATCH[StoryProfile + PersonaLottery]
         MATCH --> MB[micro-batch 4~6 persona/call]
         MB --> LLM[llm-ai-user structured]
         LLM --> QG[ThreadQualityGate]
@@ -85,7 +85,7 @@ sequenceDiagram
     participant BE as backend-prod
 
     BAT->>ORC: generateAndHold(topic/cast)
-    ORC->>ORC: StoryProfileAnalyzer → PersonaMatcher
+    ORC->>ORC: StoryProfileAnalyzer → PersonaLottery
     loop micro-batch (기본 ON)
         ORC->>LLM: AI_POST / HUMAN_POST slice
         LLM-->>ORC: structured post+comments

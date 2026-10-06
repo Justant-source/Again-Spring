@@ -35,7 +35,7 @@ public class PersonaProfileService {
     private final LlmWorkerPool pool;
 
     /** 글 전용 모델(Sonnet) — 페르소나 프로필도 이 모델을 재사용한다(§4: "새 서비스는 claudePostModel을 쓴다"). */
-    @Value("${llm.post-model:claude-sonnet-5}")
+    @Value("${llm.post-model:claude-sonnet-5-5}")
     private String claudePostModel;
 
     @Value("${llm.worker.default-timeout-ms:600000}")

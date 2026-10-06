@@ -378,14 +378,6 @@ public class ScheduledPostPublisher {
                 LiteralNewlineNormalizer.normalize(body), proposed);
     }
 
-    /** @deprecated */
-    @Deprecated
-    @SuppressWarnings("unchecked")
-    private Integer readCaptureSplitFromCandidates(String candidatesJson, String body) {
-        List<Integer> list = readCaptureSplitsFromCandidates(candidatesJson, body);
-        return (list == null || list.isEmpty()) ? null : list.get(0);
-    }
-
     @SuppressWarnings("unchecked")
     private String readPromoTitleFromCandidates(String candidatesJson, String title) {
         if (candidatesJson == null || candidatesJson.isBlank()) return null;

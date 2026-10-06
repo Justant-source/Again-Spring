@@ -183,21 +183,6 @@ public class VideoVariantService {
     private boolean enabled;
 
     /**
-     * Legacy overload (no sibom candidates). Prefer
-     * {@link #generate(String, String, String, String, boolean, boolean, List)}.
-     */
-    public Variants generate(
-            String masterHook,
-            String hookEmotion,
-            String title,
-            String body,
-            boolean needReels,
-            boolean needShorts
-    ) {
-        return generate(masterHook, hookEmotion, title, body, needReels, needShorts, List.of());
-    }
-
-    /**
      * Generate variants for requested video platforms. When both Reels and Shorts are needed,
      * runs <strong>separate</strong> LLM calls (channel-specific script + {@code sibom_plan}).
      *

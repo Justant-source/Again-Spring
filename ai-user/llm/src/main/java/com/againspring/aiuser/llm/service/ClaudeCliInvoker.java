@@ -51,7 +51,7 @@ public class ClaudeCliInvoker implements Invoker {
      * This list preserves StructuredOutput while blocking all other tools,
      * reducing overhead to ~18.8k tokens (still high but functional for structured output).
      *
-     * Measured (model=claude-sonnet-5, --strict-mcp-config --no-session-persistence):
+     * Measured (model=claude-sonnet-5-5, --strict-mcp-config --no-session-persistence):
      * - baseline (all tools): 25,267 input tokens
      * - --disallowedTools "*": 279 tokens (but breaks --json-schema)
      * - explicit list WITH StructuredOutput: 18,812 tokens (works)

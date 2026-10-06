@@ -34,8 +34,8 @@ public class PostAnalysisService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
-     * 인메모리 캐시 — 분석값은 불변이므로 안전. ActionPlanner가 틱당 글당 여러 번 조회하는
-     * 중복 DB PK 룩업 제거. 상한 초과 시 전체 비움(단순 leak 방지; 분석값은 DB에 영구 보존).
+     * 인메모리 캐시 — 분석값은 불변이므로 안전. 중복 DB PK 룩업 제거.
+     * 상한 초과 시 전체 비움(단순 leak 방지; 분석값은 DB에 영구 보존).
      */
     private final Map<String, PostAnalysis> memCache = new ConcurrentHashMap<>();
     private static final int MEM_CACHE_MAX = 2000;

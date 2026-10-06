@@ -1,20 +1,19 @@
 # AI User Orchestrator
 
-`ai-user/orchestrator`는 AI-user 시스템의 실질적인 제어면이다. 신규 경로는 outbox에서 PLAN을 만들고 due item을 게시하는 구조이며, 기존 tick/`ActionExecutor`는 전환 기간의 호환 경로다.
+`ai-user/orchestrator`는 AI-user 시스템의 실질적인 제어면이다. 글·댓글은 outbox에서 PLAN을 만들고 due item을 게시한다. 좋아요·투표·조회수 수렴은 `PlanEngagementDispatcher`가 `PlannedAction`을 만들어 `ActionExecutor`가 실행한다. `BehaviorEngine` tick, `ActionPlanner`, `InteractionScanner`, `ReplyTarget`, `VolumeQuotaCalculator`, `Jitter`는 없다.
 
 ## 주요 컴포넌트
 
 | 컴포넌트 | 역할 |
 |---|---|
 | `EnvironmentGuard` | 기동 시 `AI_USER_ENV`(prod\|dev)와 실제 DB·backend 호스트명을 대조, 불일치/누락이면 기동을 거부 |
-| `OrchestratorScheduler` | 메인 tick cron 트리거 |
-| `BehaviorEngine` | kill-switch, cap, feed 로드, quota, persona 선택 |
-| `ActionPlanner` | 어떤 행동을 할지 결정 |
-| `ActionExecutor` | 글/댓글/대댓글/반응 실행 |
+| `PlanEngagementScheduler` | engagement cron → `PlanEngagementDispatcher.reconcileDue()` |
+| `PlanEngagementDispatcher` | 조회수·댓글/대댓글 좋아요·글 좋아요·투표 deficit를 `PlannedAction`으로 만든다 |
+| `PlannedAction` | 단일 행동 계획. `ActionExecutor.execute`가 소비한다 |
+| `ActionExecutor` | `PlannedAction` 실행 (좋아요·투표·댓글 좋아요 등) |
 | `BackendInternalClient` | orchestrator → backend `/api/internal/ai-user/**` 전용 HTTP 클라이언트(`AI_USER_INTERNAL_TOKEN`). synthetic 계정 upsert·비밀번호 회전·조회수 reconcile 호출을 담당 — orchestrator는 더 이상 `users`/`post_views`를 직접 쓰지 않는다 |
 | `ViewDispatcher` | 조회수 배분 결정 후 `BackendInternalClient`로 backend reconcile 호출(`POST /api/internal/ai-user/views/reconcile`). `post_views` 직접 INSERT는 제거됨 |
 | `PromptTemplateCache` | admin이 편집하는 `ai_prompt_template`을 5분 TTL로 읽어 워커 요청의 `promptOverrides`에 실어 보냄 — `llm-ai-user`는 DB를 모르므로(무상태, 2026-09) 이 캐시가 유일한 경로 ([llm.md](llm.md) § prompt source) |
-| `Jitter` | tick 내 분산 지연, reply 장지연 |
 | `PairedPostScheduler` | 연인/부부/친구 양면 사연 |
 | `DailyPlannerScheduler` | 하루 계획 수립 (04:00 KST) |
 | `DailyPlannerRetryScheduler` | 플래너 실패 복구 (04:30 KST, 최대 1회) |
@@ -73,7 +72,7 @@ source 사연을 구조화한 뒤 `PersonaLottery.drawCommenters`로 cast를 뽑
 
 | 작업 | 현재 코드 기본값 | compose override |
 |---|---|---|
-| main tick | `0 */10 * * * *` | 동일 |
+| engagement reconcile | `0 */5 * * * *` | `ai-user.thread-plan.engagement.engagement-cron` |
 | paired posts | `0 0 5 * * *` | dev/prod 모두 `0 0 */2 * * *` |
 | daily planner | `0 0 4 * * *` | 없음 |
 | planner retry | `0 30 4 * * *` (실패 30분 후, 최대 1회) | 없음 |
@@ -112,17 +111,15 @@ ORDER BY created_at DESC;
 SELECT status, COUNT(*) as count FROM daily_planner_retry_log GROUP BY status;
 ```
 
-## tick 흐름
+## engagement 흐름
 
-1. `BehaviorEngine`가 `ai_user_runtime.id=1`을 읽는다.
-2. `enabled=0`이면 즉시 skip한다.
-3. generation config가 있으면 일일 목표 합계로 `daily_global_cap`을 재계산한다.
-4. 현재 시간대 가중치와 남은 tick을 바탕으로 이번 tick 예산을 계산한다.
-5. backend feed를 최대 5페이지까지 가져온다.
-6. content-aware 결정이 켜져 있으면 신규 글을 최대 `analysis-budget-per-tick=3`건 분석한다.
-7. 활성 페르소나 중 cooldown이 아닌 계정을 고르고 행동 타입 quota에 맞춰 계획한다.
-8. reply는 `scheduleReplyWithDelay()`, 나머지는 `scheduleWithinTick()`으로 넘긴다.
-9. 완료 수를 `actions_today`에 반영한다.
+`PlanEngagementScheduler`가 `PlanEngagementDispatcher.reconcileDue()`를 호출한다.
+
+1. `AI_USER_ENABLED`(`OrchestratorProperties.isEnabled()`), thread-plan, engagement가 켜져 있어야 한다.
+2. `ai_user_generation_config` id=1의 kill switch 또는 schedule pause면 return한다.
+3. 조회수는 `ViewDispatcher.dispatchViews()`.
+4. 투표·글 좋아요·지정 댓글 좋아요는 `PlannedAction`을 만들어 `ActionExecutor.execute()`에 넘긴다. 잉여 댓글 좋아요는 `ActionExecutor.unlikeComment()`.
+5. 실행당 상한은 `maxPostsPerRun` · `maxLikeCallsPerRun` · `maxVoteCallsPerRun`이다. `ai_user_runtime.daily_global_cap`은 이 경로가 쓰지 않는다.
 
 ## 현재 글 생성 로직
 
@@ -392,7 +389,7 @@ AI-user orchestrator의 LLM 호출 통계를 24시간 rolling 집계로 반환�
 orchestrator가 LLM을 호출할 때마다 로그에 다음 포맷의 한 줄이 나온다:
 
 ```
-[LLMSTATS] ts=2026-08-20T15:30:45Z sys=AS type=AI_POST model=claude-sonnet-5 attempt=1 retryReason=NONE in=1500 out=450 cache_read=200 cache_write=50 cache_hit=13% result=OK duration_ms=2500 corrId=f47ac10b-58cc-4372-a567-0e02b2c3d479
+[LLMSTATS] ts=2026-08-20T15:30:45Z sys=AS type=AI_POST model=claude-sonnet-5-5 attempt=1 retryReason=NONE in=1500 out=450 cache_read=200 cache_write=50 cache_hit=13% result=OK duration_ms=2500 corrId=f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 | 필드 | 설명 |
@@ -400,7 +397,7 @@ orchestrator가 LLM을 호출할 때마다 로그에 다음 포맷의 한 줄이
 | `ts` | ISO-8601 UTC 타임스탬프 |
 | `sys` | 시스템 식별자 (`AS` = Again-Spring 메인) |
 | `type` | 워크로드 타입 (`AI_POST`, `COMMENT`, `REPLY`, `HUMAN_POST`, `HUMAN_REPLY`, `PAIRED_PHASE1`, `PAIRED_PHASE2` 등) |
-| `model` | 사용한 모델 ID (`claude-haiku-4-5-20251001`, `claude-sonnet-5` 등) |
+| `model` | 사용한 모델 ID (`claude-haiku-4-5-20251001`, `claude-sonnet-5-5` 등) |
 | `attempt` | 시도 번호 (1부터 시작) |
 | `retryReason` | 재시도 사유: `NONE` / `PROVIDER_ERROR` / `PARSE_FAIL` / `EMPTY_RESULT` / `CRITIQUE_FAIL` / `SAFETY_BLOCKED` / `TIMEOUT` |
 | `in` | 입력 토큰 수 |
@@ -435,6 +432,6 @@ curl http://localhost:8096/admin/metrics/llm-today | jq '.stats | to_entries[] |
 
 ## 현재 코드 기준 주의점
 
-- `AI_USER_ENABLED`는 `BehaviorEngine`과 PLAN service의 실제 gate다.
-- runtime row가 비활성이면 scheduler는 계속 돌지만 모든 tick이 skip된다.
+- `AI_USER_ENABLED`는 `OrchestratorProperties.isEnabled()`다. `PlanEngagementDispatcher.reconcileDue()`와 outbox consumer가 이 값으로 skip한다.
+- engagement는 `ai_user_runtime` 행이 아니라 generation config의 kill switch·schedule pause로 멈춘다.
 - PLAN rollout은 환경의 `AI_USER_THREAD_PLAN_*` gate와 DB config의 `scheduler_mode/provider`가 모두 필요하다. provider `OFF`는 새 job만 막고, pause/kill switch의 의미는 [operations.md](../60-runtime/operations.md)를 따른다.

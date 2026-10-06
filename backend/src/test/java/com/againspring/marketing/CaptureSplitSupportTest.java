@@ -53,10 +53,10 @@ class CaptureSplitSupportTest {
     }
 
     @Test
-    void legacyResolveSplitReturnsFirstCut() {
-        Integer cut = CaptureSplitSupport.resolveSplit(blocks(20), 7);
-        assertEquals(7, cut);
-        assertNull(CaptureSplitSupport.resolveSplit(blocks(5), null));
+    void resolveSoloFallsBackWhenSingleCutLeavesAnOversizedTail() {
+        CaptureSplitSupport.ResolvedCapture cut = CaptureSplitSupport.resolveSolo(blocks(20), List.of(7));
+        assertEquals(List.of(7, 14), cut.splits());
+        assertTrue(CaptureSplitSupport.resolveSolo(blocks(5), null).splits().isEmpty());
     }
 
     @Test

@@ -1,9 +1,7 @@
 package com.againspring.api;
 
 import com.againspring.api.dto.request.DeleteAccountRequest;
-import com.againspring.api.dto.request.OnboardingRequest;
 import com.againspring.api.dto.request.UpdateUserRequest;
-import com.againspring.api.dto.response.OnboardingResponse;
 import com.againspring.api.dto.response.UserResponse;
 import com.againspring.repository.UserRepository;
 import com.againspring.service.UserService;

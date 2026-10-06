@@ -13,8 +13,7 @@ import java.time.format.DateTimeFormatter;
  *   in={N} out={M} cache_read={P} cache_write={Q} cache_hit={R%} result={OK|RETRY|FAIL}
  *   duration_ms={T} corrId={uuid}
  *
- * Note: This is a local copy (not imported from orchestrator module) to avoid cross-module
- * dependencies. Kept in sync with orchestrator/LlmStatsLogger.
+ * Note: Local to the llm module so it does not depend on the orchestrator.
  */
 public class LlmStatsLogger {
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter

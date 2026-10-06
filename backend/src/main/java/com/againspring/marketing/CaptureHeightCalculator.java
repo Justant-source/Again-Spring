@@ -56,18 +56,6 @@ public final class CaptureHeightCalculator {
         return heights;
     }
 
-    /**
-     * Legacy single-cut height.
-     * @deprecated use {@link #partHeightsCss}
-     */
-    @Deprecated
-    public static Double part1HeightCss(String title, String body, Integer splitAfterLine, boolean paired) {
-        List<Integer> prop = splitAfterLine == null ? null : List.of(splitAfterLine);
-        CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, prop);
-        List<Double> hs = partHeightsCss(title, body, r, paired);
-        return hs.isEmpty() ? null : hs.get(0);
-    }
-
     private static double bodyLinesThrough(List<String> blocks, int endExclusive1Based) {
         int end = Math.min(endExclusive1Based, blocks.size());
         if (end <= 0) return 0;

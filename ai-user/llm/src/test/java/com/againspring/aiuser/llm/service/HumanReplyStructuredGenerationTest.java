@@ -142,7 +142,7 @@ class HumanReplyStructuredGenerationTest {
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");
-        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5");
+        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5-5");
         ReflectionTestUtils.setField(service, "structuredPromptModeEnabled", false);
         return service;
     }

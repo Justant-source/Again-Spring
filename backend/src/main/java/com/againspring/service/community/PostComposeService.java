@@ -76,33 +76,6 @@ public class PostComposeService {
                 sessionId, source, (java.util.List<Integer>) null, null, null);
     }
 
-    /** @deprecated prefer list overload */
-    @Deprecated
-    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
-                                  PostCategory category, String visibility,
-                                  String sessionId,
-                                  SourceSnapshot source,
-                                  Integer captureSplitAfterLine) {
-        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                sessionId, source,
-                captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
-                null, null);
-    }
-
-    /** @deprecated prefer list overload */
-    @Deprecated
-    public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
-                                  PostCategory category, String visibility,
-                                  String sessionId,
-                                  SourceSnapshot source,
-                                  Integer captureSplitAfterLine,
-                                  String promoTitle) {
-        return composeAndPublish(authorId, userTitle, bodyRaw, category, visibility,
-                sessionId, source,
-                captureSplitAfterLine == null ? null : java.util.List.of(captureSplitAfterLine),
-                promoTitle, null);
-    }
-
     public Post composeAndPublish(String authorId, String userTitle, String bodyRaw,
                                   PostCategory category, String visibility,
                                   String sessionId,

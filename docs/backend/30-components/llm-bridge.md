@@ -96,7 +96,7 @@ backend는 `SyntheticOutputGuard`로 `users.synthetic=1` 작성자의 글·댓�
 `llm-worker/` 디렉토리: Spring Boot + Claude CLI 실행 앱  
 컨테이너: `againspring-llm` (base 스택, dev·prod 공유, port :8090)  
 - 모델: `claude-haiku-4-5-20251001`
-- 보고서/분석 모델: `claude-sonnet-5` (2026-08-21부터; 이전 `claude-sonnet-4-6`)
+- 보고서/분석 모델: `claude-sonnet-5-5` (2026-08-21부터; 이전 `claude-sonnet-5-5`)
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
 - **호출 경로**: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke` (RemoteLlmProvider 경유)

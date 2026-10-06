@@ -9,7 +9,7 @@
 | 빌드 | Gradle 8.5 (Kotlin DSL) |
 | DB | MariaDB 11 LTS (utf8mb4, UTC) |
 | ORM | Spring Data JPA (Hibernate) |
-| 마이그레이션 | Flyway 10 (V1~V56) |
+| 마이그레이션 | Flyway 10 (V1~V126) |
 | 인증 | Spring Security + JWT (jjwt 0.12.5) |
 | 메일 | Spring Mail (Gmail SMTP) |
 | API 문서 | springdoc-openapi 2.6 (Swagger UI) |
@@ -37,7 +37,7 @@ flowchart TB
         Sched["RetentionScheduler\nservice/retention/"]
         Notify["service/notify/\nservice/notification/"]
     end
-    DB[(MariaDB 11\nFlyway V1~V56)]
+    DB[(MariaDB 11\nFlyway V1~V126)]
     LLMWorker["againspring-llm\n공유 워커 컨테이너\nClaude CLI"]
 
     Client --> Filter --> Controller --> Service
@@ -63,12 +63,12 @@ HTTP Request
    │  ├── safety/* (CrisisKeywordGuard, PromptSanitizer)
    │  └── llm/remote/* (RemoteLlmProvider → llm-worker HTTP)
    │
-   │  자세한 설명: llm-bridge.md 참조
+   │  자세한 설명: docs/backend/30-components/llm-bridge.md
    ▼
 @Repository (Spring Data JPA)
    │
    ▼
-MariaDB (Flyway V1~V56 관리 스키마)
+MariaDB (Flyway V1~V126 관리 스키마)
 ```
 
 ## 트랜잭션 정책
@@ -132,11 +132,16 @@ flowchart LR
 
 | 빈 | cron | 동작 |
 |---|---|---|
-| `RetentionScheduler.purgeExpiredContent` | `0 0 3 * * *` (매일 03:00 UTC) | 30일 경과 세션의 `messages.content` NULL 처리 |
 | `RevokedTokenCleanupScheduler.cleanup` | `0 0 4 * * *` (매일 04:00 UTC) | 만료된 `revoked_tokens` 행 삭제 |
-| `DailyStatsAggregator` | `0 0 0 * * *` (자정 UTC) | 전날 세션·사용자 통계 → `daily_stats` 집계 |
-| `GuestSessionCleanupScheduler` | `0 0 2 * * *` (매일 02:00 UTC) | 만료 게스트 세션 정리 |
-| `SessionHealthCheckJob` *(dev, marketing.enabled)* | `0 0 3 * * *` (매일 03:00) | X·Instagram 세션 유효성 확인 + 피드 방문으로 쿠키 갱신 → DB 저장 |
+| `DailyStatsAggregatorService` | `0 0 0 * * *` (자정 Asia/Seoul) | 전날 통계 → `daily_stats` |
+| `MarketingPollingScheduler` | poll 15s · retry 60s · monitor 5m | 마케팅 잡 폴링 |
+| `MarketingHoldingPoolScheduler` | 10m | 홀딩 풀 갱신 |
+| `MarketingDailyReportScheduler` | `0 0 22 * * *` Asia/Seoul | 일일 리포트 |
+| `MarketingPlatformStatsScheduler` | 06:30 매일 · 월요일 09:00 | 플랫폼 통계 |
+| `XGrowthLoopScheduler` | 매분 · 08–22시 30분 | X 성장 루프 |
+| `XThreadPublishTriggerScheduler` | 10m | X 스레드 발행 트리거 |
+| `XPersonaLearnScheduler` | 매분 Asia/Seoul | 페르소나 학습 |
+| `AiBatchLearningService` | 30m fixed delay | 배치 학습 |
 
 `SchedulingConfig`의 `@EnableScheduling` 활성. 테스트 프로파일에서는 비활성.
 
@@ -167,7 +172,7 @@ flowchart LR
 | `JwtAuthFilter` | 모든 요청에서 토큰 검증 + 폐기 확인 | [`shared/policies/auth.md`](../../shared/70-policy/auth.md) |
 | `RateLimitFilter` | bucket4j 기반 IP/유저별 제한 | [`shared/policies/auth.md`](../../shared/70-policy/auth.md) |
 | `CrisisKeywordGuard` | 실사용자 위기 키워드 감사 로그(게시 차단 없음) | `docs/frontend/60-runtime/flows/08-crisis.md` |
-| `PromptSanitizer` | LLM 입력 inject 방지 | `docs/backend/llm-bridge.md` |
+| `PromptSanitizer` | LLM 입력 inject 방지 | `docs/backend/30-components/llm-bridge.md` |
 | `SafetyAuditLogger` | 모든 safety 이벤트 마스킹 후 DB | — |
 
 ## 예외 처리
@@ -198,11 +203,11 @@ flowchart LR
 
 | 요구사항 | 구현 |
 |---|---|
-| LLM 동시성 제한 | `ClaudeCodeWorkerPool.semaphore = 3` (변경: `CLAUDE_POOL_SIZE` env) |
-| LLM 타임아웃 | 60s (변경: `claude-code.default-timeout-ms`) |
+| LLM 동시성 제한 | base `againspring-llm` 워커 풀 (`LLM_POOL_SIZE`, 기본 100) |
+| LLM 타임아웃 | 워커 기본 120s (`LLM` execution timeout). BE는 `RemoteLlmProvider`만 호출 |
 | DB 풀 크기 | dev 10/2, prod 20/5 (HikariCP) |
 | Rate limit | RateLimitFilter (bucket4j) |
 | 로깅 | logback-spring.xml + Lombok @Slf4j |
-| 트레이싱 | `correlationId` (UUID, X-Request-ID 헤더) — `LLMCallLogger` 등에 전파 |
+| 트레이싱 | `correlationId` (UUID, X-Request-ID 헤더) |
 
 ---

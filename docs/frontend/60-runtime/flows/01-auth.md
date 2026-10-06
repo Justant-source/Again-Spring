@@ -31,7 +31,7 @@
 | `/login?next=/s/{token}` | 성공 후 `safeRedirect(next)` → `/s/{token}` |
 | `/signup?next=/s/{token}` | 성공 후 동일 (게스트 업그레이드 포함) |
 | OAuth `state` | `next=/s/{token}` 인코딩 → 콜백에서 복원 |
-| GuestUpgradeModal | `redirect`/`next`에 `/s/{token}` 유지 |
+| 게스트 가입·로그인 | `redirect`/`next`에 `/s/{token}` 유지 (`GuestUpgradeModal`은 없음) |
 
 근거: `safeRedirect()` · [09-partner-invite-ownership.md](./09-partner-invite-ownership.md).
 

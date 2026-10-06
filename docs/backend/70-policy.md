@@ -73,9 +73,9 @@ prod:8091 e2e 게이트가 이 스크립트를 setup/teardown에서 호출한다
 
 ```java
 @ExtendWith(MockitoExtension.class)
-class StyleCalculatorTest {
+class PromoTitleServiceTest {
     @Test
-    void givenAllFives_returnsWaveStyle() { ... }
+    void generate_stripsTitleOverlap() { ... }
 }
 ```
 
@@ -123,7 +123,6 @@ CI에서는 환경변수 없으면 자동 skip.
 다음 클래스는 변경 시 반드시 테스트:
 
 - `safety/CrisisKeywordGuard` — 위기 키워드 카테고리 전부
-- `safety/RatioEnforcer` — factual/difference/mixed 클리핑 + 엣지 케이스
 - `llm/PromptSanitizer` — INJECTION_PATTERNS 전부 + 길이 제한
 - `security/JwtService` — 토큰 발급/검증/폐기 확인
 - `security/JwtAuthFilter` — 인증 헤더 누락/유효/만료/폐기 시나리오

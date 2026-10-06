@@ -63,7 +63,7 @@ class XPersonaShadowEvalTest {
     @BeforeEach
     void setUp() throws Exception {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
-        ReflectionTestUtils.setField(service, "model", "claude-sonnet-5");
+        ReflectionTestUtils.setField(service, "model", "claude-sonnet-5-5");
         when(promptSanitizer.sanitize(any())).thenAnswer(inv -> {
             Object arg = inv.getArgument(0);
             return arg == null ? "" : arg.toString();
@@ -111,7 +111,7 @@ class XPersonaShadowEvalTest {
         }
         service.runForNewGold(gold);
         verify(commentComposer, times(10)).composeOutbound(anyString(), eq(List.of()), isNull(), any());
-        verify(llmProvider, times(10)).invoke(anyString(), eq("claude-sonnet-5"));
+        verify(llmProvider, times(10)).invoke(anyString(), eq("claude-sonnet-5-5"));
         verify(evalRepository, times(10)).save(any());
     }
 

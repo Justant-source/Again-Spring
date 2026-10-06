@@ -25,7 +25,7 @@ class PersonaProfileServiceTest {
 
     private static PersonaProfileService configuredService(LlmWorkerPool pool) {
         PersonaProfileService service = new PersonaProfileService(pool);
-        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5");
+        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5-5");
         ReflectionTestUtils.setField(service, "defaultTimeoutMs", 60000L);
         service.loadTemplate();
         return service;

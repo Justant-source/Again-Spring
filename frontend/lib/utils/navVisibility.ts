@@ -1,10 +1,6 @@
 /**
- * 바텀 내비 / 법적 푸터 가시성 공용 헬퍼.
- * BottomNav.tsx와 LegalFooter.tsx가 동일 로직을 공유.
+ * 바텀 내비 가시성. BottomNav.tsx가 사용한다.
  */
-
-/** 바텀 내비 시각적 높이 (safe-area 제외). layout.tsx paddingBottom 계산에 사용. */
-export const BOTTOM_NAV_HEIGHT = 0;
 
 /**
  * 바텀 내비를 표시할 경로 — 화이트리스트.
@@ -25,15 +21,4 @@ export function isNavVisible(pathname: string): boolean {
     pathname === '/profile' ||
     pathname.startsWith('/profile/')
   );
-}
-
-/** @deprecated isNavVisible 로 대체. LegalFooter.tsx 에서만 사용 중. */
-export const NAV_HIDE_PATHS = [
-  '/onboarding', '/login', '/signup', '/guest', '/forgot', '/reset',
-  '/auth/callback', '/admin', '/community/new', '/s/',
-];
-
-/** @deprecated isNavVisible 로 대체. LegalFooter.tsx 에서만 사용 중. */
-export function isNavHidden(pathname: string): boolean {
-  return NAV_HIDE_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
 }

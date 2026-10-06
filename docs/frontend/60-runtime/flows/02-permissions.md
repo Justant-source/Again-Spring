@@ -93,10 +93,7 @@
 
 - **정의**: tier가 아닌 `user.roles` 배열의 값. `permissionsFor()` 결과에 영향 없음.
 - `TESTER`를 가진 사용자는 `permissionsFor()` 기준 `registered` tier로 분류됨.
-- **사용처 1**: `components/chat/ChatLayout.tsx:33` — `isTester = currentUser?.roles?.includes('TESTER') ?? false`
-  - Solo 패널: 초대 버튼은 `isTester`일 때만 표시
-  - Duo 세션: `isTester`이면 SwipeContainer+PartnerPanel, 아니면 Solo 패널 fallback
-- **사용처 2**: `app/(admin)/admin/page.tsx` — 사용자 관리의 TESTER role 토글 버튼
+- `ChatLayout`은 없다. TESTER role 토글은 `app/(admin)/admin/users/page.tsx`와 `app/(admin)/admin/users/[id]/page.tsx`에 있다.
 
 ---
 
@@ -119,11 +116,8 @@ Next.js middleware 없음. 모든 가드는 클라이언트 측에서 처리.
 
 | 모달 | 표시 조건 | 닫기 방법 |
 |---|---|---|
-| `OnboardingModal` (30초 튜토리얼) | `!!user && !isGuest && tutorialCompleted === false` | 슬라이드 완료 또는 닫기 버튼 |
-| `ConsentReconfirmModal` | `registered/admin && (!termsAgreedAt \|\| !privacyAgreedAt \|\| !disclaimerAgreedAt)` | 동의 완료 |
 | `ForcePasswordChangeModal` | 임시 비밀번호로 로그인 + `forcePasswordChange === true` | 비밀번호 변경 완료 |
-| `GuestUpgradeModal` | `uiStore.guestLimitModalVisible === true` | 닫기 또는 가입하기 |
-| `DailyLimitModal` | `uiStore.dailyLimitModalVisible === true` | 닫기 |
+| `DailyLimitModal` | `uiStore.dailyLimitModal === true` | 닫기 |
 
 ---
 
@@ -132,6 +126,5 @@ Next.js middleware 없음. 모든 가드는 클라이언트 측에서 처리.
 - `lib/constants/userPermissions.ts` — 권한 정의 + `permissionsFor()`
 - `lib/api/client.ts` — 응답 인터셉터 (401/403/402/429 처리)
 - `lib/store/uiStore.ts` — `showGuestLimitModal()` · `showDailyLimitModal()`
-- `app/layout.tsx` — 전역 모달 게이트
-- `components/chat/ChatLayout.tsx` — TESTER role 분기
-- `app/(admin)/admin/page.tsx` — admin 3중 가드
+- `app/layout.tsx` — `DailyLimitModal`, `ForcePasswordChangeModal` (`OnboardingModal`·`GuestUpgradeModal`·`LegalFooter` 없음)
+- `app/(admin)/admin/users/page.tsx` — TESTER role 토글

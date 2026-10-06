@@ -57,11 +57,6 @@ api.interceptors.response.use(
         }
         useUiStore.getState().setAuthError('unauthorized');
       }
-    } else if (status === 402 && code === 'GUEST_LIMIT_REACHED') {
-      const match = typeof window !== 'undefined'
-        ? window.location.pathname.match(/\/session\/chat\/([^/]+)/)
-        : null;
-      useUiStore.getState().showGuestLimitModal(match ? match[1] : null);
     } else if (status === 429 && code === 'DAILY_LIMIT_EXCEEDED') {
       useUiStore.getState().showDailyLimitModal();
     }

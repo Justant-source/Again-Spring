@@ -140,12 +140,9 @@ class StructuredGenerationServiceTest {
     }
 
     @Test
-    void sanitizeCaptureSplitHelpers() {
+    void countNonEmptyBlocksCountsLines() {
         String longBody = longBodyWithBlocks(14);
         assertEquals(14, StructuredGenerationService.countNonEmptyBlocks(longBody));
-        assertEquals(8, StructuredGenerationService.sanitizeCaptureSplit(longBody, 8));
-        assertEquals(null, StructuredGenerationService.sanitizeCaptureSplit(longBody, 14));
-        assertEquals(null, StructuredGenerationService.sanitizeCaptureSplit("한 줄만", 1));
     }
 
     @Test
@@ -477,7 +474,7 @@ class StructuredGenerationServiceTest {
         ReflectionTestUtils.setField(service, "codexTerra", "gpt-5.6-terra");
         ReflectionTestUtils.setField(service, "codexLuna", "gpt-5.6-luna");
         ReflectionTestUtils.setField(service, "claudeDefault", "claude-haiku-4-5-20251001");
-        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5");
+        ReflectionTestUtils.setField(service, "claudePostModel", "claude-sonnet-5-5");
         ReflectionTestUtils.setField(service, "structuredPromptModeEnabled", false);
         return service;
     }

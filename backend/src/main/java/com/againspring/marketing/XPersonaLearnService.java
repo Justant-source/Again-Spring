@@ -88,7 +88,7 @@ public class XPersonaLearnService {
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
 
-    @Value("${marketing.x.persona-learn-model:claude-sonnet-5}")
+    @Value("${marketing.x.persona-learn-model:claude-sonnet-5-5}")
     private String model;
 
     public record LearnResult(String status, int newManuals, Instant learnedAt, String summary) {}

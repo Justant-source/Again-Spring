@@ -68,7 +68,7 @@ class XPersonaLearnServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         ReflectionTestUtils.setField(service, "llmEnabled", false);
-        ReflectionTestUtils.setField(service, "model", "claude-sonnet-5");
+        ReflectionTestUtils.setField(service, "model", "claude-sonnet-5-5");
         when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
         when(systemSettingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(xOpsSettingsService.get()).thenReturn(learningOn());
@@ -282,13 +282,13 @@ class XPersonaLearnServiceTest {
                 .source(XPersonaExample.Source.TIMELINE)
                 .operatorBody("너무귀여움 ㅋㅋㅋㅋ")
                 .build()));
-        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5")))
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5-5")))
             .thenReturn("{\"summary\":\"한줄 구어체\",\"traits\":[\"ㅋㅋ\"],\"examples\":[\"너무귀여움\"],\"avoid\":[\"습니다체\"],\"situations\":[],\"post_style\":\"짧고 장난\"}");
 
         XPersonaLearnService.LearnResult r = service.runNow("admin");
 
         assertThat(r.status()).isEqualTo("OK");
-        verify(llmProvider).invoke(anyString(), eq("claude-sonnet-5"));
+        verify(llmProvider).invoke(anyString(), eq("claude-sonnet-5-5"));
         ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
         verify(systemSettingRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
         assertThat(captor.getAllValues())
@@ -308,7 +308,7 @@ class XPersonaLearnServiceTest {
                 .source(XPersonaExample.Source.TIMELINE)
                 .operatorBody("너무귀여움 ㅋㅋㅋㅋ")
                 .build()));
-        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5")))
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5-5")))
             .thenReturn("Credit balance is too low");
 
         XPersonaLearnService.LearnResult r = service.runNow("admin");
@@ -333,7 +333,7 @@ class XPersonaLearnServiceTest {
                 .source(XPersonaExample.Source.TIMELINE)
                 .operatorBody("너무귀여움 ㅋㅋㅋㅋ")
                 .build()));
-        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5")))
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5-5")))
             .thenReturn("{\"summary\":\"Hello this profile is entirely english filler text\",\"traits\":[],\"examples\":[\"hello world entirely english\"],\"avoid\":[]}");
 
         XPersonaLearnService.LearnResult r = service.runNow("admin");
@@ -365,13 +365,13 @@ class XPersonaLearnServiceTest {
                 .source(XPersonaExample.Source.TIMELINE_POST)
                 .operatorBody("벌써자?")
                 .build()));
-        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5")))
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5-5")))
             .thenReturn("{\"summary\":\"한줄 구어체\",\"traits\":[\"ㅋㅋ\"],\"examples\":[\"너무귀여움\"],\"avoid\":[\"습니다체\"]}");
 
         service.runNow("admin");
 
         ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(prompt.capture(), eq("claude-sonnet-5"));
+        verify(llmProvider).invoke(prompt.capture(), eq("claude-sonnet-5-5"));
         assertThat(prompt.getValue())
             .contains("유지 원칙 — 절대 바꾸지 말 것")
             .contains("한 줄로 끊는 구어체 유지 원칙 앵커")

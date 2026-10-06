@@ -67,7 +67,7 @@ public class XPersonaShadowEval {
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
 
-    @Value("${marketing.x.persona-learn-model:claude-sonnet-5}")
+    @Value("${marketing.x.persona-learn-model:claude-sonnet-5-5}")
     private String model;
 
     /**

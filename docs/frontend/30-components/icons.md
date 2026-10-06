@@ -22,48 +22,10 @@
 
 ## 아이콘 목록
 
-### 다시봄 정체성 — `components/icons/`
-
-| 컴포넌트 | 역할 | 주요 사용처 |
-|---|---|---|
-| `DasibomLogo` | 다시봄 새싹 로고 | 헤더, 랜딩 |
-| `Conversation` | 대화·정리 아이콘 | 온보딩, 안내 |
-| `SafeHaven` | 보호·우산 | 위기 자원 섹션 |
-| `Phone` | 전화 수화기 | 핫라인 번호 옆 |
-| `CrisisResources` | 위기 자원 진입 | 위기 메뉴 |
-| `IconCheck` | 완료·성공 체크 | 성공 메시지 |
-| `StatusDot` | 상태 컬러 점(진영 식별) | 작성자(피치) / 상대방(세이지) |
-
-### 커뮤니케이션 스타일 — `components/shared/Motif.tsx`
-
-6종 자연물 은유 SVG:
-
-| variant | 스타일 | 색 참고 |
-|---|---|---|
-| `wave` | 파도형 | `#60A5FA` |
-| `mountain` | 산형 | `#78716C` |
-| `flame` | 불꽃형 | `#F87171` |
-| `leaf` | 이파리형 | `#4ADE80` |
-| `moon` | 달빛형 | `#A78BFA` |
-| `star` | 별빛형 | `#FBBF24` |
-
----
-
-## 사용 패턴
+`frontend/components/icons/` 의 React SVG(`DasibomLogo`, `Phone`, `SafeHaven`, `CrisisResources`, `IconCheck`, `StatusDot`, `Conversation`)와 `components/shared/Motif.tsx` 는 삭제됐다. 화면 아이콘은 `lucide-react` 를 쓴다. 새싹 캐릭터 자산은 `docs/frontend/assets/sprout-character-system/` 이다.
 
 ```tsx
-import { IconCheck } from '@/components/icons/IconCheck';
-import { StatusDot } from '@/components/icons/StatusDot';
-import { DasibomLogo } from '@/components/icons/DasibomLogo';
-
-// 성공 메시지
-<p>비밀번호가 변경되었어요 <IconCheck width={14} height={14} /></p>
-
-// 거리 표시
-<StatusDot level={distanceInfo.level} size={12} />
-
-// 로고
-<DasibomLogo width={28} height={28} />
+import { CheckCircle2 } from 'lucide-react';
 ```
 
 ---
@@ -84,8 +46,8 @@ import { DasibomLogo } from '@/components/icons/DasibomLogo';
 | ✅ (MOCKUP 주석) | 주석 라인 제거 | ✓ |
 | ⚠️ (MOCKUP 주석) | 주석 라인 제거 | ✓ |
 | ✓ (UI 텍스트) | 텍스트 단순화 | ✓ |
-| 💚🌱🟡🟠🔴 (거리 표시) | `StatusDot` SVG | ✓ |
-| 🌊🏔🔥🌿🌙⭐ (스타일 data) | `emoji` 필드 제거 (미사용) | ✓ |
+| 💚🌱🟡🟠🔴 (거리 표시) | 컴포넌트 삭제. 거리 점은 현재 UI에 없음 | ✓ |
+| 🌊🏔🔥🌿🌙⭐ (스타일 data) | `Motif` 삭제. emoji 필드 없음 | ✓ |
 
 ---
 

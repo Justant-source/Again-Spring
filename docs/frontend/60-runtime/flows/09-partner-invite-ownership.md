@@ -131,7 +131,7 @@ ALTER TABLE posts
 
 ### 인증
 
-`login` / `signup` / OAuth state / GuestUpgradeModal 전부 `next`·`redirect` 보존.
+`login` / `signup` / OAuth state 전부 `next`·`redirect` 보존. `GuestUpgradeModal`은 없다.
 
 ## 비범위
 

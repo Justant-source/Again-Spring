@@ -49,7 +49,7 @@ public class MarketingGenerationTrace {
     @Column(length = 32)
     private String renderProfile;
 
-    /** Model name (e.g., claude-haiku-4-5-20251001, claude-sonnet-5). */
+    /** Model name (e.g., claude-haiku-4-5-20251001, claude-sonnet-5-5). */
     @Column(length = 64)
     private String llmModel;
 

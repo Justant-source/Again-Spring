@@ -19,57 +19,6 @@ public interface MarketingHoldingRepository extends JpaRepository<MarketingHoldi
     List<MarketingHolding> findByPostIdIn(Collection<String> postIds);
 
     /**
-     * @deprecated Phase 1 shared-pool count. Prefer {@link #countCommittedForPlatformSince}.
-     */
-    @Deprecated
-    @Query(nativeQuery = true, value = """
-        SELECT COUNT(*) FROM marketing_holding mh
-        WHERE mh.status = 'COMMITTED'
-        AND mh.locked_at >= :since
-        """)
-    long countCommittedSince(@Param("since") Instant since);
-
-    /**
-     * @deprecated Phase 1 video subset. Prefer {@link #countCommittedForPlatformSince}.
-     */
-    @Deprecated
-    @Query(nativeQuery = true, value = """
-        SELECT COUNT(*) FROM marketing_holding mh
-        WHERE mh.status = 'COMMITTED'
-        AND mh.locked_at >= :since
-        AND (
-            mh.pin_format = 'VIDEO'
-            OR EXISTS (
-                SELECT 1 FROM marketing_job mj
-                WHERE mj.post_id = mh.post_id
-                AND (
-                    JSON_CONTAINS(mj.targets, '"instagram_reels"') = TRUE
-                    OR JSON_CONTAINS(mj.targets, '"youtube_shorts"') = TRUE
-                )
-            )
-        )
-        """)
-    long countCommittedVideosSince(@Param("since") Instant since);
-
-    /**
-     * Phase 2: stories COMMITTED today (KST window via {@code since}) that have a job
-     * targeting {@code platform}. One story counts once per platform.
-     */
-    @Query(nativeQuery = true, value = """
-        SELECT COUNT(*) FROM marketing_holding mh
-        WHERE mh.status = 'COMMITTED'
-        AND mh.locked_at >= :since
-        AND EXISTS (
-            SELECT 1 FROM marketing_job mj
-            WHERE mj.post_id = mh.post_id
-            AND JSON_CONTAINS(mj.targets, CONCAT('"', :platform, '"')) = TRUE
-        )
-        """)
-    long countCommittedForPlatformSince(
-        @Param("platform") String platform,
-        @Param("since") Instant since);
-
-    /**
      * Active waiting-board candidates: still inside the 24h window, not soft-deleted,
      * and not already COMMITTED/DROPPED on the holding table.
      */

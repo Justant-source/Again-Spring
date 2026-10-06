@@ -6,7 +6,7 @@
 
 systemd 사용자 타이머가 5분마다 watchdog 스크립트를 실행하여:
 
-1. **Claude 세션 생존** — **10분마다**(2026-08-15 단축, 기존 1시간) canary ping (최소 토큰 호출). ping은 **90초** 제한·`ANTHROPIC_API_KEY` 제거·WSL은 `~/.local/bin/claude`를 nvm보다 우선한다(nvm v22에 claude가 없어 30초 타임아웃으로 정상 oauth를 실패 처리한 전례). 마케팅 LLM 호출 실패 기반 즉시 감지(연속 인증 오류 2회 → 긴급 알림)는 `docs/backend/llm-bridge.md` §인증 오류 감지 참조 — canary는 요청이 없는 시간대(새벽)만 보조로 커버한다.
+1. **Claude 세션 생존** — **10분마다**(2026-08-15 단축, 기존 1시간) canary ping (최소 토큰 호출). ping은 **90초** 제한·`ANTHROPIC_API_KEY` 제거·WSL은 `~/.local/bin/claude`를 nvm보다 우선한다(nvm v22에 claude가 없어 30초 타임아웃으로 정상 oauth를 실패 처리한 전례). 마케팅 LLM 호출 실패 기반 즉시 감지(연속 인증 오류 2회 → 긴급 알림)는 `docs/backend/30-components/llm-bridge.md` §마케팅 경로 인증 오류 즉시 감지 참조 — canary는 요청이 없는 시간대(새벽)만 보조로 커버한다.
 2. **자격증명 소유권** — `~/.claude/.credentials.json` 소유자 확인 (justant 여부)
 3. **컨테이너 헬스** — `docker ps`에서 `unhealthy` 상태인 againspring 컨테이너 자동 재시작. `.State.Health.Status`가 있는 컨테이너는 그 값을, 없으면(`health=NONE`) 기존처럼 `.State.Status`만 판정 (2026-08-15부터 WSL 워치독에 반영)
 4. **WSL 재부팅 감지** — 부팅 시각을 상태 파일에 기록해 이전 값과 비교, 변경 시 Telegram 통보 (2026-08-15 신설 — 최근 12일 재부팅 5회 실측, 근본원인 미확정 상태에서 최소한의 가시성 확보)

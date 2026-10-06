@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaptureHeightCalculatorTest {
@@ -16,7 +15,6 @@ class CaptureHeightCalculatorTest {
         CaptureSplitSupport.ResolvedCapture r = CaptureSplitSupport.resolveSolo(body, null);
         assertTrue(r.splits().isEmpty());
         assertTrue(CaptureHeightCalculator.partHeightsCss("짧은 제목", body, r, false).isEmpty());
-        assertNull(CaptureHeightCalculator.part1HeightCss("짧은 제목", body, null, false));
     }
 
     @Test

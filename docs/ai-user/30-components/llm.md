@@ -61,7 +61,7 @@ solo `thread-plan` mega/micro-batch와 분리된 **paired 전용** 구조화 워
 
 ### 검증된 세션 smoke 결과
 
-2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-5` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
+2026-07-30에 컨테이너에서 provider별로 승인된 단일 구조화 요청을 실행했다. Codex `gpt-5.6-terra`와 Claude `claude-sonnet-5-5` 모두 schema 유효 JSON을 반환했다. 이 검증은 DB/게시 API에 쓰지 않았으며, 실제 운영 콘텐츠 생성은 별도 승인 범위다.
 
 ## Claude CLI tool 오버헤드 감소 (2026-08-21)
 
@@ -91,7 +91,7 @@ Claude Code CLI는 기본적으로 모든 tool 정의를 프롬프트에 함께 
 | queue wait timeout | `30000ms` |
 | default timeout | `120000ms` |
 | base model | `claude-haiku-4-5-20251001` |
-| post model override | 빈 값, compose에서는 `claude-sonnet-5` |
+| post model override | 빈 값, compose에서는 `claude-sonnet-5-5` |
 
 **타임아웃 시 프로세스 트리 종료** (2026-09-03): 실행 타임아웃이 지나면 `LlmWorkerPool`이 더 이상 `LlmTimeoutException`만 던지고 CLI 프로세스를 방치하지 않는다. 각 실행은 `ExecutionSlot.open(correlationId)`으로 슬롯을 열고, `ClaudeCliInvoker`/`CodexCliInvoker`가 `ExecutionSlot.attachCurrent(process)`로 실제 프로세스를 슬롯에 연결한다. 타임아웃 스케줄 태스크는 `slot.terminate(processTerminator, "execution-timeout")`을 호출해 `ProcessTerminator`가 프로세스 트리를 죽인 뒤에 예외를 완료시킨다 — 이전에는 타임아웃이 나도 프로세스가 살아남아 워커 슬롯을 영구히 붙잡는 문제가 있었다. `WorkerMetrics.timedOut`(`GET /v1/metrics`)이 누적 타임아웃 건수를 노출한다.
 

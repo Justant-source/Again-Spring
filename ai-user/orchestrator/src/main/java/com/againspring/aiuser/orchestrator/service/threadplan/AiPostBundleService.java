@@ -1120,13 +1120,6 @@ public class AiPostBundleService {
         return cuts.isEmpty() ? null : cuts;
     }
 
-    /** @deprecated use {@link #resolveCaptureSplits} */
-    @Deprecated
-    static Integer resolveCaptureSplit(String body, Integer proposed) {
-        List<Integer> list = resolveCaptureSplits(body, proposed == null ? null : List.of(proposed));
-        return (list == null || list.isEmpty()) ? null : list.get(0);
-    }
-
     static int countNonEmptyBlocks(String body) {
         if (body == null || body.isBlank()) return 0;
         int c = 0;

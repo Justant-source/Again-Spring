@@ -95,18 +95,6 @@ public final class CaptureSplitSupport {
         return new PairedCapture(author, partner);
     }
 
-    /**
-     * Legacy single-cut API — first cut only, or null when short / single part.
-     * @deprecated use {@link #resolveSolo(String, List)}
-     */
-    @Deprecated
-    public static Integer resolveSplit(String body, Integer proposed) {
-        List<Integer> prop = proposed == null ? null : List.of(proposed);
-        ResolvedCapture r = resolveSolo(body, prop);
-        if (r.splits().isEmpty()) return null;
-        return r.splits().get(0);
-    }
-
     private static List<Integer> sanitizeProposed(List<Integer> proposed, int usable, int partsCap) {
         if (proposed == null || proposed.isEmpty()) return null;
         List<Integer> raw = new ArrayList<>();

@@ -60,7 +60,7 @@ class VideoVariantServiceTest {
                     """);
 
         VideoVariantService.Variants v = service.generate(
-                "마스터훅", "shock", "제목", "본문이 길어요 갈등 이야기", true, true);
+                "마스터훅", "shock", "제목", "본문이 길어요 갈등 이야기", true, true, List.of());
 
         assertThat(v.hookReels()).isEqualTo("릴스만의훅");
         assertThat(v.hookShorts()).isEqualTo("쇼츠훅");
@@ -209,7 +209,7 @@ class VideoVariantServiceTest {
             """);
 
         VideoVariantService.Variants v = service.generate(
-                "마스터훅", "tension", "제목", "본문 갈등", false, true);
+                "마스터훅", "tension", "제목", "본문 갈등", false, true, List.of());
 
         assertThat(v.hookShorts()).doesNotContain("/").doesNotContain("／");
         assertThat(v.hookShorts()).isEqualTo("연애 3개월에 8개월 동거를 들었다 지금의 연애가 뭐인지 모르겠어");
@@ -290,7 +290,7 @@ class VideoVariantServiceTest {
         when(llmProvider.invoke(anyString(), anyString())).thenThrow(new RuntimeException("down"));
 
         VideoVariantService.Variants v = service.generate(
-                "마스터", "anger", "제목", "본문요약용텍스트입니다", true, false);
+                "마스터", "anger", "제목", "본문요약용텍스트입니다", true, false, List.of());
 
         assertThat(v.hookReels()).isEqualTo("마스터");
         assertThat(v.scriptReels()).contains("본문");
@@ -317,7 +317,7 @@ class VideoVariantServiceTest {
 
     @Test
     void generate_nonVideo_returnsEmpty() {
-        VideoVariantService.Variants v = service.generate("h", "sad", "t", "b", false, false);
+        VideoVariantService.Variants v = service.generate("h", "sad", "t", "b", false, false, List.of());
         assertThat(v.hookReels()).isNull();
         assertThat(v.scriptShorts()).isNull();
         assertThat(v.sibomPlan()).isEmpty();
@@ -334,7 +334,7 @@ class VideoVariantServiceTest {
                     """);
 
         VideoVariantService.Variants v = service.generate(
-                "마스터", "tension", "제목", "본문", true, true);
+                "마스터", "tension", "제목", "본문", true, true, List.of());
 
         assertThat(v.hookReels()).doesNotContain("판결");
         assertThat(v.scriptReels()).doesNotContain("배심원");

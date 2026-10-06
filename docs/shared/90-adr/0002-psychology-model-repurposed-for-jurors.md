@@ -93,7 +93,7 @@ Rather than per-turn inference, each juror represents a distinct perspective gro
 
 **Preserved (not deleted)**:
 - `PromptSanitizer` — still used in `JuryService` to clean juror outputs.
-- `EnforcedRatio` class — not wired to UI, not deleted. Future use: per-juror scoring (optional).
+- `EnforcedRatio` — 당시에는 남겼다. 2026-10-06에 클래스와 `ConflictType`을 삭제했다. 배심원 점수 용도로 쓰지 않는다.
 - Prompts directory structure — `/docs/shared/prompts/community/`.
 
 **Deleted** (at defc742):

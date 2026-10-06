@@ -12,7 +12,7 @@ class ClaudeCliInvokerStructuredCommandTest {
 
     @Test
     void structuredClaudeCommandPassesNativeJsonSchemaWithoutSessionPersistence() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system");
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system");
 
         assertTrue(command.containsAll(List.of("--json-schema", "{\"type\":\"object\"}", "--no-session-persistence")));
     }
@@ -23,7 +23,7 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void structuredClaudeCommandUsesExplicitDisallowedToolsWithSchema() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system");
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system");
 
         // Verify --disallowedTools is present with the explicit list (not "*")
         int disallowIdx = command.indexOf("--disallowedTools");
@@ -44,7 +44,7 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void nonStructuredClaudeCommandUsesWildcardDisallowedTools() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", null, "system");
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", null, "system");
 
         // Verify --disallowedTools is present with wildcard value
         int disallowIdx = command.indexOf("--disallowedTools");
@@ -62,7 +62,7 @@ class ClaudeCliInvokerStructuredCommandTest {
     @Test
     void structuredClaudeCommandNeverIncludesUserPartAsArgument() {
         String hugeUserPart = "x".repeat(5_000_000);
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", null, "system");
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", null, "system");
 
         assertTrue(command.stream().noneMatch(arg -> arg.contains(hugeUserPart)));
     }
@@ -72,8 +72,8 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void flagOffProducesIdenticalCommand() {
-        List<String> legacyCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", false);
-        List<String> defaultCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system");
+        List<String> legacyCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system", false);
+        List<String> defaultCommand = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system");
 
         assertEquals(legacyCommand, defaultCommand, "Flag OFF must produce identical command to default behavior");
     }
@@ -83,7 +83,7 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void flagOnWithSchemaUsesWildcardDisallow() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", true);
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system", true);
 
         // Must use wildcard disallow (not explicit list)
         int disallowIdx = command.indexOf("--disallowedTools");
@@ -99,7 +99,7 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void flagOnNoSchemaUsesWildcardDisallow() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", null, "system", true);
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", null, "system", true);
 
         int disallowIdx = command.indexOf("--disallowedTools");
         assertEquals("*", command.get(disallowIdx + 1), "No schema should use wildcard --disallowedTools");
@@ -111,7 +111,7 @@ class ClaudeCliInvokerStructuredCommandTest {
      */
     @Test
     void flagOffWithSchemaPreservesExplicitDisallow() {
-        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5", "{\"type\":\"object\"}", "system", false);
+        List<String> command = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "{\"type\":\"object\"}", "system", false);
 
         int disallowIdx = command.indexOf("--disallowedTools");
         String disallowValue = command.get(disallowIdx + 1);

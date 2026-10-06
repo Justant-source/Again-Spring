@@ -105,7 +105,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--date-end", default=DEFAULT_DAY_END)
     parser.add_argument("--per-category", type=int, default=DEFAULT_PER_CATEGORY)
     parser.add_argument("--max-workers", type=int, default=DEFAULT_MAX_WORKERS)
-    parser.add_argument("--post-model", default="claude-sonnet-4-6")
+    parser.add_argument("--post-model", default="claude-sonnet-5-5")
     parser.add_argument("--comment-model", default="claude-haiku-4-5-20251001")
     parser.add_argument("--seed", type=int, default=20260624)
     parser.add_argument("--output-dir", default="ai-user/tools/reports")

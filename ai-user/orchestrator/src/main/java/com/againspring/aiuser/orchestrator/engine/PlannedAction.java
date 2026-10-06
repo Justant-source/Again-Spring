@@ -4,7 +4,7 @@ import com.againspring.aiuser.orchestrator.client.dto.PostDto;
 import com.againspring.aiuser.orchestrator.domain.enums.ActionType;
 
 /**
- * 단일 봇 행동 계획 — ActionPlanner가 생성, ActionExecutor가 실행.
+ * 단일 봇 행동 계획. ActionExecutor가 실행.
  */
 public record PlannedAction(
     ActionType type,

@@ -3,7 +3,6 @@ package com.againspring.marketing;
 import com.againspring.domain.ai.SystemSetting;
 import com.againspring.domain.marketing.MarketingJob;
 import com.againspring.repository.ai.SystemSettingRepository;
-import com.againspring.repository.marketing.MarketingHoldingRepository;
 import com.againspring.repository.marketing.MarketingJobRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -33,8 +32,6 @@ class MarketingQuotaServiceTest {
 
     @Mock
     private SystemSettingRepository systemSettingRepository;
-    @Mock
-    private MarketingHoldingRepository holdingRepository;
     @Mock
     private MarketingJobRepository jobRepository;
     @Spy

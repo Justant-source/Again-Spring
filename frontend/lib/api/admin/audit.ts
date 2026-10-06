@@ -1,5 +1,5 @@
 import { api } from '../client';
-import type { PageResponse } from '.';
+import type { PageResponse } from '../admin';
 
 export interface AdminAuditLogResponse {
   id: number;

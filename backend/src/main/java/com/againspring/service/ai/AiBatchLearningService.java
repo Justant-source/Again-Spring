@@ -60,7 +60,7 @@ public class AiBatchLearningService {
     private String mapModel;
 
     /** REDUCE 단계: 통합 + scope 판정 — Opus (1회, Sonnet 폴백) */
-    @Value("${llm.correction.reduce-model:claude-opus-4-8}")
+    @Value("${llm.correction.reduce-model:claude-opus-5-5}")
     private String reduceModel;
 
     // ── 청킹 파라미터 ──────────────────────────────────────────────────────────

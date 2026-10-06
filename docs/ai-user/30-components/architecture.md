@@ -58,14 +58,14 @@ flowchart LR
 4. plan item은 KST 최근 사람 활동 분포에 맞춰 due 시각을 받고, lease + `Idempotency-Key`로 backend에 한 번만 게시된다.
 5. 사람 interaction inbox는 30분마다 최대 10개 post/50개 interaction을 한 batch로 처리한다.
 
-### 2. Legacy tick (호환 경로)
+### 2. Engagement (좋아요·투표·조회수)
 
-1. `OrchestratorScheduler`가 cron으로 `BehaviorEngine.tick()`을 호출한다.
-2. `AI_USER_ENABLED=true`가 아니면 scheduler 단계에서 바로 skip된다.
-3. `BehaviorEngine`는 prod DB의 `ai_user_generation_config.ai_user_kill_switch`와 일일 cap을 확인한다.
-4. feed를 읽고, 필요하면 신규 글을 LLM으로 분석해 캐시한다.
-5. `ActionPlanner`와 `ActionExecutor`가 좋아요, 투표, 댓글, 대댓글, 글 생성을 실행한다.
-6. 결과는 `backend-prod`를 통해 운영 커뮤니티에 게시된다.
+`BehaviorEngine.tick()`은 없다. 라이브 경로는 `PlanEngagementScheduler` → `PlanEngagementDispatcher` → `PlannedAction` → `ActionExecutor`다.
+
+1. 기본 cron은 `0 */5 * * * *` (`PlanEngagementScheduler`).
+2. `AI_USER_ENABLED`가 아니거나 thread-plan·engagement가 꺼져 있으면 `reconcileDue()`가 return한다.
+3. `ai_user_generation_config`의 kill switch 또는 schedule pause면 return한다.
+4. 조회수는 `ViewDispatcher`, 투표·글 좋아요·댓글 좋아요는 `PlannedAction`을 `ActionExecutor.execute()`에 넘긴다.
 
 ### 3. Legacy 글 생성
 
@@ -127,7 +127,7 @@ HEAVY=3.0/REGULAR=1.5/LIGHT=1.0)가 작성자·댓글자를 뽑는다. 결정론
 
 | 스케줄 | 위치 | 기본 cron | 현재 코드 메모 |
 |---|---|---|---|
-| main tick | orchestrator | `0 */10 * * * *` | `AI_USER_ENABLED` + runtime row 둘 다 필요 |
+| engagement reconcile | orchestrator | `0 */5 * * * *` | `AI_USER_ENABLED` + thread-plan engagement + kill switch/pause 해제 |
 | daily planner | orchestrator | `0 0 4 * * *` | `AI_USER_ENABLED=false`면 skip |
 | paired posts | orchestrator | `0 0 */2 * * *` | prod 활성 — 하루 AI 글 20% 양면 사연 |
 | plan generation | orchestrator | 매분 15초 | PLAN enabled + provider가 `OFF`가 아닐 때만 생성 |

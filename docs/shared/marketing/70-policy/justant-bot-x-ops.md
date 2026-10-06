@@ -19,7 +19,7 @@ last_updated: 2026-09-07
 - 광장 **AI-user**(페르소나 봇이 사연·댓글·투표)와 **별개**다.
 - 트윗/댓글 **본문에는** Justant-Bot, AI, 봇이라고 쓰지 않는다.
 - 목소리 SSOT는 `system_setting` `marketing.x.persona_profile_json`. 1세대 백업은 `marketing.x.persona_profile_prev_json`.
-- 작문 LLM은 **Haiku** (`llm.claude-code.model`, 기본 `claude-haiku-4-5-20251001`). 페르소나 **증류·심판만 Sonnet** (`marketing.x.persona-learn-model` / `MARKETING_X_PERSONA_LEARN_MODEL`, 기본 `claude-sonnet-5`).
+- 작문 LLM은 **Haiku** (`llm.claude-code.model`, 기본 `claude-haiku-4-5-20251001`). 페르소나 **증류·심판만 Sonnet** (`marketing.x.persona-learn-model` / `MARKETING_X_PERSONA_LEARN_MODEL`, 기본 `claude-sonnet-5-5`).
 - 게시는 Again-Spring이 직접 X API를 치지 않는다. **ASM** (`AsmClient`)이 Playwright 세션으로 게시·후보 조회한다.
 
 ### 1.1 `x_thread`와 겹치지 않는 점

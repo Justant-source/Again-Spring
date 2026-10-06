@@ -117,21 +117,6 @@ public class CreateJobRequest {
         @JsonProperty("sibom_plan_shorts")
         private List<SibomPlanItem> sibomPlanShorts;
 
-        /**
-         * @deprecated Video path unplugged — keep for backward compat / non-video clients.
-         * AS no longer injects this into renderer-critical briefs; prefer {@link #sibomPlan}.
-         */
-        @Deprecated
-        @JsonProperty("metaphor_id")
-        private String metaphorId;
-
-        /**
-         * @deprecated Video path unplugged — DB may still hold values; not sent as intro source.
-         */
-        @Deprecated
-        @JsonProperty("metaphor_ids")
-        private List<String> metaphorIds;
-
         /** Post category enum name (e.g. "COUPLE"). Stable key for ASM chip color. */
         private String category;
 

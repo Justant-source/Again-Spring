@@ -91,7 +91,7 @@ AI-user 글·댓글에 표현 denylist(판결·욕설·혐오어 등)를 두지 
 
 **코드 설정값** (ai-user llm) — `LLM_API_REFUSAL_*`는 `API` provider에만 적용된다:
 - `LLM_API_REFUSAL_RETRIES=1` (dev .env) → 거절 노드 재시도 최대 2회(초기+재시도 1회)
-- `LLM_API_REFUSAL_FALLBACK_MODEL=claude-sonnet-5` (dev .env에서 설정)
+- `LLM_API_REFUSAL_FALLBACK_MODEL=claude-sonnet-5-5` (dev .env에서 설정)
 - 기본값 (`application.yml`): `refusal-retries: 2` (= 총 3회) — 프롬프트 인젝션 방어
 - Sonnet 폴백은 Haiku의 거절 노드 소진 후 1회 승격(거절율 0% 실측)
 
@@ -102,7 +102,7 @@ AI-user 글·댓글에 표현 denylist(판결·욕설·혐오어 등)를 두지 
 ## 5. LLM 브릿지 (요약 — 상세: `docs/backend/llm-bridge.md`)
 
 - 호출 경로: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke`
-- 모델: `claude-haiku-4-5-20251001` (기본) / `claude-sonnet-5` (report)
+- 모델: `claude-haiku-4-5-20251001` (기본) / `claude-sonnet-5-5` (report)
 - 인증: 호스트 `~/.claude` 마운트
 - BE는 `RemoteLlmProvider`만 사용 — 직접 Claude CLI/API 호출 금지
 - 세션 만료 시: 호스트 `claude` 재로그인 → `cd env && docker compose restart againspring-llm`

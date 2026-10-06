@@ -218,8 +218,14 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | GET | `/api/admin/dashboard/summary` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/dashboard/daily-stats` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/dashboard/retention` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
-| GET | `/api/admin/dashboard/crisis-recent` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 | GET | `/api/admin/dashboard/llm-failure-rate` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| POST | `/api/admin/dashboard/stats/backfill` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/action-center` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/kpis` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/pulse` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/hot-posts` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/insights` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
+| GET | `/api/admin/dashboard/traffic` | **JWT + ADMIN** | 200 | [admin.md](admin.md) |
 
 ### 7. Admin — Users
 

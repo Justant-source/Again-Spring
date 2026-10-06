@@ -385,7 +385,6 @@ public class ActionExecutor {
             circuitBreaker.recordSuccess();
             writeHistory(persona, "comments", text, postId, null);
             // 피기백 반응 디스패치 — 부모 댓글(항목 1)만 대상
-            // ActionPlanner가 자작 댓글 reply 타겟을 사전 제외하므로 authorId 검사 불필요
             java.util.List<ReactableItem> parentItems = java.util.List.of(
                 new ReactableItem(action.parentCommentId(), null));
             dispatchReactions(persona, jwt, action.targetPost(), res.reactionsJson(), parentItems, corrId);

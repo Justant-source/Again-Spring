@@ -74,7 +74,7 @@ public class StructuredGenerationService {
     private final PromptAssembler promptAssembler;
 
     @Value("${llm.worker.claude-model:claude-haiku-4-5-20251001}") private String claudeDefault;
-    @Value("${llm.post-model:claude-sonnet-5}") private String claudePostModel;
+    @Value("${llm.post-model:claude-sonnet-5-5}") private String claudePostModel;
     @Value("${llm.worker.codex-terra-model:gpt-5.6-terra}") private String codexTerra;
     @Value("${llm.worker.codex-luna-model:gpt-5.6-luna}") private String codexLuna;
     @Value("${DB_URL:}") private String dbUrl;
@@ -1262,13 +1262,6 @@ public class StructuredGenerationService {
             return null;
         }
         return List.copyOf(cuts);
-    }
-
-    /** @deprecated use {@link #sanitizeCaptureSplits} */
-    @Deprecated
-    static Integer sanitizeCaptureSplit(String body, Integer proposed) {
-        List<Integer> list = sanitizeCaptureSplits(body, proposed == null ? null : List.of(proposed));
-        return (list == null || list.isEmpty()) ? null : list.get(0);
     }
 
     private static List<Integer> readCaptureSplits(JsonNode postNode) {

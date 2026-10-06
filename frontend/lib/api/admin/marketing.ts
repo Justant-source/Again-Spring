@@ -293,47 +293,6 @@ export async function fetchSfxSampleBlob(path: string): Promise<Blob> {
   return res.data;
 }
 
-// ===== Marketing Analytics =====
-
-export interface PlatformStatsDto {
-  platform: string;
-  attempted: number;
-  published: number;
-  failed: number;
-  successRate: number;
-  lastPublishedUrl: string | null;
-  lastPublishedAt: string | null;
-}
-
-export async function getMarketingPerformance(days?: number): Promise<PlatformStatsDto[]> {
-  const params = new URLSearchParams();
-  if (days !== undefined) params.append('days', String(days));
-  const res = await api.get<PlatformStatsDto[]>(
-    `/api/admin/marketing/performance${params.size > 0 ? '?' + params.toString() : ''}`
-  );
-  return res.data;
-}
-
-// ===== Publication Timeline =====
-
-export interface TimelineEventDto {
-  jobId: number;
-  postId: string;
-  platform: string;
-  url: string | null;
-  state: string;
-  publishedAt: string | null;
-}
-
-export async function getPublicationTimeline(limit?: number): Promise<TimelineEventDto[]> {
-  const params = new URLSearchParams();
-  if (limit !== undefined) params.append('limit', String(limit));
-  const res = await api.get<TimelineEventDto[]>(
-    `/api/admin/marketing/timeline${params.size > 0 ? '?' + params.toString() : ''}`
-  );
-  return res.data;
-}
-
 // ===== Job Traffic =====
 
 export interface JobTrafficDto {
