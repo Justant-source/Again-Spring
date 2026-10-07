@@ -253,7 +253,7 @@ class MarketingPollingSchedulerTest {
     }
 
     @Test
-    @DisplayName("publish 409 with ASM PARTIAL syncs local status and does not republish")
+    @DisplayName("publish 409 with ASM PARTIAL syncs local status and does not republish or GET")
     void publishConflictReconcilesTerminalStatusWithoutRepublish() {
         MarketingJob job = MarketingJob.builder()
             .id(1514L)
@@ -263,22 +263,23 @@ class MarketingPollingSchedulerTest {
             .autoPublish(true)
             .artifacts("{\"thread\":\"ready\"}")
             .build();
-        AsmJobView remote = AsmJobView.builder().status("PARTIAL").build();
 
         when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
         when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of(job));
         when(marketingJobService.triggerPublish(1514L)).thenThrow(new AsmUnavailableException(
             "Failed to publish ASM job asm-partial: 409 Conflict: "
                 + "{\"detail\":\"Job must be READY to publish; current status: PARTIAL\"}"));
-        when(asmClient.getJob("asm-partial")).thenReturn(remote);
         doAnswer(invocation -> {
-            invocation.getArgument(0, MarketingJob.class).setStatus("PARTIAL");
+            AsmJobView view = invocation.getArgument(1);
+            assertThat(view.getStatus()).isEqualTo("PARTIAL");
+            invocation.getArgument(0, MarketingJob.class).setStatus(view.getStatus());
             return null;
-        }).when(marketingJobService).applyPoll(job, remote);
+        }).when(marketingJobService).applyPoll(any(MarketingJob.class), any(AsmJobView.class));
 
         scheduler.pollJobs();
 
-        verify(marketingJobService).applyPoll(job, remote);
+        verify(marketingJobService).applyPoll(any(MarketingJob.class), any(AsmJobView.class));
+        verify(asmClient, never()).getJob(anyString());
         verify(asmClient, never()).republish(anyString());
         verify(telegramNotifier, never()).send(anyString());
         assertThat(job.getStatus()).isEqualTo("PARTIAL");

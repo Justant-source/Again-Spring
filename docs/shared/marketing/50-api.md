@@ -598,7 +598,7 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
            READY + artifacts → GET 스킵 (게시는 due auto-publish/수동 publish)
            STALE + artifacts → READY 복구
            STALE (artifacts 없음) → 지수 백오프 / 24h 초과 시 FAILED
-           publish 409 + ASM이 이미 PARTIAL/PUBLISHED/FAILED → GET 후 그 상태로 맞춤. republish 없음
+           publish 409 + ASM이 이미 PARTIAL/PUBLISHED/FAILED → 그 상태를 로컬에 기록. 전체 GET·republish 없음
            READY 지연 텔레그램은 프로세스당 잡·에피소드 1회
 ```
 

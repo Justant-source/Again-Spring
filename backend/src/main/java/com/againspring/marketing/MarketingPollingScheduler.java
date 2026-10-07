@@ -252,26 +252,25 @@ public class MarketingPollingScheduler {
     }
 
     /**
-     * ASM already left READY (PARTIAL, PUBLISHED, or FAILED). Sync that status and do not republish.
-     * A successful sync is the one terminal alert from {@code applyPoll}; the trigger-failure
-     * telegram is reserved for conflicts we could not reconcile.
+     * ASM already left READY. The 409 body names PARTIAL, PUBLISHED, or FAILED.
+     * Apply that status directly. A full GET of these jobs times out and would
+     * stall the single scheduler thread, so it is not used. Do not republish.
      *
-     * @return true when the local job is now PARTIAL, PUBLISHED, or FAILED
+     * @return true when the local job is now that terminal status
      */
     private boolean reconcileTerminalPublishConflict(MarketingJob job, Exception error) {
-        if (!isTerminalPublishConflict(error) || job.getRemoteJobId() == null) {
+        String terminal = terminalStatusFromConflict(error);
+        if (terminal == null) {
             return false;
         }
         try {
-            AsmJobView view = asmClient.getJob(job.getRemoteJobId());
+            AsmJobView view = AsmJobView.builder().status(terminal).build();
             marketingJobService.applyPoll(job, view);
-            String status = job.getStatus();
-            if ("PARTIAL".equals(status) || "PUBLISHED".equals(status) || "FAILED".equals(status)) {
-                log.info("Reconciled marketing job {} to ASM status {} after publish conflict",
-                    job.getId(), status);
+            if (terminal.equals(job.getStatus())) {
+                log.info("Reconciled marketing job {} to {} from publish 409", job.getId(), terminal);
                 return true;
             }
-            log.warn("Publish conflict for job {} but polled status is still {}", job.getId(), status);
+            log.warn("Publish conflict for job {} did not stick; status is {}", job.getId(), job.getStatus());
             return false;
         } catch (Exception reconcileError) {
             log.warn("Failed to reconcile publish conflict for job {}: {}",
@@ -280,14 +279,21 @@ public class MarketingPollingScheduler {
         }
     }
 
-    static boolean isTerminalPublishConflict(Exception error) {
+    static String terminalStatusFromConflict(Exception error) {
         String message = error == null ? null : error.getMessage();
         if (message == null || !message.contains("409")) {
-            return false;
+            return null;
         }
-        return message.contains("current status: PARTIAL")
-            || message.contains("current status: PUBLISHED")
-            || message.contains("current status: FAILED");
+        if (message.contains("current status: PARTIAL")) {
+            return "PARTIAL";
+        }
+        if (message.contains("current status: PUBLISHED")) {
+            return "PUBLISHED";
+        }
+        if (message.contains("current status: FAILED")) {
+            return "FAILED";
+        }
+        return null;
     }
 
     private void handlePublishTriggerFailure(MarketingJob job, Exception error) {
