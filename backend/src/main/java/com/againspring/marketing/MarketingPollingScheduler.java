@@ -12,8 +12,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Polling scheduler for marketing jobs
@@ -45,6 +48,12 @@ public class MarketingPollingScheduler {
 
     /** When set, skip ASM GETs until this instant (shared outage backoff). */
     private volatile Instant asmCircuitOpenUntil = Instant.EPOCH;
+
+    /**
+     * Jobs already told about the current READY stall. Cleared when the job leaves the
+     * delayed set, so a later stall alerts again. A process restart may alert once more.
+     */
+    private final Set<Long> delayNotifiedJobIds = ConcurrentHashMap.newKeySet();
 
     /**
      * Auto-retry transient LLM failures at the job level (Decision #4).
@@ -115,26 +124,33 @@ public class MarketingPollingScheduler {
         Instant thirtyMinutesAgo = now.minus(30, ChronoUnit.MINUTES);
         List<MarketingJob> delayedJobs = marketingJobRepository.findReadyJobsPastScheduleBy30Minutes(thirtyMinutesAgo);
 
-        if (!delayedJobs.isEmpty()) {
-            for (MarketingJob delayedJob : delayedJobs) {
-                Instant readySince = delayedJob.getUpdatedAt() != null
-                    ? delayedJob.getUpdatedAt() : delayedJob.getCreatedAt();
-                long delayMinutes = readySince == null ? 0
-                    : (now.toEpochMilli() - readySince.toEpochMilli()) / 60_000;
-                log.warn("Marketing job {} READY auto-publish stuck for {} minutes",
-                    delayedJob.getId(), delayMinutes);
-                telegramNotifier.send(String.format(
-                    "⚠️ [Again-Spring] 마케팅 발행 지연%n" +
-                    "잡 #%d · post=%s%n" +
-                    "상태: READY · 채널: %s%n" +
-                    "READY 이후: %d분%n" +
-                    "조치: ASM publish 트리거 실패 여부 확인, 필요시 수동 발행",
-                    delayedJob.getId(),
-                    delayedJob.getPostId() != null ? delayedJob.getPostId() : "?",
-                    delayedJob.getTargets() != null ? delayedJob.getTargets() : "[]",
-                    delayMinutes));
+        Set<Long> stillDelayed = new HashSet<>();
+        for (MarketingJob delayedJob : delayedJobs) {
+            Long jobId = delayedJob.getId();
+            if (jobId != null) {
+                stillDelayed.add(jobId);
+                if (!delayNotifiedJobIds.add(jobId)) {
+                    continue;
+                }
             }
+            Instant readySince = delayedJob.getUpdatedAt() != null
+                ? delayedJob.getUpdatedAt() : delayedJob.getCreatedAt();
+            long delayMinutes = readySince == null ? 0
+                : (now.toEpochMilli() - readySince.toEpochMilli()) / 60_000;
+            log.warn("Marketing job {} READY auto-publish stuck for {} minutes",
+                delayedJob.getId(), delayMinutes);
+            telegramNotifier.send(String.format(
+                "⚠️ [Again-Spring] 마케팅 발행 지연%n" +
+                "잡 #%d · post=%s%n" +
+                "상태: READY · 채널: %s%n" +
+                "READY 이후: %d분%n" +
+                "조치: ASM publish 트리거 실패 여부 확인, 필요시 수동 발행",
+                delayedJob.getId(),
+                delayedJob.getPostId() != null ? delayedJob.getPostId() : "?",
+                delayedJob.getTargets() != null ? delayedJob.getTargets() : "[]",
+                delayMinutes));
         }
+        delayNotifiedJobIds.retainAll(stillDelayed);
     }
 
     @Scheduled(fixedDelayString = "${asm.poll-interval-ms:15000}")
@@ -157,7 +173,7 @@ public class MarketingPollingScheduler {
                 } catch (Exception e) {
                     log.warn("Failed to trigger scheduled publish for job {}: {}",
                         due.getId(), e.getMessage());
-                    notifyTriggerFailureOnce(due, e);
+                    handlePublishTriggerFailure(due, e);
                 }
             }
         }
@@ -231,8 +247,54 @@ public class MarketingPollingScheduler {
             log.info("Immediately triggered READY marketing job {}", job.getId());
         } catch (Exception e) {
             log.warn("Failed to immediately trigger READY job {}: {}", job.getId(), e.getMessage());
-            notifyTriggerFailureOnce(job, e);
+            handlePublishTriggerFailure(job, e);
         }
+    }
+
+    /**
+     * ASM already left READY (PARTIAL, PUBLISHED, or FAILED). Sync that status and do not republish.
+     * A successful sync is the one terminal alert from {@code applyPoll}; the trigger-failure
+     * telegram is reserved for conflicts we could not reconcile.
+     *
+     * @return true when the local job is now PARTIAL, PUBLISHED, or FAILED
+     */
+    private boolean reconcileTerminalPublishConflict(MarketingJob job, Exception error) {
+        if (!isTerminalPublishConflict(error) || job.getRemoteJobId() == null) {
+            return false;
+        }
+        try {
+            AsmJobView view = asmClient.getJob(job.getRemoteJobId());
+            marketingJobService.applyPoll(job, view);
+            String status = job.getStatus();
+            if ("PARTIAL".equals(status) || "PUBLISHED".equals(status) || "FAILED".equals(status)) {
+                log.info("Reconciled marketing job {} to ASM status {} after publish conflict",
+                    job.getId(), status);
+                return true;
+            }
+            log.warn("Publish conflict for job {} but polled status is still {}", job.getId(), status);
+            return false;
+        } catch (Exception reconcileError) {
+            log.warn("Failed to reconcile publish conflict for job {}: {}",
+                job.getId(), reconcileError.getMessage());
+            return false;
+        }
+    }
+
+    static boolean isTerminalPublishConflict(Exception error) {
+        String message = error == null ? null : error.getMessage();
+        if (message == null || !message.contains("409")) {
+            return false;
+        }
+        return message.contains("current status: PARTIAL")
+            || message.contains("current status: PUBLISHED")
+            || message.contains("current status: FAILED");
+    }
+
+    private void handlePublishTriggerFailure(MarketingJob job, Exception error) {
+        if (reconcileTerminalPublishConflict(job, error)) {
+            return;
+        }
+        notifyTriggerFailureOnce(job, error);
     }
 
     /** Persist the error marker so a due job that retries every poll does not spam Telegram. */

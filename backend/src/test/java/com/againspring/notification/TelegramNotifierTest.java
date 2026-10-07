@@ -16,4 +16,18 @@ class TelegramNotifierTest {
         assertThat(id).contains(42L);
         assertThat(n.messageIdFromBody("{\"ok\":false}")).isEmpty();
     }
+
+    @Test
+    void sendFailureLogDropsBotToken() {
+        String token = "7965451096:secret-value";
+        TelegramNotifier n = new TelegramNotifier(token, "1", false,
+            org.springframework.web.client.RestClient.builder(), new ObjectMapper());
+        String detail = "I/O error on POST request for \"https://api.telegram.org/bot"
+            + token + "/sendMessage\": Operation timed out";
+
+        assertThat(n.redactForLog(detail))
+            .doesNotContain(token)
+            .doesNotContain("secret-value")
+            .contains("/bot[redacted]/sendMessage");
+    }
 }

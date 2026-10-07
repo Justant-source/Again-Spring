@@ -24,6 +24,7 @@ WATCHDOG_STATE_DIR="${PROJECT_ROOT}/watchdog-state"
 TELEGRAM_ENV="${HOME}/.config/again-spring-watchdog/telegram.env"
 CANARY_TIMESTAMP_FILE="${WATCHDOG_STATE_DIR}/claude-canary.timestamp"
 RETRY_STATE_FILE="${WATCHDOG_STATE_DIR}/retry-state.json"
+CLAUDE_SESSION_EXHAUSTED_ALERT="${WATCHDOG_STATE_DIR}/claude-session-exhausted.alert"
 LOG_FILE="${WATCHDOG_STATE_DIR}/watchdog.log"
 
 # 상태 디렉토리 확인
@@ -166,6 +167,7 @@ check_claude_session() {
         log "INFO" "Claude session OK"
         echo "$now" > "$CANARY_TIMESTAMP_FILE"
         reset_retry_count "claude_session"
+        rm -f "$CLAUDE_SESSION_EXHAUSTED_ALERT"
         if [[ -x "$peer_bin" ]]; then
             log "INFO" "reconcile Claude oauth with WSL"
             "$peer_bin" reconcile "$wsl_ssh" >> "$LOG_FILE" 2>&1 || log "WARN" "WSL oauth reconcile failed"
@@ -180,17 +182,19 @@ check_claude_session() {
     log "INFO" "Claude session retry count: $retry_count / 3"
 
     if [[ $retry_count -ge 3 ]]; then
-        send_telegram "❌ [Again-Spring] Claude 세션 복구 한계. WSL 복사 후에도 실패. AS/WSL에서 claude 로그인 필요."
+        if [[ ! -f "$CLAUDE_SESSION_EXHAUSTED_ALERT" ]]; then
+            send_telegram "❌ [Again-Spring] Claude 세션 복구 한계. WSL 복사 후에도 실패. AS/WSL에서 claude 로그인 필요."
+            touch "$CLAUDE_SESSION_EXHAUSTED_ALERT"
+        fi
         return 1
     fi
-
-    send_telegram "🔧 [Again-Spring] Claude 세션 이상. WSL(100.115.252.61) 세션을 가져와 재시도 ($((retry_count + 1))/3)"
 
     if [[ -x "$peer_bin" ]] && "$peer_bin" pull "$wsl_ssh" >> "$LOG_FILE" 2>&1 \
         && timeout 90 env -u ANTHROPIC_API_KEY claude -p 'ping' > /dev/null 2>&1; then
         log "INFO" "Claude session recovered from WSL"
         echo "$now" > "$CANARY_TIMESTAMP_FILE"
         reset_retry_count "claude_session"
+        rm -f "$CLAUDE_SESSION_EXHAUSTED_ALERT"
         "$peer_bin" reconcile "$wsl_ssh" >> "$LOG_FILE" 2>&1 || true
         send_telegram "✅ [Again-Spring] Claude 세션 복구 (WSL 복사)"
         return 0

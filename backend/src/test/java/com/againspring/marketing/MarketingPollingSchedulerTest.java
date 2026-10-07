@@ -20,10 +20,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
 
 @ExtendWith(MockitoExtension.class)
 class MarketingPollingSchedulerTest {
@@ -222,6 +223,65 @@ class MarketingPollingSchedulerTest {
             .contains("post_delayed")
             .contains("instagram_reels")
             .contains("분");
+    }
+
+    @Test
+    @DisplayName("the same READY stall alerts once until the job leaves the delayed set")
+    void monitoringDelayAlertsOncePerEpisode() {
+        MarketingJob delayed = MarketingJob.builder()
+            .id(777L)
+            .remoteJobId("asm-delayed")
+            .postId("post_delayed")
+            .status("READY")
+            .autoPublish(true)
+            .updatedAt(Instant.now().minus(40, ChronoUnit.MINUTES))
+            .targets("[\"x_thread\"]")
+            .build();
+
+        when(marketingJobRepository.findReadyJobsPastScheduleBy30Minutes(any()))
+            .thenReturn(List.of(delayed))
+            .thenReturn(List.of(delayed))
+            .thenReturn(List.of())
+            .thenReturn(List.of(delayed));
+
+        scheduler.monitorPublishingDelays();
+        scheduler.monitorPublishingDelays();
+        scheduler.monitorPublishingDelays();
+        scheduler.monitorPublishingDelays();
+
+        verify(telegramNotifier, times(2)).send(anyString());
+    }
+
+    @Test
+    @DisplayName("publish 409 with ASM PARTIAL syncs local status and does not republish")
+    void publishConflictReconcilesTerminalStatusWithoutRepublish() {
+        MarketingJob job = MarketingJob.builder()
+            .id(1514L)
+            .remoteJobId("asm-partial")
+            .postId("post_stuck")
+            .status("READY")
+            .autoPublish(true)
+            .artifacts("{\"thread\":\"ready\"}")
+            .build();
+        AsmJobView remote = AsmJobView.builder().status("PARTIAL").build();
+
+        when(marketingJobRepository.findByStatusIn(any())).thenReturn(List.of());
+        when(marketingJobRepository.findDueAutoPublishJobs(any())).thenReturn(List.of(job));
+        when(marketingJobService.triggerPublish(1514L)).thenThrow(new AsmUnavailableException(
+            "Failed to publish ASM job asm-partial: 409 Conflict: "
+                + "{\"detail\":\"Job must be READY to publish; current status: PARTIAL\"}"));
+        when(asmClient.getJob("asm-partial")).thenReturn(remote);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, MarketingJob.class).setStatus("PARTIAL");
+            return null;
+        }).when(marketingJobService).applyPoll(job, remote);
+
+        scheduler.pollJobs();
+
+        verify(marketingJobService).applyPoll(job, remote);
+        verify(asmClient, never()).republish(anyString());
+        verify(telegramNotifier, never()).send(anyString());
+        assertThat(job.getStatus()).isEqualTo("PARTIAL");
     }
 
     @Test

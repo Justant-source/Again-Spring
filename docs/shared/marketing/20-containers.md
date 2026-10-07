@@ -171,6 +171,8 @@ X 캡처·IG 피드·Reels·Shorts 모두 채널 렌더가 READY가 되면 **즉
 
 ASM Waggle 영상 경로도 X와 같이 `auto_publish`면 READY 직후 `PUBLISHING`으로 올린다.
 Again-Spring 폴러는 READY auto-publish 잡을 슬롯 대기 없이 `triggerPublish`한다.
+`publish`가 409이고 ASM이 이미 `PARTIAL`/`PUBLISHED`/`FAILED`이면 그 잡을 GET해 로컬 상태를 맞추고, 재발행하지 않는다.
+READY로 30분 넘게 남은 auto-publish 잡의 지연 텔레그램은 같은 프로세스에서 잡당 한 번이다.
 
 ### 6. Phase 2 분배 · 영상 · 통계 루프
 

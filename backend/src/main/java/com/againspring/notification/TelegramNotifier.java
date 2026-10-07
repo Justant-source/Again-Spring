@@ -97,7 +97,7 @@ public class TelegramNotifier {
                     .toBodilessEntity();
             log.info("[telegram] alert sent");
         } catch (Exception e) {
-            log.warn("[telegram] failed to send alert: {}", e.getMessage());
+            log.warn("[telegram] failed to send alert: {}", redactForLog(e.getMessage()));
         }
     }
 
@@ -121,9 +121,21 @@ public class TelegramNotifier {
             log.info("[telegram] alert sent messageId={}", id.orElse(null));
             return id;
         } catch (Exception e) {
-            log.warn("[telegram] failed to send alert: {}", e.getMessage());
+            log.warn("[telegram] failed to send alert: {}", redactForLog(e.getMessage()));
             return Optional.empty();
         }
+    }
+
+    /** Drop the bot token if a client exception echoes the request URL. */
+    String redactForLog(String message) {
+        if (message == null || message.isBlank()) {
+            return "";
+        }
+        String redacted = message;
+        if (botToken != null && !botToken.isBlank()) {
+            redacted = redacted.replace(botToken, "[redacted]");
+        }
+        return redacted.replaceAll("/bot[^/\\s\"]+", "/bot[redacted]");
     }
 
     public Optional<Long> messageIdFromBody(String raw) {

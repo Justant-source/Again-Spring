@@ -595,9 +595,11 @@ AS polling → GET /api/v1/jobs/{remote_job_id} → ASM
              (단 artifacts 있으면 READY 유지 — 미리보기 보존)
            연결 실패 시 ASM circuit 5분 open (나머지 잡 GET 중단)
            
-           READY + artifacts → GET 스킵 (게시는 due-slot/수동 publish)
+           READY + artifacts → GET 스킵 (게시는 due auto-publish/수동 publish)
            STALE + artifacts → READY 복구
            STALE (artifacts 없음) → 지수 백오프 / 24h 초과 시 FAILED
+           publish 409 + ASM이 이미 PARTIAL/PUBLISHED/FAILED → GET 후 그 상태로 맞춤. republish 없음
+           READY 지연 텔레그램은 프로세스당 잡·에피소드 1회
 ```
 
 **상태 정의**
