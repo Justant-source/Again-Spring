@@ -98,7 +98,7 @@ test.describe('Journey 19: 검색 패널 (SearchPanel)', () => {
     await searchInput.press('Enter')
 
     await expect(page.getByText('검색어는 두 글자 이상 입력해 주세요')).toBeVisible({ timeout: 3_000 })
-    await expect(page.getByText(/[\d,]+건/)).not.toBeVisible()
+    await expect(page.getByText(/^[\d,]+건$/)).not.toBeVisible()
   })
 
   test('검색 — 카테고리별 검색 범위', async ({ page }) => {
