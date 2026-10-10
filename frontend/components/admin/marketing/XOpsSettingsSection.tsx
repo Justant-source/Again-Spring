@@ -32,6 +32,7 @@ const DEFAULTS: MarketingXOpsSettings = {
   originalPostDailyCap: 1,
   outboundPerTick: 1,
   inboundPerTick: 3,
+  outboundPerAccountDailyCap: 2,
 };
 
 function formatDeletePct(rate: number | null | undefined): string {
@@ -59,6 +60,7 @@ function mergeXOps(raw: MarketingXOpsSettings): MarketingXOpsSettings {
     originalPostDailyCap: raw.originalPostDailyCap ?? 1,
     outboundPerTick: raw.outboundPerTick ?? 1,
     inboundPerTick: raw.inboundPerTick ?? 3,
+    outboundPerAccountDailyCap: raw.outboundPerAccountDailyCap ?? 2,
   };
 }
 
@@ -163,6 +165,7 @@ export function XOpsSettingsSection() {
     originalPostDailyCap: s.originalPostDailyCap ?? 1,
     outboundPerTick: s.outboundPerTick ?? 1,
     inboundPerTick: s.inboundPerTick ?? 3,
+    outboundPerAccountDailyCap: s.outboundPerAccountDailyCap ?? 2,
   });
 
   const handleSave = async () => {
@@ -354,6 +357,22 @@ export function XOpsSettingsSection() {
               }}
             />
             <p className="text-xs text-gray-500">30분마다. 저장 즉시 DB만 바뀌고 다음 틱에 반영</p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="x-ops-outbound-account-cap">선댓글 계정당 /일</Label>
+            <Input
+              id="x-ops-outbound-account-cap"
+              type="number"
+              min={1}
+              max={10}
+              value={settings.outboundPerAccountDailyCap ?? 2}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                const clamped = Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 2;
+                patch('outboundPerAccountDailyCap', clamped);
+              }}
+            />
+            <p className="text-xs text-gray-500">한 계정에 하루 최대 댓글 수. 같은 틱에는 계정당 1건</p>
           </div>
           <div className="space-y-1">
             <Label htmlFor="x-ops-inbound-cap">우리 글 대댓글 /일</Label>

@@ -52,6 +52,7 @@ class MarketingXOpsSettingsServiceTest {
         assertThat(settings.originalPostDailyCap()).isEqualTo(1);
         assertThat(settings.outboundPerTick()).isEqualTo(1);
         assertThat(settings.inboundPerTick()).isEqualTo(3);
+        assertThat(settings.outboundPerAccountDailyCap()).isEqualTo(2);
     }
 
     @Test
@@ -166,6 +167,18 @@ class MarketingXOpsSettingsServiceTest {
         assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
             "07:30", "22:00", 2, 20, 40, 12, 3, 6,
             false, false, false, true, "04:30", true, false, 1, 6, 3), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void update_outboundPerAccountDailyCapOutOfRange_throws() {
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 1, 1, 3, 0), "admin"))
+            .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
+            "07:30", "22:00", 2, 20, 40, 12, 3, 6,
+            false, false, false, true, "04:30", true, false, 1, 1, 3, 11), "admin"))
             .isInstanceOf(ResponseStatusException.class);
     }
 }

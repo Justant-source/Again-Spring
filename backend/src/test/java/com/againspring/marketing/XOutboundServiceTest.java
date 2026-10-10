@@ -17,10 +17,12 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,6 +43,8 @@ class XOutboundServiceTest {
     private OutboundDraftGuard outboundDraftGuard;
     @Mock
     private XOpsActionLedger ledger;
+    @Mock
+    private XCommentTraceRecorder commentTrace;
     @Mock
     private TelegramNotifier telegramNotifier;
 
@@ -87,11 +91,13 @@ class XOutboundServiceTest {
         service.run(now);
 
         verify(asmClient).publishX(eq("너무귀여움"), eq("root-1"), isNull(), isNull());
-        verify(ledger).recordPosted(
-            eq(XOpsAction.Kind.OUTBOUND), eq("root-1"), eq("root-1"), isNull(),
-            eq("out-posted"), eq("너무귀여움"), eq(now));
+        verify(ledger).recordOutboundPosted(
+            eq("root-1"), eq("root-1"), eq("out-posted"), eq("너무귀여움"), eq(now), eq("mutual"));
         verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("너무귀여움"));
         verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("https://x.com/i/out"));
+        verify(commentTrace).record(
+            eq(XOpsAction.Kind.OUTBOUND), nullable(XOpsAction.class), any(),
+            eq("오늘 저녁 뭐먹지"), eq(""), eq(false));
     }
 
     @Test
@@ -102,9 +108,8 @@ class XOutboundServiceTest {
         service.run(now);
 
         verify(asmClient).publishX(eq("너무귀여움"), eq("our-reply-9"), isNull(), isNull());
-        verify(ledger).recordPosted(
-            eq(XOpsAction.Kind.OUTBOUND), eq("our-reply-9"), eq("root-1"), isNull(),
-            eq("out-posted"), eq("너무귀여움"), eq(now));
+        verify(ledger).recordOutboundPosted(
+            eq("our-reply-9"), eq("root-1"), eq("out-posted"), eq("너무귀여움"), eq(now), eq("mutual"));
     }
 
     @Test
@@ -149,8 +154,11 @@ class XOutboundServiceTest {
         service.run(now);
 
         verify(asmClient, never()).publishX(any(), any(), any(), any());
-        verify(ledger).recordSkipped(eq(XOpsAction.Kind.OUTBOUND), eq("root-1"), eq("NO_VOICE"), eq(now));
-        verify(ledger, never()).recordPosted(any(), any(), any(), any(), any(), any(), any());
+        verify(ledger).recordOutboundSkipped(eq("root-1"), eq("NO_VOICE"), eq(now), eq("mutual"));
+        verify(commentTrace).record(
+            eq(XOpsAction.Kind.OUTBOUND), nullable(XOpsAction.class), any(),
+            eq("글"), eq(""), eq(false));
+        verify(ledger, never()).recordOutboundPosted(any(), any(), any(), any(), any(), any());
         verify(telegramNotifier, never()).send(any());
     }
 
@@ -191,8 +199,9 @@ class XOutboundServiceTest {
 
         service.run(now);
 
-        verify(ledger).recordSkipped(eq(XOpsAction.Kind.OUTBOUND), eq("vid-1"), eq("VIDEO"), eq(now));
+        verify(ledger).recordOutboundSkipped(eq("vid-1"), eq("VIDEO"), eq(now), eq("a"));
         verify(composer, never()).composeOutbound(eq("영상글"), any(), any());
+        verify(commentTrace, never()).record(any(), any(), any(), eq("영상글"), any(), anyBoolean());
         verify(asmClient).publishX(eq("너무귀여움"), eq("root-2"), isNull(), isNull());
         verify(asmClient, times(1)).publishX(any(), any(), any(), any());
         verify(telegramNotifier, times(1)).send(any());
@@ -206,10 +215,62 @@ class XOutboundServiceTest {
 
         service.run(now);
 
-        verify(ledger).recordSkipped(eq(XOpsAction.Kind.OUTBOUND), eq("pic-1"), eq("VISION_FAIL"), eq(now));
+        verify(ledger).recordOutboundSkipped(eq("pic-1"), eq("VISION_FAIL"), eq(now), eq("a"));
         verify(composer, never()).composeOutbound(eq("사진글"), any(), any());
         verify(asmClient).publishX(eq("너무귀여움"), eq("root-2"), isNull(), isNull());
         verify(telegramNotifier, times(1)).send(any());
+    }
+
+    @Test
+    void accountDailyCap_skipsAuthorAtCap_andPicksNext() {
+        when(settingsService.get()).thenReturn(outboundOn(20, 1));
+        when(ledger.postedByAuthorSince(any(), any())).thenReturn(java.util.Map.of(
+            "hot", new XOpsActionLedger.AuthorPosted(2, now.minusSeconds(60))));
+        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+            cand("root-1", "Hot", "글1", 5, 1.0, false, null),
+            cand("root-2", "cold", "글2", 8, 2.0, false, null)));
+
+        service.run(now);
+
+        verify(asmClient, never()).publishX(any(), eq("root-1"), any(), any());
+        verify(asmClient).publishX(eq("너무귀여움"), eq("root-2"), isNull(), isNull());
+    }
+
+    @Test
+    void sameAuthorTwiceInOneTick_onlyFirstPublishes() {
+        when(settingsService.get()).thenReturn(outboundOn(20, 3));
+        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+            cand("root-1", "@Same", "글1", 5, 1.0, false, null),
+            cand("root-2", "same", "글2", 8, 2.0, false, null),
+            cand("root-3", "other", "글3", 9, 1.5, false, null)));
+
+        service.run(now);
+
+        verify(asmClient).publishX(any(), eq("root-1"), any(), any());
+        verify(asmClient, never()).publishX(any(), eq("root-2"), any(), any());
+        verify(asmClient).publishX(any(), eq("root-3"), any(), any());
+    }
+
+    @Test
+    void leastRecentlyCoveredAuthorGoesFirst() {
+        when(settingsService.get()).thenReturn(outboundOn(20, 1));
+        when(ledger.postedByAuthorSince(any(), any())).thenReturn(java.util.Map.of(
+            "busy", new XOpsActionLedger.AuthorPosted(5, now.minusSeconds(3600))));
+        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+            cand("root-1", "busy", "글1", 5, 1.0, false, null),
+            cand("root-2", "fresh", "글2", 8, 2.0, false, null)));
+
+        service.run(now);
+
+        verify(asmClient).publishX(any(), eq("root-2"), any(), any());
+        verify(asmClient, never()).publishX(any(), eq("root-1"), any(), any());
+    }
+
+    @Test
+    void normHandle_stripsAtAndLowercases() {
+        org.assertj.core.api.Assertions.assertThat(XOpsActionLedger.normHandle(" @FooBar ")).isEqualTo("foobar");
+        org.assertj.core.api.Assertions.assertThat(XOpsActionLedger.normHandle("  ")).isNull();
+        org.assertj.core.api.Assertions.assertThat(XOpsActionLedger.normHandle(null)).isNull();
     }
 
     private static AsmClient.XOutboundCandidate cand(

@@ -1,6 +1,6 @@
 ---
 title: Justant-Bot — X 선댓글·대댓글·의식·원글·페르소나 학습
-last_updated: 2026-09-07
+last_updated: 2026-10-08
 ---
 
 # Justant-Bot — X 성장 루프
@@ -19,7 +19,7 @@ last_updated: 2026-09-07
 - 광장 **AI-user**(페르소나 봇이 사연·댓글·투표)와 **별개**다.
 - 트윗/댓글 **본문에는** Justant-Bot, AI, 봇이라고 쓰지 않는다.
 - 목소리 SSOT는 `system_setting` `marketing.x.persona_profile_json`. 1세대 백업은 `marketing.x.persona_profile_prev_json`.
-- 작문 LLM은 **Haiku** (`llm.claude-code.model`, 기본 `claude-haiku-4-5-20251001`). 페르소나 **증류·심판만 Sonnet** (`marketing.x.persona-learn-model` / `MARKETING_X_PERSONA_LEARN_MODEL`, 기본 `claude-sonnet-5-5`).
+- 선댓글·대댓글 작문은 **Sonnet 5.5 + effort low** (`marketing.x.comment-model` / `MARKETING_X_COMMENT_MODEL`, 기본 `claude-sonnet-5-5`, `marketing.x.comment-effort` / `MARKETING_X_COMMENT_EFFORT`, 기본 `low`). 의식·원글은 **Haiku** (`llm.claude-code.model`, 기본 `claude-haiku-4-5-20251001`). 페르소나 **증류·심판은 Sonnet** (`marketing.x.persona-learn-model` / `MARKETING_X_PERSONA_LEARN_MODEL`, 기본 `claude-sonnet-5-5`, effort 플래그 없음).
 - 게시는 Again-Spring이 직접 X API를 치지 않는다. **ASM** (`AsmClient`)이 Playwright 세션으로 게시·후보 조회한다.
 
 ### 1.1 `x_thread`와 겹치지 않는 점
@@ -51,6 +51,7 @@ last_updated: 2026-09-07
 | 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` (**원글 파이프가 켜져 있을 때 소비**. 실제 발행 = `min(original_post_daily_cap, story_scoops_per_day)`) |
 | 선댓글 /일 | 20 | `marketing.x.outbound_daily_cap` |
 | 선댓글 /틱 | 1 (1–5) | `marketing.x.outbound_per_tick` |
+| 선댓글 계정당 /일 | 2 (1–10) | `marketing.x.outbound_per_account_daily_cap` |
 | 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
 | 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
 | 대댓글 /틱 | 3 (1–10) | `marketing.x.inbound_per_tick` |
@@ -84,6 +85,8 @@ flowchart TD
 
 - `XGrowthLoopScheduler.tick`: `0 * * * * *` Asia/Seoul — ritual + inbound + original(`runIfDue`, 스위치 기본 false).
 - `outboundTick`: `0 0,30 8-22 * * *` — 08:00, 08:30, … **22:30** KST. 틱당 게시 성공 상한 = `marketing.x.outbound_per_tick`. 스킵은 다음 후보.
+- **계정 다양화 (선댓글)**: 후보를 (최근 7일 해당 계정 댓글 수 ↑, 마지막 댓글 오래된 순)으로 재정렬한 뒤 처리. KST 하루 계정당 `outbound_per_account_daily_cap`건 초과 계정과 같은 틱의 동일 계정 두 번째 후보는 건너뜀(`[x-outbound] accountCapSkipped` 로그). 상한 때문에 `outbound_daily_cap`을 못 채우는 것은 의도된 동작이다.
+- **계정 통계는 DB로**: `x_ops_action.target_author_handle`(V128), 후보 노출·게시 누계 `x_target_account`. 예: `SELECT target_author_handle, COUNT(*) FROM x_ops_action WHERE kind='OUTBOUND' AND status='POSTED' AND created_at >= NOW() - INTERVAL 7 DAY GROUP BY 1 ORDER BY 2 DESC;` (V128 이전 행은 NULL — 백필 전까지 제외됨)
 - `XPersonaLearnScheduler.tick`: 매분. 실제 학습은 `personaLearnAt` 그 시각에만 (`runIfDue`). 말미에 shadow eval (`llmEnabled ∧ persona_eval_enabled`).
 - `llm.enabled=false`(dev L3): 작문·발행 **no-op**. 새벽 학습은 돌아가되 증류는 `INGESTED_LLM_DISABLED`이고 **프로필 JSON은 저장하지 않음**.
 
@@ -109,6 +112,7 @@ flowchart TD
 - 가드 `OutboundDraftGuard` + `marketing.x.outbound_guards`: `TOO_LONG`(기본 비공백 40자, 최대 2줄) / `LAUGH_SPAM` / `ECHO` / `HABIT_ECHO`(`힘빠지긴 할듯`이 아닌 `~이긴 할듯` 템플릿, 예: 미친놈이긴 할듯) / `LANG_MISMATCH`.
 - 안전: LLM 오류 시그니처(`docs/shared/policies/llm-error-signatures.json`). 오류 문자열은 본문으로 게시 금지. 표현 denylist는 없다.
 - 게시: ASM `POST /api/v1/x/publish`. 성공 시 Telegram (`XOpsTelegramAlerts.posted`).
+- 작문 시도마다 `x_comment_trace`에 대상 글·프롬프트·원문 출력·게시 결과를 남긴다 (§3.5). 영상 스킵처럼 모델을 호출하지 않은 경우는 남기지 않는다.
 
 ### 3.2 Inbound — 우리 글에 달린 남 댓글에 답
 
@@ -119,6 +123,22 @@ flowchart TD
 - 스킵: URL만, 맞팔 미끼, 욕설 패턴 → `SAFETY`.
 - 작문: `composeReply` — **인라인 프롬프트 + persona**. outbound JSON 프롬프트·few-shot·`OutboundDraftGuard`를 타지 않는다.
 - 게시 성공 시 outbound와 같은 Telegram 알림.
+- 작문 시도마다 `x_comment_trace` (§3.5).
+
+### 3.5 댓글 추적 `x_comment_trace`
+
+선댓글·대댓글을 만든 뒤(게시, 가드 스킵, 게시 실패) 한 행을 넣는다. 어드민 REST는 없다. 분석은 DB 조회.
+
+| 컬럼 | 내용 |
+|---|---|
+| `action_id` | `x_ops_action.id`. FK 없음 |
+| `input_text` / `context_text` | 대상 트윗·받은 댓글 / 다른 사람 댓글 또는 부모 맥락 |
+| `llm_prompt` / `llm_response` | 모델에 보낸 프롬프트 / 파싱 전 출력. 사진 바이트는 넣지 않는다 (`has_photo`) |
+| `body` | 파싱된 댓글. 가드에 걸려 게시하지 않아도 남긴다 |
+| `model` / `effort` | 그 호출의 모델과 effort |
+| `status` / `skip_reason` / `posted_tweet_id` | 원장과 같은 결과 |
+
+저장 실패는 게시·원장을 되돌리지 않는다. 스키마 [`docs/backend/40-data.md`](../../../backend/40-data.md).
 
 ### 3.3 Ritual — 아침/밤 사진 + 짧은 줄
 
@@ -147,8 +167,8 @@ flowchart TD
 
 | 경로 | 모델 | 입력 |
 |---|---|---|
-| outbound | Haiku | `x-outbound-reply.md` + donts + persona + TIMELINE few-shot(held-out 시 `excludeTweetId`) + DELETED_AUTO avoid + JPEG? |
-| inbound | Haiku | 인라인 답글 프롬프트 + persona |
+| outbound | Sonnet 5.5, effort `low` | `x-outbound-reply.md` + donts + persona + TIMELINE few-shot(held-out 시 `excludeTweetId`) + DELETED_AUTO avoid + JPEG? |
+| inbound | Sonnet 5.5, effort `low` | 인라인 답글 프롬프트 + persona |
 | ritual | Haiku | 의식 프롬프트 + persona |
 | original | Haiku | `x-original-post.md` + `post_style` + TIMELINE_POST few-shot + donts |
 | 프로필 증류 | Sonnet | 층화 gold + TIMELINE_POST + avoid + 차터 → `persona_profile_json` |
@@ -254,6 +274,7 @@ flowchart TD
 | 작문 | `XCommentComposer` |
 | 길이·언어 가드 | `OutboundDraftGuard` |
 | 원장 | `XOpsActionLedger` |
+| 댓글 입력·결과 | `XCommentTraceRecorder` → `x_comment_trace` |
 | 학습 | `XPersonaLearnService` · `XPersonaLearnScheduler` |
 | 닮음 채점 | `XPersonaShadowEval` |
 | 수동 vs 자동 | `XManualStatusClassifier` |

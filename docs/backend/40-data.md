@@ -5,7 +5,7 @@ last_updated: 2026-09-01
 
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-09-01 · code-ref: `backend/src/main/resources/db/migration/V48~V126.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V127.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -160,6 +160,7 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `visit_events` | 방문 계측 (경로·UTM·referrer·봇 판정·고유방문자) | BIGINT auto · 유입 귀속 확장 **V120** |
 | `marketing_holding_exclusion` | 홀딩 풀 콘텐츠 가드 제외 사유 (조용한 누락 방지) | `post_id` VARCHAR(32) PK **V121** |
 | `x_ops_action` | X 성장 루프 원장 (ritual / inbound / outbound / original) | BIGINT auto · `ref_post_id` **V126** |
+| `x_comment_trace` | Justant-Bot 선댓글·대댓글 입력·모델 출력·게시 결과 | BIGINT auto **V127** |
 | `x_persona_example` | Justant-Bot 말투 코퍼스 (TIMELINE · TIMELINE_POST gold / DELETED_AUTO avoid) | BIGINT auto **V123** · 드릴 행 삭제 **V124** · source 코멘트 **V125** |
 | `x_persona_eval` | 페르소나 held-out 재현 채점 (28일 닮음 지표) | BIGINT auto **V125** |
 
@@ -609,12 +610,51 @@ ritual / inbound / outbound / original 작문·게시 결과. 어드민 REST 없
 | `our_post_tweet_id` | VARCHAR | 우리 글(inbound 글당 cap) |
 | `posted_tweet_id` | VARCHAR | 우리가 게시한 트윗 ID (`POSTED`일 때) |
 | `ref_post_id` | BIGINT NULL | ORIGINAL 스쿱 사연. `posts.id`는 VARCHAR(32)이라 숫자면 parse, 아니면 hash (**V126**). 다른 kind는 null |
+| `target_author_handle` | VARCHAR(64) NULL | OUTBOUND 대상 트윗 작성자(소문자·@ 제거). V128 이전 행은 NULL (백필 대상) (**V128**) |
 | `body` | TEXT | 게시 본문 |
 | `status` | VARCHAR | `POSTED` \| `SKIPPED` \| `FAILED` |
 | `skip_reason` | VARCHAR(32) | `VIDEO` \| `UNSURE` \| `TOO_LONG` \| `LAUGH_SPAM` \| `ECHO` \| `SAFETY` \| `VISION_FAIL` \| `NO_VOICE` \| `LLM_ERROR` \| `CAP` \| `DISABLED` \| `DEV_LLM_OFF` \| `PUBLISH_FAILED` \| `ASM_ERROR` |
 | `created_at` | TIMESTAMP | 일일 cap·글당 cap 집계 |
 
-인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound), `idx_xoa_ref_post(ref_post_id)` (**V126**, 기스쿱 제외).
+인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound), `idx_xoa_ref_post(ref_post_id)` (**V126**, 기스쿱 제외), `idx_xoa_author_created(target_author_handle, created_at)` (**V128**, 계정별 분포·계정당 일일 상한).
+
+### `x_target_account` (선댓글 대상 계정 집계) **V128**
+
+계정(핸들)별 후보 노출·게시 누계. `XOpsActionLedger`의 네이티브 upsert로만 갱신.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `handle` | VARCHAR(64) PK | 소문자·@ 제거 |
+| `first_seen_at` / `last_seen_at` | TIMESTAMP(3) | 후보 틱에 처음/마지막으로 등장 |
+| `seen_count` | INT | 선댓글 후보 틱에 등장한 횟수(팔로잉 풀 크기·노출 대비 게시 비율) |
+| `posted_count` | INT | 선댓글 POSTED 누계 |
+| `last_posted_at` | TIMESTAMP(3) NULL | 마지막 게시 |
+
+### `x_comment_trace` (댓글 입력·결과) **V127**
+
+선댓글·대댓글 작문 시도 1회 = 1행. 모델을 호출하지 않은 스킵(영상, 수신 안전 필터, cap)은 없다. 어드민 REST 없음. 런타임 `XCommentTraceRecorder`. 상세 [`justant-bot-x-ops.md`](../shared/marketing/70-policy/justant-bot-x-ops.md) §3.5.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT auto PK | |
+| `action_id` | BIGINT NULL | `x_ops_action.id`. FK 없음 |
+| `kind` | VARCHAR(16) | `OUTBOUND` \| `INBOUND` |
+| `target_tweet_id` | VARCHAR(64) | 답글 대상 |
+| `target_author_handle` | VARCHAR(64) NULL | OUTBOUND 대상 작성자 (**V128**) |
+| `model` | VARCHAR(64) | 그 호출 모델. 기본 `claude-sonnet-5-5` |
+| `effort` | VARCHAR(16) | CLI effort. 기본 `low` |
+| `input_text` | MEDIUMTEXT | 대상 트윗 또는 받은 댓글 |
+| `context_text` | MEDIUMTEXT | 다른 사람 댓글 또는 부모 맥락 |
+| `llm_prompt` | LONGTEXT | 모델 입력. 사진 바이트 없음 |
+| `llm_response` | LONGTEXT | 파싱 전 출력 |
+| `body` | TEXT | 파싱된 댓글. 가드 거절이어도 보존 |
+| `has_photo` | TINYINT(1) | 사진이 호출에 붙었는지 |
+| `status` | VARCHAR(16) | `POSTED` \| `SKIPPED` \| `FAILED` |
+| `skip_reason` | VARCHAR(32) | 원장과 같은 사유 |
+| `posted_tweet_id` | VARCHAR(64) | 게시한 댓글 id |
+| `created_at` | TIMESTAMP(3) | |
+
+인덱스: `idx_xct_kind_created(kind, created_at)`, `idx_xct_status_created(status, created_at)`, `idx_xct_target(target_tweet_id)`, `idx_xct_action(action_id)`.
 
 ### `x_persona_example` (Justant-Bot 말투 코퍼스) **V123** · **V124** · **V125**
 

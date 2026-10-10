@@ -380,6 +380,8 @@ export interface MarketingXOpsSettings {
   originalPostDailyCap?: number;
   /** 선댓글 30분 틱당 성공 게시 수. 1–5. 빈 DB 폴백 1. */
   outboundPerTick?: number;
+  /** 선댓글 계정당 /일 상한 1–10. 같은 틱에는 계정당 1건. 빈 DB 폴백 2. */
+  outboundPerAccountDailyCap?: number;
   /** 대댓글 1분 틱당 처리 상한. 1–10. 빈 DB 폴백 3. */
   inboundPerTick?: number;
   mimicryAvg28d?: number | null;

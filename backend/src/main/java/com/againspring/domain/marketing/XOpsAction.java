@@ -19,7 +19,8 @@ import java.time.Instant;
     @Index(name = "idx_xoa_kind_created", columnList = "kind, created_at"),
     @Index(name = "idx_xoa_target_tweet", columnList = "target_tweet_id"),
     @Index(name = "idx_xoa_our_post_created", columnList = "our_post_tweet_id, created_at"),
-    @Index(name = "idx_xoa_ref_post", columnList = "ref_post_id")
+    @Index(name = "idx_xoa_ref_post", columnList = "ref_post_id"),
+    @Index(name = "idx_xoa_author_created", columnList = "target_author_handle, created_at")
 })
 public class XOpsAction {
 
@@ -65,6 +66,10 @@ public class XOpsAction {
 
     @Column(name = "skip_reason", length = 32)
     private String skipReason;
+
+    /** OUTBOUND target author (lowercase, no @). Null for other kinds / pre-V128 rows. */
+    @Column(name = "target_author_handle", length = 64)
+    private String targetAuthorHandle;
 
     /** Scooped community post for {@link Kind#ORIGINAL}; null for other kinds. */
     @Column(name = "ref_post_id")
