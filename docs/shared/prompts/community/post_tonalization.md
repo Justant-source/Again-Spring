@@ -2,7 +2,7 @@
 
 > **목적**: 사용자가 입력한 제목/본문을 한국 갈등 커뮤니티 톤(구어체·반말·감정)에 맞게 정규화
 > **호출 위치**: `AnswerProcessingService.processAsync()` / `PostInviteService` 파트너 답변 경로 (`TonalizationService`)
-> **모델**: Claude Haiku (빠른 처리)
+> **모델**: `claude-sonnet-5-5` (`llm.tonalization.model`)
 > **타임아웃**: 30초
 
 ---

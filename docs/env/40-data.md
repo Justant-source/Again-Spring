@@ -96,7 +96,11 @@ last_updated: 2026-09-01
 |---|---|---|
 | `MARKETING_RENDER_PROFILE` | 코드 폴백 `marketing_fast`, **prod 실제값 `marketing_v2`**(2026-08-29~) | WaggleBot 렌더 프로필 선택. `marketing_fast` = 간편 레이아웃 / `marketing_v2` = BGM·SFX·전환·앱크롬제거·투표바. 잡 생성 시 `renderProfile` 필드로 개별 지정 가능. BGM은 2026-09-04부터 정상 동작(그 전 v2 렌더는 무음) |
 | `MARKETING_X_TIMELINE_BASE_URL` | `https://api.fxtwitter.com` | `@againspring_net` 타임라인 읽기(페르소나 학습). 발행 아님. Spring `marketing.x.timeline-base-url` |
-| `MARKETING_X_PERSONA_LEARN_MODEL` | `claude-sonnet-5-5` | Justant-Bot 페르소나 프로필 증류. Spring `marketing.x.persona-learn-model`. 선댓글 작문은 Haiku. 상세 `docs/shared/marketing/70-policy/justant-bot-x-ops.md` |
+| `MARKETING_X_PERSONA_LEARN_MODEL` | `claude-sonnet-5-5` | Justant-Bot 페르소나 프로필 증류. Spring `marketing.x.persona-learn-model`. 상세 `docs/shared/marketing/70-policy/justant-bot-x-ops.md` |
+| `MARKETING_X_COMMENT_MODEL` | `claude-sonnet-5-5` | 선댓글·대댓글 작문. Spring `marketing.x.comment-model`. 의식·원글은 `CLAUDE_MODEL`(Haiku) |
+| `MARKETING_X_COMMENT_EFFORT` | `low` | 선댓글·대댓글 Claude CLI `--effort` (`low`\|`medium`\|`high`\|`xhigh`\|`max`). 그 외 값은 `low` |
+| `MARKETING_CONTENT_LLM_MODEL` | `claude-sonnet-5-5` | 마케팅 마스터 훅·채널 대본(ASM `script_*`). Spring `llm.marketing.model` (`PromoTitleService`, `VideoVariantService`) |
+| `LLM_TONALIZATION_MODEL` | `claude-sonnet-5-5` | 파트너 답변 톤 정규화. Spring `llm.tonalization.model` (`TonalizationService`) |
 
 **2026-08-15 마케팅 파이프라인 안정화**: 시봄이 영상 생성 LLM 호출이 최대 600초까지 걸릴 수 있어
 `LLM_QUEUE_WAIT_TIMEOUT_MS`를 4배 상향했다(30s는 호출 1건이 600초를 점유하는 상황에서 큐 포화 시

@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +38,8 @@ class XInboundServiceTest {
     private XCommentComposer composer;
     @Mock
     private XOpsActionLedger ledger;
+    @Mock
+    private XCommentTraceRecorder commentTrace;
     @Mock
     private TelegramNotifier telegramNotifier;
 
@@ -116,6 +119,9 @@ class XInboundServiceTest {
             eq("posted-1"), eq("공감돼요 ㅋㅋ"), eq(now));
         verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("공감돼요 ㅋㅋ"));
         verify(telegramNotifier).send(org.mockito.ArgumentMatchers.contains("https://x.com/i/posted-1"));
+        verify(commentTrace).record(
+            eq(XOpsAction.Kind.INBOUND), nullable(XOpsAction.class), any(),
+            eq("좋은 글이네요"), eq("our-1"), eq(false));
     }
 
     @Test

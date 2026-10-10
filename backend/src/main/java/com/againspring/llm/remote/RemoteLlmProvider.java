@@ -46,11 +46,16 @@ public class RemoteLlmProvider implements LLMProvider {
 
     @Override
     public String invoke(String prompt, String model) throws Exception {
-        return invoke(prompt, model, null);
+        return invoke(prompt, model, null, null);
     }
 
     @Override
     public String invoke(String prompt, String model, List<LlmImage> images) throws Exception {
+        return invoke(prompt, model, images, null);
+    }
+
+    @Override
+    public String invoke(String prompt, String model, List<LlmImage> images, String effort) throws Exception {
         if (!enabled) {
             log.warn("[remote-llm] blocked: llm.enabled=false");
             throw new BusinessException("LLM_DISABLED", DISABLED_MESSAGE, 501);
@@ -62,6 +67,7 @@ public class RemoteLlmProvider implements LLMProvider {
                     .model(model != null ? model : defaultModel)
                     .timeoutMs(defaultTimeoutMs)
                     .images(capImages(images))
+                    .effort(effort == null || effort.isBlank() ? null : effort.strip())
                     .build();
             WorkerInvokeResponse resp = restClient.post()
                     .uri("/v1/invoke")

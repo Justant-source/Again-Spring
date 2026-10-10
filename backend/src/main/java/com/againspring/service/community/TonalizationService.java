@@ -34,7 +34,7 @@ public class TonalizationService {
 
     private final ObjectMapper objectMapper;
 
-    @Value("${llm.model:claude-haiku-4-5-20251001}")
+    @Value("${llm.tonalization.model:claude-sonnet-5-5}")
     private String model;
 
     @Value("${tonalization.enabled:true}")

@@ -18,4 +18,6 @@ public class InvokeRequest {
     private String correlationId;
     /** Optional vision attachments. Worker caps at 1. */
     private List<InvokeImage> images;
+    /** Optional Claude CLI effort: low, medium, high, xhigh, max. Blank omits the flag. */
+    private String effort;
 }

@@ -61,12 +61,17 @@ public class ClaudeCliInvoker {
     }
 
     public String invoke(String prompt, String model, List<InvokeImage> images) throws ClaudeCodeException {
+        return invoke(prompt, model, images, null);
+    }
+
+    public String invoke(String prompt, String model, List<InvokeImage> images, String effort)
+            throws ClaudeCodeException {
         String corrId = UUID.randomUUID().toString();
         long startMs = System.currentTimeMillis();
         List<Path> imageFiles = List.of();
         try {
             imageFiles = writeTempImages(images);
-            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles);
+            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles, effort);
             Process process = pb.start();
             try {
                 processTerminator.register(process);
@@ -109,12 +114,17 @@ public class ClaudeCliInvoker {
 
     public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv,
                                          List<InvokeImage> images) throws Exception {
+        return invokeWithCancelSupport(prompt, model, inv, images, null);
+    }
+
+    public String invokeWithCancelSupport(String prompt, String model, CancelableInvocation inv,
+                                         List<InvokeImage> images, String effort) throws Exception {
         String corrId = UUID.randomUUID().toString();
         long startMs = System.currentTimeMillis();
         List<Path> imageFiles = List.of();
         try {
             imageFiles = writeTempImages(images);
-            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles);
+            ProcessBuilder pb = buildProcessBuilder(prompt, model, imageFiles, effort);
             Process process = pb.start();
             try {
                 processTerminator.register(process);
@@ -295,6 +305,10 @@ public class ClaudeCliInvoker {
      * 이미지 경로가 없으면 기존 텍스트 전용 command와 동일하다.
      */
     ProcessBuilder buildProcessBuilder(String prompt, String model, List<Path> imagePaths) {
+        return buildProcessBuilder(prompt, model, imagePaths, null);
+    }
+
+    ProcessBuilder buildProcessBuilder(String prompt, String model, List<Path> imagePaths, String effort) {
         int splitIdx = prompt.indexOf("<conversation_history>");
         String systemPart;
         String userPart;
@@ -306,7 +320,7 @@ public class ClaudeCliInvoker {
             userPart = prompt;
         }
 
-        var command = buildCommand(claudeBinaryPath, model, systemPart);
+        var command = buildCommand(claudeBinaryPath, model, systemPart, effort);
         command.add(userPart);
         if (imagePaths != null) {
             for (Path path : imagePaths) {
@@ -384,10 +398,23 @@ public class ClaudeCliInvoker {
      * @return list of command arguments (excluding userPart, which should be appended by caller)
      */
     static java.util.List<String> buildCommand(String binary, String model, String systemPart) {
+        return buildCommand(binary, model, systemPart, null);
+    }
+
+    /**
+     * {@code effort} must be a CLI allowlist value. Anything else omits {@code --effort}.
+     */
+    static java.util.List<String> buildCommand(String binary, String model, String systemPart, String effort) {
         var command = new java.util.ArrayList<String>(java.util.List.of(
                 binary, "--print", "--output-format", "stream-json", "--verbose",
                 "--include-partial-messages", "--model", model, "--strict-mcp-config",
                 "--no-session-persistence"));
+        String normalized = normalizeEffort(effort);
+        if (normalized != null) {
+            int modelFlag = command.indexOf("--model");
+            command.add(modelFlag + 2, "--effort");
+            command.add(modelFlag + 3, normalized);
+        }
 
         // Token reduction: disallow all CLI tools to reduce prompt overhead.
         // Measured empirically: ~25,267 input tokens without this flag,
@@ -399,5 +426,16 @@ public class ClaudeCliInvoker {
         command.add("--system-prompt");
         command.add(systemPart);
         return command;
+    }
+
+    /** Returns null when the flag should be omitted. */
+    static String normalizeEffort(String effort) {
+        if (effort == null || effort.isBlank()) {
+            return null;
+        }
+        return switch (effort.strip().toLowerCase()) {
+            case "low", "medium", "high", "xhigh", "max" -> effort.strip().toLowerCase();
+            default -> null;
+        };
     }
 }

@@ -117,6 +117,7 @@ flowchart LR
 2. `PostComposeService`가 원문 그대로 DB 저장 + VoteOption(작성자/상대방) 생성 (게시 시 LLM 미호출)
 3. 커뮤니티가 투표/댓글 → `POST .../vote`, `POST .../comments`
 4. 공개 글은 `ai_user_outbox`로 AI-user 반응이 이어질 수 있음
+5. 마케팅 마스터 훅·채널 대본은 `PromoTitleService` / `VideoVariantService`가 `llm.marketing.model`(`claude-sonnet-5-5`)로 생성한다. 파트너 답변 톤 정규화는 `llm.tonalization.model`(`claude-sonnet-5-5`)이다.
 
 역사적 피벗 결정은 ADR-0001·0002 참고.
 

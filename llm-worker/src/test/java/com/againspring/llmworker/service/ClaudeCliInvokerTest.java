@@ -116,6 +116,24 @@ class ClaudeCliInvokerTest {
     }
 
     @Test
+    void buildCommandOmitsEffortWhenBlankOrUnknown() {
+        List<String> blank = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "sys", "  ");
+        List<String> unknown = ClaudeCliInvoker.buildCommand("claude", "claude-sonnet-5-5", "sys", "turbo");
+        assertFalse(blank.contains("--effort"));
+        assertFalse(unknown.contains("--effort"));
+    }
+
+    @Test
+    void buildCommandAddsLowEffortAfterModel() {
+        List<String> command = ClaudeCliInvoker.buildCommand(
+            "claude", "claude-sonnet-5-5", "sys", "LOW");
+        int modelIdx = command.indexOf("--model");
+        assertEquals("claude-sonnet-5-5", command.get(modelIdx + 1));
+        assertEquals("--effort", command.get(modelIdx + 2));
+        assertEquals("low", command.get(modelIdx + 3));
+    }
+
+    @Test
     void buildCommandIncludesRequiredFlags() {
         List<String> command = ClaudeCliInvoker.buildCommand(
             "claude",

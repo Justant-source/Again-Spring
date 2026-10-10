@@ -49,7 +49,7 @@ public class InvocationController {
         long start = System.currentTimeMillis();
         try {
             String text = pool.executeSyncTask(req.getPrompt(), req.getModel(),
-                    req.getTimeoutMs(), correlationId, capImages(req.getImages()));
+                    req.getTimeoutMs(), correlationId, capImages(req.getImages()), req.getEffort());
             long latency = System.currentTimeMillis() - start;
             return ResponseEntity.ok(InvokeResponse.success(text, latency, correlationId));
 

@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +60,8 @@ class XCommentComposerTest {
     void setUp() {
         ReflectionTestUtils.setField(composer, "llmEnabled", true);
         ReflectionTestUtils.setField(composer, "model", "claude-haiku-4-5-20251001");
+        ReflectionTestUtils.setField(composer, "commentModel", "claude-sonnet-5-5");
+        ReflectionTestUtils.setField(composer, "commentEffort", "low");
         when(promptSanitizer.sanitize(any())).thenAnswer(inv -> {
             Object arg = inv.getArgument(0);
             return arg == null ? "" : arg.toString();
@@ -76,16 +79,19 @@ class XCommentComposerTest {
 
     @Test
     void composeReply_usesPersonaAndReturnsShortKoreanDraft() throws Exception {
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("힘빠지긴 할듯 ㅋㅋㅋ");
+        stubComment("힘빠지긴 할듯 ㅋㅋㅋ");
 
         XCommentComposer.Draft draft = composer.composeReply("퇴근하고 왔는데 진짜 힘드네", "부모님이 또 잔소리");
 
         assertThat(draft.skip()).isFalse();
         assertThat(draft.body()).isEqualTo("힘빠지긴 할듯 ㅋㅋㅋ");
         assertThat(draft.skipReason()).isNull();
+        assertThat(draft.llmCall().model()).isEqualTo("claude-sonnet-5-5");
+        assertThat(draft.llmCall().effort()).isEqualTo("low");
+        assertThat(draft.llmCall().rawResponse()).isEqualTo("힘빠지긴 할듯 ㅋㅋㅋ");
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-sonnet-5-5"), nullable(List.class), eq("low"));
         String prompt = promptCaptor.getValue();
         assertThat(prompt).contains("<user_input>");
         assertThat(prompt).contains("테스트페르소나XYZ");
@@ -94,7 +100,7 @@ class XCommentComposerTest {
 
     @Test
     void composeReply_blankVoiceMarker_skipsNoVoice() throws Exception {
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("할 말 없음");
+        stubComment("할 말 없음");
 
         XCommentComposer.Draft draft = composer.composeReply("아무 트윗", null);
 
@@ -105,7 +111,7 @@ class XCommentComposerTest {
 
     @Test
     void composeReply_creditBalanceError_skipsLlmErrorWithoutPostingString() throws Exception {
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("Credit balance is too low");
+        stubComment("Credit balance is too low");
 
         XCommentComposer.Draft draft = composer.composeReply("아무 트윗", null);
 
@@ -117,7 +123,7 @@ class XCommentComposerTest {
 
     @Test
     void composeReply_verdictWordingIsPublished() throws Exception {
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("그건 작성자 쪽 판결이야 ㅋㅋ");
+        stubComment("그건 작성자 쪽 판결이야 ㅋㅋ");
 
         XCommentComposer.Draft draft = composer.composeReply("누가 잘못한 거야?", null);
 
@@ -140,8 +146,7 @@ class XCommentComposerTest {
     @Test
     void composeOutbound_jsonUnsure_skips() throws Exception {
         stubOutboundPrompts();
-        when(llmProvider.invoke(anyString(), anyString()))
-            .thenReturn("{\"ok\":false,\"reason\":\"UNSURE\"}");
+        stubComment("{\"ok\":false,\"reason\":\"UNSURE\"}");
 
         XCommentComposer.Draft draft = composer.composeOutbound("아무 트윗", List.of("다른댓글"), null);
 
@@ -153,12 +158,13 @@ class XCommentComposerTest {
     @Test
     void composeOutbound_parseFailOrEmpty_skipsUnsure() throws Exception {
         stubOutboundPrompts();
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("ㅋㅋㅋㅋ 그냥 텍스트");
+        stubComment("ㅋㅋㅋㅋ 그냥 텍스트");
 
         XCommentComposer.Draft notJson = composer.composeOutbound("트윗", List.of(), null);
         assertThat(notJson.skipReason()).isEqualTo("UNSURE");
+        assertThat(notJson.llmCall().rawResponse()).isEqualTo("ㅋㅋㅋㅋ 그냥 텍스트");
 
-        when(llmProvider.invoke(anyString(), anyString())).thenReturn("{\"ok\":true,\"body\":\"\"}");
+        stubComment("{\"ok\":true,\"body\":\"\"}");
         XCommentComposer.Draft empty = composer.composeOutbound("트윗", List.of(), null);
         assertThat(empty.skipReason()).isEqualTo("UNSURE");
     }
@@ -167,15 +173,15 @@ class XCommentComposerTest {
     void composeOutbound_photoBytesStayOutOfPrompt() throws Exception {
         stubOutboundPrompts();
         String jpeg = "QUFBQUFBQUE=";
-        when(llmProvider.invoke(anyString(), anyString(), anyList()))
-            .thenReturn("{\"ok\":true,\"body\":\"사진이쁘다\"}");
+        stubComment("{\"ok\":true,\"body\":\"사진이쁘다\"}");
 
         XCommentComposer.Draft draft = composer.composeOutbound("강아지", List.of("귀엽네"), jpeg);
 
         assertThat(draft.skip()).isFalse();
         assertThat(draft.body()).isEqualTo("사진이쁘다");
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"), anyList());
+        verify(llmProvider).invoke(
+            promptCaptor.capture(), eq("claude-sonnet-5-5"), anyList(), eq("low"));
         assertThat(promptCaptor.getValue()).doesNotContain(jpeg);
         verify(llmProvider, never()).invoke(anyString(), anyString());
     }
@@ -191,13 +197,13 @@ class XCommentComposerTest {
                 .hasPhoto(false)
                 .operatorBody("너무귀여움")
                 .build()));
-        when(llmProvider.invoke(anyString(), anyString()))
-            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+        stubComment("{\"ok\":true,\"body\":\"귀엽네\"}");
 
         composer.composeOutbound("고양이도 귀엽다", List.of(), null);
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        verify(llmProvider).invoke(
+            promptCaptor.capture(), eq("claude-sonnet-5-5"), nullable(List.class), eq("low"));
         assertThat(promptCaptor.getValue()).contains("너무귀여움");
         assertThat(promptCaptor.getValue()).contains("강아지 사진 올렸다");
         assertThat(promptCaptor.getValue()).contains("운영자가 같은 종류 글에 직접 단 댓글");
@@ -212,13 +218,13 @@ class XCommentComposerTest {
                 .tweetId("gone")
                 .operatorBody("문맥없는말")
                 .build()));
-        when(llmProvider.invoke(anyString(), anyString()))
-            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+        stubComment("{\"ok\":true,\"body\":\"귀엽네\"}");
 
         composer.composeOutbound("고양이도 귀엽다", List.of(), null);
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        verify(llmProvider).invoke(
+            promptCaptor.capture(), eq("claude-sonnet-5-5"), nullable(List.class), eq("low"));
         assertThat(promptCaptor.getValue()).contains("문맥없는말");
         assertThat(promptCaptor.getValue()).contains("운영자가 지운 자동댓글");
     }
@@ -240,13 +246,13 @@ class XCommentComposerTest {
                     .postText("상황 킵")
                     .operatorBody("킵바디")
                     .build()));
-        when(llmProvider.invoke(anyString(), anyString()))
-            .thenReturn("{\"ok\":true,\"body\":\"귀엽네\"}");
+        stubComment("{\"ok\":true,\"body\":\"귀엽네\"}");
 
         composer.composeOutbound("아무 트윗", List.of(), null, "hold-me");
 
         ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-        verify(llmProvider).invoke(promptCaptor.capture(), eq("claude-haiku-4-5-20251001"));
+        verify(llmProvider).invoke(
+            promptCaptor.capture(), eq("claude-sonnet-5-5"), nullable(List.class), eq("low"));
         assertThat(promptCaptor.getValue()).doesNotContain("홀드바디");
         assertThat(promptCaptor.getValue()).contains("킵바디");
     }
@@ -349,6 +355,11 @@ class XCommentComposerTest {
         assertThat(prompt).contains("퇴근 갈등");
         assertThat(prompt).contains("오늘 광장 글 하나 올렸다");
         assertThat(prompt).contains("- no spam");
+    }
+
+    private void stubComment(String raw) throws Exception {
+        when(llmProvider.invoke(anyString(), eq("claude-sonnet-5-5"), nullable(List.class), eq("low")))
+            .thenReturn(raw);
     }
 
     private void stubOutboundPrompts() throws Exception {

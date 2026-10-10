@@ -34,6 +34,7 @@ public class XInboundService {
     private final AsmClient asmClient;
     private final XCommentComposer composer;
     private final XOpsActionLedger ledger;
+    private final XCommentTraceRecorder commentTrace;
     private final TelegramNotifier telegramNotifier;
 
     @Value("${llm.enabled:true}")
@@ -85,12 +86,13 @@ public class XInboundService {
                 continue;
             }
 
-            XCommentComposer.Draft draft = composer.composeReply(
-                item.text(), parentContext(item));
+            String context = parentContext(item);
+            XCommentComposer.Draft draft = composer.composeReply(item.text(), context);
             if (draft == null || draft.skip() || draft.body() == null || draft.body().isBlank()) {
                 String reason = draft != null && draft.skipReason() != null
                     ? draft.skipReason() : "NO_VOICE";
-                ledger.recordSkipped(XOpsAction.Kind.INBOUND, item.tweetId(), reason, now);
+                remember(ledger.recordSkipped(XOpsAction.Kind.INBOUND, item.tweetId(), reason, now),
+                    draft, item, context);
                 batch++;
                 if (batch >= perTick) {
                     return;
@@ -102,22 +104,26 @@ public class XInboundService {
                 AsmClient.XPublishResult result = asmClient.publishX(
                     draft.body(), item.tweetId(), null, null);
                 if (result != null && result.ok()) {
-                    ledger.recordPosted(
+                    remember(ledger.recordPosted(
                         XOpsAction.Kind.INBOUND,
                         item.tweetId(),
                         item.parentTweetId(),
                         item.ourPostTweetId(),
                         result.tweetId(),
                         draft.body(),
-                        now);
+                        now), draft, item, context);
                     telegramNotifier.send(XOpsTelegramAlerts.posted(
                         "Justant-Bot 대댓글", result, item.tweetId(), draft.body()));
                 } else {
-                    ledger.recordFailed(XOpsAction.Kind.INBOUND, item.tweetId(), "PUBLISH_FAILED", now);
+                    remember(ledger.recordFailed(
+                        XOpsAction.Kind.INBOUND, item.tweetId(), "PUBLISH_FAILED", now),
+                        draft, item, context);
                 }
             } catch (Exception e) {
                 log.warn("[x-inbound] publish failed tweetId={}: {}", item.tweetId(), e.getMessage());
-                ledger.recordFailed(XOpsAction.Kind.INBOUND, item.tweetId(), "ASM_ERROR", now);
+                remember(ledger.recordFailed(
+                    XOpsAction.Kind.INBOUND, item.tweetId(), "ASM_ERROR", now),
+                    draft, item, context);
             }
             batch++;
             if (batch >= perTick) {
@@ -166,6 +172,12 @@ public class XInboundService {
         Instant earliest = item.createdAt().plus(Duration.ofMinutes(jitterMinutes(item.tweetId())));
         Instant latest = item.createdAt().plus(Duration.ofMinutes(REPLY_WINDOW_MINUTES));
         return !now.isBefore(earliest) && !now.isAfter(latest);
+    }
+
+    private void remember(
+            XOpsAction action, XCommentComposer.Draft draft, AsmClient.XInboxItem item, String context) {
+        commentTrace.record(
+            XOpsAction.Kind.INBOUND, action, draft, item.text(), context, false);
     }
 
     private static String parentContext(AsmClient.XInboxItem item) {

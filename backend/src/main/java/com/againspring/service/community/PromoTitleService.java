@@ -64,7 +64,7 @@ public class PromoTitleService {
     private final ObjectMapper objectMapper;
     private final MarketingGenerationTraceRepository generationTraceRepository;
 
-    @Value("${llm.model:claude-haiku-4-5-20251001}")
+    @Value("${llm.marketing.model:claude-sonnet-5-5}")
     private String model;
 
     @Value("${promo-title.enabled:true}")

@@ -7,9 +7,9 @@
 | 경로 | 컨테이너 | 누가 호출 |
 |---|---|---|
 | AI-user PLAN / legacy 생성 | `againspring-llm-ai-user` (`:8092`) | orchestrator |
-| 마케팅 숏폼 훅·대본·시봄이 플랜 | `againspring-llm` (base, BE `RemoteLlmProvider`) | `VideoVariantService` 등 |
+| 마케팅 숏폼 훅·대본·시봄이 플랜 | `againspring-llm` (base, BE `RemoteLlmProvider`) | `VideoVariantService` · `PromoTitleService`. 모델 `llm.marketing.model` = `claude-sonnet-5-5` |
 
-ASM/WaggleBot은 사연·variant 텍스트를 **다시 LLM으로 쓰지 않는다**. 렌더는 AS가 넘긴 brief를 합성한다.
+ASM 텍스트 채널 카피(`copy_generator`)도 같은 Sonnet 5.5(`claude-sonnet-5-5`)를 쓴다. 영상 렌더는 AS가 넘긴 brief를 합성한다.
 
 ---
 

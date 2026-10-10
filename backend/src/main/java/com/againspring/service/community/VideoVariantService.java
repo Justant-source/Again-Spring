@@ -176,7 +176,7 @@ public class VideoVariantService {
     private final ObjectMapper objectMapper;
     private final MarketingLlmAuthGuard llmAuthGuard;
 
-    @Value("${llm.model:claude-haiku-4-5-20251001}")
+    @Value("${llm.marketing.model:claude-sonnet-5-5}")
     private String model;
 
     @Value("${video-variant.enabled:true}")

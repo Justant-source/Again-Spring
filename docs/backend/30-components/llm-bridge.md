@@ -36,6 +36,7 @@ backend/src/main/java/com/againspring/
 - 타임아웃: `llm.remote.default-timeout-ms` (운영 기본 600,000ms). HTTP read timeout은 이 값보다 길게 둔다.
 - 인증: 없음 (내부 네트워크, 컨테이너 간)
 - **선택 이미지**: `LLMProvider.invoke(prompt, model, List<LlmImage>)` — `{mime, base64}` 최대 1장. `RemoteLlmProvider`는 body `images`로 전달한다. 인터페이스 기본 구현은 이미지가 있으면 `UnsupportedOperationException`(호출측 `VISION_FAIL`) — 텍스트 invoke는 사진이 없을 때만.
+- **선택 effort**: `invoke(prompt, model, images, effort)` → body `effort`. 워커는 `low`\|`medium`\|`high`\|`xhigh`\|`max`일 때만 CLI `--effort`를 붙인다. 없거나 그 외 값이면 플래그를 생략한다. 선댓글·대댓글은 `low`.
 
 ---
 
@@ -97,10 +98,12 @@ backend는 `SyntheticOutputGuard`로 `users.synthetic=1` 작성자의 글·댓�
 컨테이너: `againspring-llm` (base 스택, dev·prod 공유, port :8090)  
 - 모델: `claude-haiku-4-5-20251001`
 - 보고서/분석 모델: `claude-sonnet-5-5` (2026-08-21부터; 이전 `claude-sonnet-5-5`)
+- 마케팅 훅·채널 대본: `claude-sonnet-5-5` (`llm.marketing.model` / `MARKETING_CONTENT_LLM_MODEL`). ASM에 넘기는 `script_reels`·`script_shorts`가 이 호출이다.
+- 톤 정규화: `claude-sonnet-5-5` (`llm.tonalization.model` / `LLM_TONALIZATION_MODEL`, `TonalizationService`).
 - `~/.claude` bind mount (Claude 인증)
 - 엔드포인트: `POST /v1/invoke`, `GET /v1/invocations`
 - **호출 경로**: `backend` → HTTP POST → `againspring-llm:8090/v1/invoke` (RemoteLlmProvider 경유)
-- `/v1/invoke` **optional `images`**: mime+base64. 없으면 텍스트만. 있으면 임시 파일로 CLI에 첨부 후 삭제.
+- `/v1/invoke` **optional `images`**: mime+base64. 없으면 텍스트만. 있으면 임시 파일로 CLI에 첨부 후 삭제. **optional `effort`**: allowlist일 때만 `--effort`.
 
 **CLI 도구 오버헤드 감소 (2026-08-21)**: llm-worker는 structured output이 불필요하므로 `--disallowedTools "*"`로 모든 CLI 도구를 차단. 
 입력 토큰 오버헤드를 25,267 토큰에서 ~279 토큰으로 감소시킨다(기본값 대비 -99%). 

@@ -33,13 +33,20 @@ public class XCommentComposer {
     static final int ORIGINAL_MAX_CHARS = 140;
     static final int ORIGINAL_MAX_LINES = 3;
 
-    public record Draft(boolean skip, String body, String skipReason) {
+    /** Model call captured for {@code x_comment_trace}. Null when no LLM call ran. */
+    public record LlmCall(String model, String effort, String prompt, String rawResponse) {}
+
+    public record Draft(boolean skip, String body, String skipReason, LlmCall llmCall) {
         public static Draft of(String body) {
-            return new Draft(false, body, null);
+            return new Draft(false, body, null, null);
         }
 
         public static Draft skipped(String reason) {
-            return new Draft(true, null, reason);
+            return new Draft(true, null, reason, null);
+        }
+
+        public Draft withLlmCall(LlmCall llmCall) {
+            return new Draft(skip, body, skipReason, llmCall);
         }
     }
 
@@ -53,8 +60,15 @@ public class XCommentComposer {
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
 
+    /** Ritual and original posts. Comment paths use {@link #commentModel}. */
     @Value("${llm.claude-code.model:claude-haiku-4-5-20251001}")
     private String model;
+
+    @Value("${marketing.x.comment-model:claude-sonnet-5-5}")
+    private String commentModel;
+
+    @Value("${marketing.x.comment-effort:low}")
+    private String commentEffort;
 
     /** Reply to someone else's tweet/comment. Persona from marketing.x.persona_profile_json. */
     public Draft composeReply(String targetText, String parentContext) {
@@ -87,7 +101,7 @@ public class XCommentComposer {
 
             댓글 본문만 출력하세요. 할 말이 없으면 '할 말 없음'만 출력하세요.
             """.formatted(safeProfile, safeTarget, safeParent);
-        return invokeDraft(prompt);
+        return invokeReply(prompt);
     }
 
     /**
@@ -242,23 +256,56 @@ public class XCommentComposer {
         }
     }
 
+    private Draft invokeReply(String prompt) {
+        String modelName = commentModelName();
+        String effort = commentEffort();
+        try {
+            String raw = llmProvider.invoke(prompt, modelName, null, effort);
+            return toDraft(raw).withLlmCall(new LlmCall(modelName, effort, prompt, raw));
+        } catch (Exception e) {
+            log.warn("[x-composer] reply invoke failed: {}", e.getMessage());
+            return Draft.skipped("LLM_ERROR").withLlmCall(new LlmCall(modelName, effort, prompt, null));
+        }
+    }
+
     private Draft invokeOutbound(String prompt, String photoJpegBase64) {
+        String modelName = commentModelName();
+        String effort = commentEffort();
+        boolean hasPhoto = photoJpegBase64 != null && !photoJpegBase64.isBlank();
         try {
             String raw;
-            if (photoJpegBase64 != null && !photoJpegBase64.isBlank()) {
+            if (hasPhoto) {
                 raw = llmProvider.invoke(
-                    prompt, model, List.of(new LlmImage("image/jpeg", photoJpegBase64)));
+                    prompt, modelName, List.of(new LlmImage("image/jpeg", photoJpegBase64)), effort);
             } else {
-                raw = llmProvider.invoke(prompt, model);
+                raw = llmProvider.invoke(prompt, modelName, null, effort);
             }
-            return toOutboundDraft(raw);
+            return toOutboundDraft(raw).withLlmCall(new LlmCall(modelName, effort, prompt, raw));
         } catch (UnsupportedOperationException e) {
             log.warn("[x-composer] vision unavailable: {}", e.getMessage());
-            return Draft.skipped("VISION_FAIL");
+            return Draft.skipped("VISION_FAIL").withLlmCall(new LlmCall(modelName, effort, prompt, null));
         } catch (Exception e) {
             log.warn("[x-composer] outbound invoke failed: {}", e.getMessage());
-            return Draft.skipped("LLM_ERROR");
+            return Draft.skipped("LLM_ERROR").withLlmCall(new LlmCall(modelName, effort, prompt, null));
         }
+    }
+
+    private String commentModelName() {
+        if (commentModel == null || commentModel.isBlank()) {
+            return "claude-sonnet-5-5";
+        }
+        return commentModel.strip();
+    }
+
+    /** CLI allowlist. Anything else stays on low so a bad config cannot change the flag. */
+    private String commentEffort() {
+        if (commentEffort == null) {
+            return "low";
+        }
+        return switch (commentEffort.strip().toLowerCase()) {
+            case "low", "medium", "high", "xhigh", "max" -> commentEffort.strip().toLowerCase();
+            default -> "low";
+        };
     }
 
     private Draft invokeDraft(String prompt) {

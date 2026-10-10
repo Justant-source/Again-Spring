@@ -26,6 +26,14 @@ public interface LLMProvider {
     }
 
     /**
+     * 동기 호출 + 선택 이미지 + Claude CLI {@code --effort}.
+     * effort가 없으면 구현체는 플래그를 생략한다. 기본 구현은 effort를 무시하고 이미지 invoke로 떨어진다.
+     */
+    default String invoke(String prompt, String model, List<LlmImage> images, String effort) throws Exception {
+        return invoke(prompt, model, images);
+    }
+
+    /**
      * Provider 식별자 (로깅용).
      */
     String getProviderName();

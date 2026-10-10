@@ -93,11 +93,16 @@ public class LlmWorkerPool {
      */
     public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId)
             throws LlmException {
-        return executeSyncTask(prompt, model, timeoutMs, correlationId, List.of());
+        return executeSyncTask(prompt, model, timeoutMs, correlationId, List.of(), null);
     }
 
     public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId,
                                   List<InvokeImage> images) throws LlmException {
+        return executeSyncTask(prompt, model, timeoutMs, correlationId, images, null);
+    }
+
+    public String executeSyncTask(String prompt, String model, long timeoutMs, String correlationId,
+                                  List<InvokeImage> images, String effort) throws LlmException {
         long effectiveTimeout = timeoutMs > 0 ? timeoutMs : defaultTimeoutMs;
         String resolvedModel = (model != null && !model.isBlank()) ? model : defaultModel;
         long enqueueTime = System.currentTimeMillis();
@@ -119,7 +124,8 @@ public class LlmWorkerPool {
                 if (inv.isCanceled()) return;
                 activeCount.incrementAndGet();
                 try {
-                    String result = invoker.invokeWithCancelSupport(prompt, resolvedModel, inv, images);
+                    String result = invoker.invokeWithCancelSupport(
+                            prompt, resolvedModel, inv, images, effort);
                     if (!inv.isCanceled() && resultFuture.complete(result)) completedCount.incrementAndGet();
                 } catch (InvocationCanceledException | LlmTimeoutException e) {
                     // timeout/cancel already completed the future and terminated its process tree

@@ -155,6 +155,7 @@ rm -f watchdog-state/retry-state.json
 
 스크립트:
 - 공통: `scripts/claude-oauth-peer.sh pull|push|reconcile user@host`
+- 원격 병합은 `scripts/claude_oauth_creds.py`만 쓴다. `ssh host python3 -c`에 여러 줄 스크립트를 넣으면 원격 셸이 `-c` 인자를 버리고 push가 실패한다.
 - AS → WSL 수동+검증: `scripts/sync-claude-creds-to-wsl.sh`
 - 래퍼: `scripts/pull-claude-creds-from-as.sh` · `scripts/pull-claude-creds-from-wsl.sh`
 - WSL 워치독 SSOT: `env/scripts/wsl-ops-watchdog-script.sh`

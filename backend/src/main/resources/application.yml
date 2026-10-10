@@ -121,6 +121,11 @@ app:
 
 llm:
   enabled: ${LLM_ENABLED:true}
+  # 마케팅 훅·채널 대본(PromoTitleService, VideoVariantService). ASM에 넘기는 script_*.
+  marketing:
+    model: ${MARKETING_CONTENT_LLM_MODEL:claude-sonnet-5-5}
+  tonalization:
+    model: ${LLM_TONALIZATION_MODEL:claude-sonnet-5-5}
   compose:
     model: ${COMPOSE_LLM_MODEL:claude-haiku-4-5-20251001}
   correction:
@@ -173,6 +178,9 @@ marketing:
     # Public FxTwitter read-only timeline for persona learning (not publish).
     timeline-base-url: ${MARKETING_X_TIMELINE_BASE_URL:https://api.fxtwitter.com}
     persona-learn-model: ${MARKETING_X_PERSONA_LEARN_MODEL:claude-sonnet-5-5}
+    # 선댓글·대댓글만. 의식·원글은 llm.claude-code.model (Haiku).
+    comment-model: ${MARKETING_X_COMMENT_MODEL:claude-sonnet-5-5}
+    comment-effort: ${MARKETING_X_COMMENT_EFFORT:low}
   telegram:
     # 실패 알림에 인라인 버튼(재구동/무시) 표시 여부. 기본값 false (안전 장치).
     # 활성화 시 Telegram 인라인 버튼 클릭 → ASM webhook → AS redrive API 호출 흐름 개시.

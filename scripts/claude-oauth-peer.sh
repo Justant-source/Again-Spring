@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 #
 # AS ↔ WSL Claude Code oauth 동기화.
-# claudeAiOauth 만 옮긴다. 토큰은 SSH 파이프에만 두고 화면에 찍지 않는다.
+# 토큰은 SSH 파이프에만 두고 화면에 찍지 않는다.
 #
 #   pull <user@host>         피어 → 로컬 병합
 #   push <user@host>         로컬 → 피어 병합
 #   reconcile <user@host>    expiresAt 이 더 큰 쪽을 양쪽에 맞춤 (같으면 noop)
+#   install-wsl [user@host]  헬퍼·래퍼를 WSL ~/.local 에 설치
+#
+# 원격 python3 -c 멀티라인 금지: SSH가 -c 인자를 버려 push 가 깨진다.
+# 원격 merge 는 헬퍼 파일을 먼저 설치한 뒤 `python3 claude_oauth_creds.py merge`.
+# pull 의 extract 는 heredoc|pipe 를 쓰지 않는다 (stdin 이 merge 쪽으로 새어 빈 JSON).
 #
 set -euo pipefail
 
@@ -14,125 +19,70 @@ PEER="${2:-}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-[ -n "$ACTION" ] && [ -n "$PEER" ] || die "usage: $0 pull|push|reconcile user@host"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+resolve_helper() {
+  if [ -f "${SCRIPT_DIR}/claude_oauth_creds.py" ]; then
+    echo "${SCRIPT_DIR}/claude_oauth_creds.py"
+  elif [ -f "${HOME}/.local/lib/claude_oauth_creds.py" ]; then
+    echo "${HOME}/.local/lib/claude_oauth_creds.py"
+  else
+    die "claude_oauth_creds.py 없음 (scripts/ 또는 ~/.local/lib/)"
+  fi
+}
+
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10)
+
+[ -n "$ACTION" ] || die "usage: $0 pull|push|reconcile|install-wsl [user@host]"
+
+if [ "$ACTION" != "install-wsl" ]; then
+  [ -n "$PEER" ] || die "usage: $0 pull|push|reconcile user@host"
+fi
+
+HELPER="$(resolve_helper)"
 
 expires_local() {
-  python3 - <<'PY'
-import json, os
-p = os.path.expanduser("~/.claude/.credentials.json")
-if not os.path.isfile(p):
-    print(0)
-    raise SystemExit
-d = json.load(open(p))
-oauth = d.get("claudeAiOauth") or {}
-print(int(oauth.get("expiresAt") or 0))
-PY
+  python3 "$HELPER" expires
 }
 
 expires_peer() {
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$PEER" python3 - <<'PY'
-import json, os
-p = os.path.expanduser("~/.claude/.credentials.json")
-if not os.path.isfile(p):
-    print(0)
-    raise SystemExit
-d = json.load(open(p))
-oauth = d.get("claudeAiOauth") or {}
-print(int(oauth.get("expiresAt") or 0))
-PY
+  local remote_helper
+  remote_helper="$(ensure_remote_helper)"
+  ssh "${SSH_OPTS[@]}" "$PEER" python3 "$remote_helper" expires
 }
 
-extract_oauth() {
-  python3 - <<'PY'
-import json, os, sys
-p = os.path.expanduser("~/.claude/.credentials.json")
-if not os.path.isfile(p):
-    sys.stderr.write("local credentials missing\n")
-    raise SystemExit(2)
-d = json.load(open(p))
-if "claudeAiOauth" not in d:
-    sys.stderr.write("local claudeAiOauth missing\n")
-    raise SystemExit(3)
-print(json.dumps({"claudeAiOauth": d["claudeAiOauth"]}))
-PY
+ensure_remote_helper() {
+  ssh "${SSH_OPTS[@]}" "$PEER" 'mkdir -p "$HOME/.local/lib"' >/dev/null
+  local local_sum remote_sum
+  local_sum="$(md5sum "$HELPER" | awk '{print $1}')"
+  remote_sum="$(ssh "${SSH_OPTS[@]}" "$PEER" 'md5sum "$HOME/.local/lib/claude_oauth_creds.py" 2>/dev/null | awk "{print \$1}"' || true)"
+  if [ "$local_sum" != "$remote_sum" ]; then
+    scp -q "${SSH_OPTS[@]}" "$HELPER" "${PEER}:.local/lib/claude_oauth_creds.py"
+  fi
+  remote_helper_path
 }
 
-merge_local_from_stdin() {
-  python3 -c "
-import json, os, shutil, sys, time
-incoming = json.load(sys.stdin)
-if 'claudeAiOauth' not in incoming:
-    print('ERROR: incoming oauth 없음', file=sys.stderr)
-    raise SystemExit(1)
-path = os.path.expanduser('~/.claude/.credentials.json')
-current = {}
-if os.path.exists(path):
-    backup = path + '.bak-' + time.strftime('%Y%m%d-%H%M%S')
-    shutil.copy2(path, backup)
-    print('backup :', backup)
-    with open(path) as f:
-        current = json.load(f)
-before = current.get('claudeAiOauth') or {}
-current['claudeAiOauth'] = incoming['claudeAiOauth']
-os.makedirs(os.path.dirname(path), exist_ok=True)
-fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-with os.fdopen(fd, 'w') as f:
-    json.dump(current, f, indent=2)
-after = current['claudeAiOauth']
-print('written:', path, '(mode 600)')
-print('  subscriptionType:', before.get('subscriptionType'), '->', after.get('subscriptionType'))
-"
-}
-
-# 파이프 JSON → 원격 python stdin. 원격 코드는 -c, heredoc은 ssh stdin을 뺏음.
-merge_peer_from_stdin() {
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$PEER" python3 -c "
-import json, os, shutil, sys, time
-incoming = json.load(sys.stdin)
-if 'claudeAiOauth' not in incoming:
-    print('ERROR: incoming oauth 없음', file=sys.stderr)
-    raise SystemExit(1)
-path = os.path.expanduser('~/.claude/.credentials.json')
-current = {}
-if os.path.exists(path):
-    backup = path + '.bak-' + time.strftime('%Y%m%d-%H%M%S')
-    shutil.copy2(path, backup)
-    print('backup :', backup)
-    with open(path) as f:
-        current = json.load(f)
-before = current.get('claudeAiOauth') or {}
-current['claudeAiOauth'] = incoming['claudeAiOauth']
-os.makedirs(os.path.dirname(path), exist_ok=True)
-fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-with os.fdopen(fd, 'w') as f:
-    json.dump(current, f, indent=2)
-after = current['claudeAiOauth']
-print('written:', path, '(mode 600)')
-print('  subscriptionType:', before.get('subscriptionType'), '->', after.get('subscriptionType'))
-"
+# 원격 셸이 $HOME 을 확장한 실제 경로. stdout 은 경로만.
+remote_helper_path() {
+  ssh "${SSH_OPTS[@]}" "$PEER" 'echo "$HOME/.local/lib/claude_oauth_creds.py"'
 }
 
 do_pull() {
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$PEER" true 2>/dev/null || die "SSH 실패: $PEER"
+  ssh "${SSH_OPTS[@]}" "$PEER" true 2>/dev/null || die "SSH 실패: $PEER"
   mkdir -p "${HOME}/.claude"
-  ssh -o BatchMode=yes "$PEER" python3 - <<'PY' | merge_local_from_stdin
-import json, os, sys
-p = os.path.expanduser("~/.claude/.credentials.json")
-if not os.path.isfile(p):
-    sys.stderr.write("peer credentials missing\n")
-    raise SystemExit(2)
-d = json.load(open(p))
-if "claudeAiOauth" not in d:
-    sys.stderr.write("peer claudeAiOauth missing\n")
-    raise SystemExit(3)
-print(json.dumps({"claudeAiOauth": d["claudeAiOauth"]}))
-PY
+  ensure_remote_helper >/dev/null
+  local rpy
+  rpy="$(remote_helper_path)"
+  # heredoc 을 ssh stdin 에 넣지 않는다 — 파이프와 겹치면 merge stdin 이 빈다.
+  ssh "${SSH_OPTS[@]}" "$PEER" python3 "$rpy" extract | python3 "$HELPER" merge
   echo "claude-oauth-peer pull ok from $PEER"
 }
 
 do_push() {
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$PEER" true 2>/dev/null || die "SSH 실패: $PEER"
-  extract_oauth | merge_peer_from_stdin
+  ssh "${SSH_OPTS[@]}" "$PEER" true 2>/dev/null || die "SSH 실패: $PEER"
+  ensure_remote_helper >/dev/null
+  local rpy
+  rpy="$(remote_helper_path)"
+  python3 "$HELPER" extract | ssh "${SSH_OPTS[@]}" "$PEER" python3 "$rpy" merge
   echo "claude-oauth-peer push ok to $PEER"
 }
 
@@ -151,9 +101,30 @@ do_reconcile() {
   fi
 }
 
+do_install_wsl() {
+  PEER="${PEER:-justant@100.115.252.61}"
+  ssh "${SSH_OPTS[@]}" "$PEER" true 2>/dev/null || die "SSH 실패: $PEER"
+  ssh "${SSH_OPTS[@]}" "$PEER" "mkdir -p ~/.local/bin ~/.local/lib ~/.config/systemd/user"
+  scp -q "${SSH_OPTS[@]}" "$HELPER" "${PEER}:.local/lib/claude_oauth_creds.py"
+  scp -q "${SSH_OPTS[@]}" "${SCRIPT_DIR}/claude-oauth-peer.sh" "${PEER}:.local/bin/claude-oauth-peer.sh"
+  ssh "${SSH_OPTS[@]}" "$PEER" "chmod 755 ~/.local/bin/claude-oauth-peer.sh ~/.local/lib/claude_oauth_creds.py"
+  local watchdog="${SCRIPT_DIR}/../env/scripts/wsl-ops-watchdog-script.sh"
+  local watchdog_svc="${SCRIPT_DIR}/../env/scripts/wsl-ops-watchdog.service"
+  if [ -f "$watchdog" ]; then
+    scp -q "${SSH_OPTS[@]}" "$watchdog" "${PEER}:.config/systemd/user/wsl-ops-watchdog-script.sh"
+    ssh "${SSH_OPTS[@]}" "$PEER" "chmod 755 ~/.config/systemd/user/wsl-ops-watchdog-script.sh"
+  fi
+  if [ -f "$watchdog_svc" ]; then
+    scp -q "${SSH_OPTS[@]}" "$watchdog_svc" "${PEER}:.config/systemd/user/wsl-ops-watchdog.service"
+    ssh "${SSH_OPTS[@]}" "$PEER" "systemctl --user daemon-reload" || true
+  fi
+  echo "installed oauth peer + watchdog script on $PEER"
+}
+
 case "$ACTION" in
   pull) do_pull ;;
   push) do_push ;;
   reconcile) do_reconcile ;;
+  install-wsl) do_install_wsl ;;
   *) die "unknown action: $ACTION" ;;
 esac
