@@ -146,6 +146,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `hook_emotion` | `shock`\|`anger`\|`tension`\|`sad`\|`hype` → **TTS S2 Pro** |
 | `hook_reels` / `hook_shorts` | **영상 슬롯 확정 시** 변형 훅 (`VideoVariantService`). 채널당 LLM 1회(+보정 최대 1). 회로 open이면 호출 없음. `/`·`／` 구분자는 공백으로 정규화. [llm-call-budget.md](../../../ai-user/70-policy/llm-call-budget.md) §3 |
 | `script_reels` / `script_shorts` | 요약 낭독 대본. 끝에 공감비율·댓글·의견 요청 CTA를 추가하지 않음. |
+| `hook_rule` | 훅 규칙 버전 태그(실험 추적). 영상 잡만 `"v2"`, 태그 없는 과거 잡 = v1. AS `BriefDto.hookRule`(`CreateJobRequest`) → ASM `StoryBrief.hook_rule` → `job.brief_json.hook_rule` 저장 |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | 본문 목표 30 / 45초 (듀얼·분리 잡). 본문 TTS는 각각 32 / 47초를 넘으면 실패한다. 댓글 2개·아웃트로는 본문 길이 판정에서 제외한다. |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
 | `sibom_candidates` | string[] ≤12. 사연 생성 후 코드 keyword shortlist (`posts.sibom_candidates`) |
@@ -199,6 +200,18 @@ curl -sL -A "Mozilla/5.0 …" https://www.youtube.com/@againspring_official/abou
 플랫폼 안의 댓글 유도로 읽힐 여지가 있다(실제로 조회 85,678에 YouTube 댓글 63개가 달렸고
 사이트 방문은 0이었다). 변경 시 [`acquisition-measurement.md`](../40-data/acquisition-measurement.md)의
 기준선과 대조해 효과를 판정할 것.
+
+
+### 5.1 훅 규칙 v2 (2026-10-18, `VideoVariantService.buildChannelPrompt`)
+
+근거: Shorts 84건 — 훅/제목에 구체적 숫자가 있으면 조회 중앙값 701, 없으면 440. 질문형 제목 232(비질문 495). 상위 훅은 첫 문장에 충격 사실·구체 사건, 하위 훅은 분위기·추상 요약.
+
+- 훅 첫 문장에 **본문에 실제로 있는** 숫자(금액·기간·횟수·나이 1개 이상) + 사건(누가 무엇을 했다). 본문에 없는 숫자 창작 금지(숫자가 없으면 구체 행동만).
+- 질문형(`~일까?`·`~인가요`)·분위기 서술형(`자꾸 떠올라요`)·추상 요약형(`~한 이유`) 훅 금지. 평서문으로 사건을 단정.
+- 스크립트 첫 문장은 훅을 이어받아 사건을 먼저 던지고 설명·맥락은 뒤로(훅 문장 복제 금지).
+- 유지: 판결/처방/승패/배심원 금지, `/` 구분자 금지, Reels ≤30s / Shorts ≤45s, `PromptSanitizer` 경유. AI-user 콘텐츠 검열 아님(프롬프트 지시일 뿐, 사후 denylist 없음).
+- 마스터 훅(`PromoTitleService`)에도 같은 숫자 근거·질문형 금지 문구를 추가했다.
+- 비교 분석 시 `hook_rule` 없음(v1) vs `v2` 로 `job.brief_json` 을 나눈다. 동일 일령 비교 필수.
 
 ---
 

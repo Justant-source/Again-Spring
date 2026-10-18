@@ -218,7 +218,7 @@ UNKNOWN으로 덮지 않는다.
 | BE Admin API 경로 (BGM/SFX) | `GET /api/admin/marketing/bgm/tracks` · `GET /api/admin/marketing/bgm/sample` · `PUT /api/admin/marketing/bgm/settings` · `GET /api/admin/marketing/sfx/mapping` · `PUT /api/admin/marketing/sfx/mapping` · `GET /api/admin/marketing/sfx/sample` |
 | FE 마케팅 허브 | `frontend/app/(admin)/admin/marketing/page.tsx` (탭: 대기/완료/통계/테스트/설정) |
 | FE 홀딩 UI | `frontend/components/admin/marketing/HoldingBoard.tsx` · `HoldingControlsBar.tsx` · `HoldingDraftDialog.tsx` |
-| FE 테스트 탭 (렌더 QA) | `frontend/components/admin/marketing/RenderTestSection.tsx` — `createMarketingTestJob`(항상 `autoPublish:false`) |
+| FE 테스트 탭 (렌더 QA) | `frontend/components/admin/marketing/RenderTestSection.tsx` — `createMarketingTestJob`(항상 `autoPublish:false`, 게시 버튼 없음). 프로필 5종 선택 · 프로필/훅 규칙(v1·v2) 배지·필터 · 같은 사연(postId) 변형 나란히 비교. A/B 성과 분석 = `scripts/marketing_ab_report.py`(같은 일령 비교, 코호트 n<10 이면 결론 보류) |
 | FE 잡 상세 | `frontend/app/(admin)/admin/marketing/jobs/[id]/page.tsx` |
 | FE API 클라이언트 | `frontend/lib/api/admin/marketing.ts` |
 | FE 플랫폼 계정 UI | `frontend/components/admin/marketing/PlatformCredentialsSection.tsx` · `PlatformAutoSection.tsx` |

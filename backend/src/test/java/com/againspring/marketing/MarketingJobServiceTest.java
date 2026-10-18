@@ -323,6 +323,9 @@ class MarketingJobServiceTest {
         verify(asmClient, times(2)).createJob(captor.capture(), any(String.class));
         assertThat(captor.getAllValues()).extracting(CreateJobRequest::getTargets)
             .containsExactly(List.of("x_thread"), List.of("instagram_reels"));
+        // hook_rule 태그: 영상 잡만 v2, x_thread는 없음(=v1 취급). JSON 키는 ASM StoryBrief.hook_rule.
+        assertThat(captor.getAllValues().get(0).getBrief().getHookRule()).isNull();
+        assertThat(captor.getAllValues().get(1).getBrief().getHookRule()).isEqualTo("v2");
         assertThat(captor.getAllValues()).allSatisfy(req -> {
             assertThat(req.getSourceId()).isEqualTo(TEST_POST_ID);
             assertThat(req.getBrief().getPostId()).isEqualTo(TEST_POST_ID);

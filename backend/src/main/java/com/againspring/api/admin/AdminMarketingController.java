@@ -2,6 +2,7 @@ package com.againspring.api.admin;
 
 import com.againspring.annotation.Auditable;
 import com.againspring.api.admin.dto.JobResponse;
+import com.againspring.marketing.MarketingRenderProfiles;
 import com.againspring.api.admin.dto.CreateJobRequest;
 import com.againspring.api.admin.dto.MarketingPublishSlotsResponse;
 import com.againspring.api.admin.dto.MarketingQuotaResponse;
@@ -285,9 +286,13 @@ public class AdminMarketingController {
         // Validate render profile if specified
         String renderProfile = req.getRenderProfile();
         if (renderProfile != null && !renderProfile.isEmpty()) {
-            if (!renderProfile.matches("marketing_fast|marketing_v2")) {
+            if (!MarketingRenderProfiles.isAllowed(renderProfile)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Invalid renderProfile: must be 'marketing_fast' or 'marketing_v2'");
+                    "Invalid renderProfile: must be one of " + MarketingRenderProfiles.ALLOWED);
+            }
+            if (MarketingRenderProfiles.isExperimental(renderProfile) && req.isAutoPublish()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Experimental renderProfile " + renderProfile + " is test-only (autoPublish must be false)");
             }
         }
 

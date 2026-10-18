@@ -402,6 +402,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/requests/supplies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSupplyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/snacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createSnackRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quests/{id}/vote": {
         parameters: {
             query?: never;
@@ -636,6 +668,118 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["resetUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/supplies/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rejectSupplyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/supplies/{id}/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["purchaseSupplyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rejectSnackRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/{id}/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["purchaseSnackRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/items/{catalogItemId}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rejectSnackItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/items/{catalogItemId}/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["purchaseSnackItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["syncCatalog"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1042,6 +1186,38 @@ export interface paths {
         patch: operations["closeSurveyByPost"];
         trace?: never;
     };
+    "/api/requests/supplies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["cancelSupplyRequest"];
+        options?: never;
+        head?: never;
+        patch: operations["updateSupplyRequest"];
+        trace?: never;
+    };
+    "/api/requests/snacks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["cancelSnackRequest"];
+        options?: never;
+        head?: never;
+        patch: operations["updateSnackQuantity"];
+        trace?: never;
+    };
     "/api/posts/{id}/status": {
         parameters: {
             query?: never;
@@ -1104,6 +1280,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["updateSurveyDelivery"];
+        trace?: never;
+    };
+    "/api/admin/requests/catalog/{id}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["setCatalogVisibility"];
+        trace?: never;
+    };
+    "/api/admin/requests/catalog/categories/{category}/visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["setCategoryVisibility"];
         trace?: never;
     };
     "/api/admin/gacha/deliveries/{drawId}/deliver": {
@@ -1338,6 +1546,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getByPost"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/supplies/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listMySupplyRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/snacks/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listMySnackRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/snacks/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSnackCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/snacks/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSnackCatalog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2018,6 +2290,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/requests/supplies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSupplies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/supplies/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSupplyHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSnackHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/snacks/grouped": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listGroupedSnacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAdminCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/catalog/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["catalogSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/requests/catalog/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCatalogCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/posts": {
         parameters: {
             query?: never;
@@ -2496,6 +2880,55 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        SupplyCreateRequest: {
+            title?: string;
+            /** Format: int32 */
+            quantity?: number;
+            memo?: string;
+        };
+        SupplyRequestResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            /** Format: int32 */
+            quantity?: number;
+            memo?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PURCHASED" | "REJECTED";
+            /** @enum {string} */
+            rejectReason?: "OUT_OF_STOCK" | "POLICY" | "DUPLICATE" | "OTHER";
+            rejectReasonLabel?: string;
+            rejectNote?: string;
+            createdAt?: string;
+            purchasedAt?: string;
+            rejectedAt?: string;
+        };
+        SnackCreateRequest: {
+            /** Format: int64 */
+            catalogItemId?: number;
+            /** Format: int32 */
+            quantity?: number;
+        };
+        SnackRequestResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            catalogItemId?: number;
+            name?: string;
+            imageUrl?: string;
+            ssgUrl?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** @enum {string} */
+            status?: "PENDING" | "PURCHASED" | "REJECTED";
+            /** @enum {string} */
+            rejectReason?: "OUT_OF_STOCK" | "POLICY" | "DUPLICATE" | "OTHER";
+            rejectReasonLabel?: string;
+            rejectNote?: string;
+            createdAt?: string;
+            purchasedAt?: string;
+            rejectedAt?: string;
+        };
         MessageRequest: {
             content?: string;
         };
@@ -2541,6 +2974,24 @@ export interface components {
             message?: string;
             /** Format: int64 */
             phraseId?: number;
+        };
+        RejectRequestBody: {
+            /** @enum {string} */
+            reason?: "OUT_OF_STOCK" | "POLICY" | "DUPLICATE" | "OTHER";
+            note?: string;
+        };
+        PurchaseCountResponse: {
+            /** Format: int32 */
+            updated?: number;
+        };
+        CatalogSyncStatusResponse: {
+            running?: boolean;
+            lastSuccessAt?: string;
+            lastFailAt?: string;
+            lastError?: string;
+            cooldownUntil?: string;
+            /** Format: int32 */
+            itemCount?: number;
         };
         CreateEventRequest: {
             type?: string;
@@ -2690,6 +3141,16 @@ export interface components {
             hasStatus?: boolean;
             adminOnly?: boolean;
         };
+        SupplyUpdateRequest: {
+            title?: string;
+            /** Format: int32 */
+            quantity?: number;
+            memo?: string;
+        };
+        SnackQuantityRequest: {
+            /** Format: int32 */
+            quantity?: number;
+        };
         CaptionUpdateRequest: {
             caption?: string;
         };
@@ -2722,6 +3183,9 @@ export interface components {
             deliveryMemo?: string;
             /** Format: date-time */
             createdAt?: string;
+        };
+        VisibilityRequest: {
+            hiddenFromUsers?: boolean;
         };
         AdminDeliveryDto: {
             /** Format: int64 */
@@ -2839,6 +3303,46 @@ export interface components {
             property?: string;
             ignoreCase?: boolean;
         };
+        SnackSsgCategoryResponse: {
+            code?: string;
+            label?: string;
+        };
+        PageSnackCatalogCardResponse: {
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["SnackCatalogCardResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"][];
+            /** Format: int32 */
+            numberOfElements?: number;
+            empty?: boolean;
+        };
+        SnackCatalogCardResponse: {
+            /** Format: int64 */
+            id?: number;
+            name?: string;
+            category?: string;
+            categoryLabel?: string;
+            imageUrl?: string;
+            ssgUrl?: string;
+            /** Format: int32 */
+            pendingQty?: number;
+            /** Format: int32 */
+            myPendingQty?: number;
+            /** Format: int64 */
+            myRequestId?: number;
+            available?: boolean;
+            hiddenFromUsers?: boolean;
+            canRequest?: boolean;
+        };
         PagePostResponse: {
             /** Format: int64 */
             totalElements?: number;
@@ -2930,6 +3434,115 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             otherLeft?: boolean;
+        };
+        SupplyAdminResponse: {
+            /** Format: int64 */
+            id?: number;
+            title?: string;
+            /** Format: int32 */
+            quantity?: number;
+            memo?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PURCHASED" | "REJECTED";
+            /** @enum {string} */
+            rejectReason?: "OUT_OF_STOCK" | "POLICY" | "DUPLICATE" | "OTHER";
+            rejectReasonLabel?: string;
+            rejectNote?: string;
+            createdAt?: string;
+            purchasedAt?: string;
+            rejectedAt?: string;
+            /** Format: int64 */
+            userId?: number;
+            nickname?: string;
+        };
+        AdminSnackRequestResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            catalogItemId?: number;
+            name?: string;
+            imageUrl?: string;
+            ssgUrl?: string;
+            /** Format: int32 */
+            quantity?: number;
+            /** @enum {string} */
+            status?: "PENDING" | "PURCHASED" | "REJECTED";
+            /** @enum {string} */
+            rejectReason?: "OUT_OF_STOCK" | "POLICY" | "DUPLICATE" | "OTHER";
+            rejectReasonLabel?: string;
+            rejectNote?: string;
+            createdAt?: string;
+            purchasedAt?: string;
+            rejectedAt?: string;
+            /** Format: int64 */
+            userId?: number;
+            nickname?: string;
+        };
+        Line: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            userId?: number;
+            nickname?: string;
+            /** Format: int32 */
+            quantity?: number;
+            createdAt?: string;
+        };
+        SnackGroupedPendingResponse: {
+            /** Format: int64 */
+            catalogItemId?: number;
+            name?: string;
+            imageUrl?: string;
+            ssgUrl?: string;
+            available?: boolean;
+            hiddenFromUsers?: boolean;
+            /** Format: int32 */
+            requesterCount?: number;
+            /** Format: int32 */
+            totalQty?: number;
+            lines?: components["schemas"]["Line"][];
+        };
+        AdminSnackCatalogItemResponse: {
+            /** Format: int64 */
+            id?: number;
+            ssgItemId?: string;
+            category?: string;
+            categoryLabel?: string;
+            name?: string;
+            imageUrl?: string;
+            ssgUrl?: string;
+            ssgImageUrl?: string;
+            /** Format: int32 */
+            displayOrder?: number;
+            available?: boolean;
+            hiddenFromUsers?: boolean;
+            hiddenLockedByAdmin?: boolean;
+            /** Format: date-time */
+            lastSeenAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            /** Format: int32 */
+            pendingQty?: number;
+        };
+        PageAdminSnackCatalogItemResponse: {
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
+            first?: boolean;
+            last?: boolean;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["AdminSnackCatalogItemResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"][];
+            /** Format: int32 */
+            numberOfElements?: number;
+            empty?: boolean;
         };
         Candidate: {
             /** Format: int64 */
@@ -4002,6 +4615,54 @@ export interface operations {
             };
         };
     };
+    createSupplyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplyRequestResponse"];
+                };
+            };
+        };
+    };
+    createSnackRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnackCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackRequestResponse"];
+                };
+            };
+        };
+    };
     vote_2: {
         parameters: {
             query?: never;
@@ -4523,6 +5184,162 @@ export interface operations {
                     "*/*": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    rejectSupplyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    purchaseSupplyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rejectSnackRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    purchaseSnackRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rejectSnackItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogItemId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseCountResponse"];
+                };
+            };
+        };
+    };
+    purchaseSnackItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalogItemId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseCountResponse"];
+                };
+            };
+        };
+    };
+    syncCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CatalogSyncStatusResponse"];
                 };
             };
         };
@@ -5239,6 +6056,7 @@ export interface operations {
         parameters: {
             query?: {
                 text?: string;
+                description?: string;
             };
             header?: never;
             path: {
@@ -5328,6 +6146,98 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    cancelSupplyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateSupplyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplyRequestResponse"];
+                };
+            };
+        };
+    };
+    cancelSnackRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateSnackQuantity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnackQuantityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackRequestResponse"];
+                };
             };
         };
     };
@@ -5498,6 +6408,54 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AdminSurveyDeliveryDto"];
                 };
+            };
+        };
+    };
+    setCatalogVisibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setCategoryVisibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisibilityRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5847,6 +6805,92 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    listMySupplyRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplyRequestResponse"][];
+                };
+            };
+        };
+    };
+    listMySnackRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackRequestResponse"][];
+                };
+            };
+        };
+    };
+    listSnackCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackSsgCategoryResponse"][];
+                };
+            };
+        };
+    };
+    listSnackCatalog: {
+        parameters: {
+            query?: {
+                q?: string;
+                requestedOnly?: boolean;
+                category?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageSnackCatalogCardResponse"];
                 };
             };
         };
@@ -6802,6 +7846,154 @@ export interface operations {
                     "*/*": {
                         [key: string]: Record<string, never>;
                     };
+                };
+            };
+        };
+    };
+    listSupplies: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplyAdminResponse"][];
+                };
+            };
+        };
+    };
+    listSupplyHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplyAdminResponse"][];
+                };
+            };
+        };
+    };
+    listSnackHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdminSnackRequestResponse"][];
+                };
+            };
+        };
+    };
+    listGroupedSnacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackGroupedPendingResponse"][];
+                };
+            };
+        };
+    };
+    listAdminCatalog: {
+        parameters: {
+            query?: {
+                q?: string;
+                includeUnavailable?: boolean;
+                category?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAdminSnackCatalogItemResponse"];
+                };
+            };
+        };
+    };
+    catalogSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CatalogSyncStatusResponse"];
+                };
+            };
+        };
+    };
+    listCatalogCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SnackSsgCategoryResponse"][];
                 };
             };
         };

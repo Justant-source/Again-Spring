@@ -106,7 +106,7 @@ public class MarketingJobService {
     /**
      * Create a new marketing job with explicit render profile.
      *
-     * @param renderProfile Render profile ("marketing_fast" | "marketing_v2"). If null, uses env default.
+     * @param renderProfile Render profile (MarketingRenderProfiles.ALLOWED). If null, uses env default.
      */
     public MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
                                   String renderProfile) {
@@ -117,6 +117,10 @@ public class MarketingJobService {
                                    Long retryOfJobId, int generationAttempt, String renderProfile) {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
+        }
+        if (autoPublish && MarketingRenderProfiles.isExperimental(renderProfile)) {
+            throw new IllegalArgumentException(
+                "Experimental renderProfile " + renderProfile + " is test-only (autoPublish must be false)");
         }
         List<List<String>> asmGroups = groupTargetsForAsm(targets);
         if (asmGroups.size() > 1) {
@@ -373,6 +377,7 @@ public class MarketingJobService {
             .hookEmotion(hookEmotion)
             .hookReels(spokenCopy(variants.hookReels()))
             .hookShorts(spokenCopy(variants.hookShorts()))
+            .hookRule((needReels || needShorts) ? VideoVariantService.HOOK_RULE_VERSION : null)
             .scriptReels(spokenCopy(variants.scriptReels()))
             .scriptShorts(spokenCopy(variants.scriptShorts()))
             .maxDurationReelsSec(variants.maxDurationReelsSec())
@@ -411,6 +416,9 @@ public class MarketingJobService {
                 .forbiddenTerms(Arrays.asList("판결", "처방", "승패", "승자", "패자", "가해자", "피해자"))
                 .build())
             .build();
+
+        // 훅 규칙 버전을 잡에 남겨 테스트 탭 배지·필터·A/B 분석에 쓴다(ASM brief_json 과 동일 값).
+        savedJob.setHookRule(brief.getHookRule());
 
         long waggleSlaMs = asmProperties.getProcessingSlaMs() > 0
             ? asmProperties.getProcessingSlaMs()

@@ -410,6 +410,41 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void generate_promptCarriesHookRuleV2_forBothChannels() throws Exception {
+        ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
+        when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""
+            {"hook_reels":"h","script_reels":"s 공감","hook_shorts":"h","script_shorts":"s 댓글","sibom_plan":[]}
+            """);
+
+        service.generate("훅", "tension", "제목", "본문 월세 180만원", true, true, List.of());
+
+        // 빈 플랜이면 채널당 보정 1회가 더 붙을 수 있어 2건 이상
+        assertThat(promptCap.getAllValues()).hasSizeGreaterThanOrEqualTo(2);
+        for (String prompt : promptCap.getAllValues()) {
+            // 숫자+사건 필수, 본문 근거 없는 숫자 금지
+            assertThat(prompt).contains("훅 규칙 v2");
+            assertThat(prompt).contains("구체적 숫자(금액·기간·횟수·나이 중 1개 이상)와 사건");
+            assertThat(prompt).contains("본문에 없는 숫자는 절대 지어내지 마세요");
+            // 질문형·분위기·추상 요약형 금지
+            assertThat(prompt).contains("질문형(\"~일까?\", \"~인가요\"");
+            assertThat(prompt).contains("분위기 서술형(\"자꾸 떠올라요\"");
+            assertThat(prompt).contains("추상 요약형");
+            // 스크립트 첫 문장: 훅 이어받아 사건 먼저, 설명 뒤로
+            assertThat(prompt).contains("첫 문장은 훅을 이어받아 사건을 먼저 던지고");
+            // 기존 제약 유지
+            assertThat(prompt).contains("슬래시(/, ／) 금지");
+            assertThat(prompt).contains("판결/처방/승패/유무죄/가해자·피해자 단정 금지");
+        }
+        assertThat(promptCap.getAllValues()).anyMatch(p -> p.contains("instagram_reels(≤30초)"));
+        assertThat(promptCap.getAllValues()).anyMatch(p -> p.contains("youtube_shorts(≤45초)"));
+    }
+
+    @Test
+    void hookRuleVersion_isV2() {
+        assertThat(VideoVariantService.HOOK_RULE_VERSION).isEqualTo("v2");
+    }
+
+    @Test
     void generate_promptContainsSoftTargetValues_forReels() throws Exception {
         ArgumentCaptor<String> promptCap = ArgumentCaptor.forClass(String.class);
         when(llmProvider.invoke(promptCap.capture(), anyString())).thenReturn("""

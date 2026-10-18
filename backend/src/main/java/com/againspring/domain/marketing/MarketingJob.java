@@ -178,6 +178,10 @@ public class MarketingJob {
     @Column(length = 32)
     private String renderProfile;
 
+    /** 훅 프롬프트 규칙 버전 태그(V129). NULL = v1(태그 도입 전). brief.hook_rule 과 동일 값. */
+    @Column(length = 16)
+    private String hookRule;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

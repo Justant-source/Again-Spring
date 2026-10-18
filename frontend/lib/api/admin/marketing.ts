@@ -11,7 +11,8 @@ export interface MarketingJob {
   progress: number;
   targets: string[];
   autoPublish: boolean;
-  renderProfile?: string | null; // 'marketing_v2'|'marketing_fast'|null
+  renderProfile?: string | null; // RENDER_PROFILE_OPTIONS 키 | null
+  hookRule?: string | null; // 훅 규칙 버전 'v1'|'v2'… (없으면 v1)
   artifacts: Record<string, string> | null; // { video_mp4, thumbnail, blog_md, ... }
   publications: Array<{ platform: string; state: string; url: string }> | null;
   errorMessage: string | null;
@@ -33,6 +34,81 @@ export interface CreateMarketingJobRequest {
   postId: string;
   targets: string[];
   autoPublish: boolean;
+}
+
+// ===== 렌더 프로필 / 훅 규칙 (테스트 탭) =====
+
+export interface RenderProfileOption {
+  key: string;
+  /** 배지에 쓰는 짧은 이름 */
+  short: string;
+  /** 선택 라벨에 쓰는 한글 설명 */
+  label: string;
+  /** Badge 색상 클래스 */
+  badgeClass: string;
+}
+
+/**
+ * 허용 렌더 프로필 — 백엔드 MarketingRenderProfiles.ALLOWED 와 같은 목록을 유지한다.
+ * hook_* 3종은 훅 구간 디자인 실험용(테스트 탭 전용, 자동 게시 불가).
+ */
+export const RENDER_PROFILE_OPTIONS: RenderProfileOption[] = [
+  { key: 'marketing_v2', short: 'v2', label: 'v2 · 현재 운영 기본', badgeClass: 'bg-indigo-200 text-indigo-800' },
+  { key: 'marketing_fast', short: 'fast', label: 'fast · 기존(앱 UI 노출형)', badgeClass: 'bg-gray-200 text-gray-800' },
+  { key: 'marketing_hook_a', short: 'hook A', label: 'hook A · 숫자 강조·대형 글자', badgeClass: 'bg-rose-200 text-rose-800' },
+  { key: 'marketing_hook_b', short: 'hook B', label: 'hook B · 키네틱 타이포', badgeClass: 'bg-emerald-200 text-emerald-800' },
+  { key: 'marketing_hook_c', short: 'hook C', label: 'hook C · 캐릭터 리액션 먼저', badgeClass: 'bg-amber-200 text-amber-800' },
+];
+
+export function getRenderProfileOption(profile: string): RenderProfileOption {
+  return (
+    RENDER_PROFILE_OPTIONS.find((o) => o.key === profile) ?? {
+      key: profile,
+      short: profile,
+      label: profile,
+      badgeClass: 'bg-gray-200 text-gray-800',
+    }
+  );
+}
+
+/** 잡의 훅 규칙 버전. 태그 없는 과거 잡 = 'v1'. */
+export function resolveHookRule(job: MarketingJob | null | undefined): string {
+  const v = job?.hookRule?.trim();
+  return v ? v : 'v1';
+}
+
+/**
+ * 같은 사연(postId)으로 만든 변형 묶음. 변형이 2개 이상인 묶음만, 최신 잡이 있는 묶음 순으로 반환.
+ * 한 묶음 안에서는 (프로필, 훅 규칙) 조합당 최신 잡 1개만 남겨 나란히 비교하기 쉽게 한다.
+ */
+export function groupVariantsByPost(jobs: MarketingJob[]): MarketingJob[][] {
+  const byPost = new Map<string, MarketingJob[]>();
+  for (const job of jobs) {
+    const list = byPost.get(job.postId) ?? [];
+    list.push(job);
+    byPost.set(job.postId, list);
+  }
+  const groups: MarketingJob[][] = [];
+  byPost.forEach((list) => {
+    const latestByVariant = new Map<string, MarketingJob>();
+    for (const job of list) {
+      const key = `${resolveRenderProfile(job)}|${resolveHookRule(job)}`;
+      const prev = latestByVariant.get(key);
+      if (!prev || new Date(job.createdAt).getTime() > new Date(prev.createdAt).getTime()) {
+        latestByVariant.set(key, job);
+      }
+    }
+    if (latestByVariant.size >= 2) {
+      const order = RENDER_PROFILE_OPTIONS.map((o) => o.key);
+      const variants = Array.from(latestByVariant.values()).sort((a, b) => {
+        const d = order.indexOf(resolveRenderProfile(a)) - order.indexOf(resolveRenderProfile(b));
+        return d !== 0 ? d : resolveHookRule(a).localeCompare(resolveHookRule(b));
+      });
+      groups.push(variants);
+    }
+  });
+  const newest = (g: MarketingJob[]) => Math.max(...g.map((j) => new Date(j.createdAt).getTime()));
+  return groups.sort((a, b) => newest(b) - newest(a));
 }
 
 // ===== API Functions =====

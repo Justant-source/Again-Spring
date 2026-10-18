@@ -5,7 +5,19 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArtifactSection } from '@/components/admin/marketing/ArtifactSection';
-import { listAdminPostsForPicker, listMarketingJobs, MarketingJob, PickerPost, resolveRenderProfile, createMarketingTestJob, getMarketingJob } from '@/lib/api/admin/marketing';
+import {
+  listAdminPostsForPicker,
+  listMarketingJobs,
+  MarketingJob,
+  PickerPost,
+  resolveRenderProfile,
+  resolveHookRule,
+  groupVariantsByPost,
+  getRenderProfileOption,
+  RENDER_PROFILE_OPTIONS,
+  createMarketingTestJob,
+  getMarketingJob,
+} from '@/lib/api/admin/marketing';
 import { useRenderTestStore, formatApiError, EMPTY_REVIEW, TestRun, ReviewItem } from '@/lib/store/renderTestStore';
 import { RefreshCw, Play, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -27,6 +39,52 @@ const TARGET_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'instagram_reels', label: '릴스 (세로 영상)' },
   { key: 'youtube_shorts', label: '쇼츠 (세로 영상)' },
 ];
+
+/** 렌더 프로필 라디오 묶음 (사연 행·직접 입력 공용). */
+function ProfileRadioGroup({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1" data-testid="render-test-profile-select">
+      {RENDER_PROFILE_OPTIONS.map((opt) => (
+        <label key={opt.key} className="flex items-center gap-1">
+          <input
+            type="radio"
+            name={name}
+            value={opt.key}
+            checked={value === opt.key}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <span className="text-gray-700">{opt.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** 프로필 + 훅 규칙 버전 배지 한 쌍. */
+function VariantBadges({ profile, hookRule }: { profile: string; hookRule: string }) {
+  const opt = getRenderProfileOption(profile);
+  return (
+    <>
+      <Badge className={opt.badgeClass} data-testid="render-test-profile-badge">
+        {opt.short}
+      </Badge>
+      <Badge
+        className={hookRule === 'v1' ? 'bg-gray-100 text-gray-600' : 'bg-sky-200 text-sky-800'}
+        data-testid="render-test-hookrule-badge"
+      >
+        훅 {hookRule}
+      </Badge>
+    </>
+  );
+}
 
 function PostRow({
   post,
@@ -79,28 +137,9 @@ function PostRow({
         </div>
       </div>
       {/* 렌더 프로필 선택 */}
-      <div className="flex items-center gap-3 border-t pt-2 text-xs">
+      <div className="flex flex-wrap items-start gap-3 border-t pt-2 text-xs">
         <span className="text-gray-600">렌더 프로필:</span>
-        <label className="flex items-center gap-1">
-          <input
-            type="radio"
-            name={`profile-${post.id}`}
-            value="marketing_v2"
-            checked={renderProfile === 'marketing_v2'}
-            onChange={(e) => setRenderProfile(e.target.value)}
-          />
-          <span className="text-gray-700">v2 (신규)</span>
-        </label>
-        <label className="flex items-center gap-1">
-          <input
-            type="radio"
-            name={`profile-${post.id}`}
-            value="marketing_fast"
-            checked={renderProfile === 'marketing_fast'}
-            onChange={(e) => setRenderProfile(e.target.value)}
-          />
-          <span className="text-gray-700">fast (기존)</span>
-        </label>
+        <ProfileRadioGroup name={`profile-${post.id}`} value={renderProfile} onChange={setRenderProfile} />
       </div>
     </div>
   );
@@ -122,12 +161,7 @@ function TestRunCard({ run, onRemove }: { run: TestRun; onRemove: (runKey: strin
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge
-            className={profile === 'marketing_v2' ? 'bg-indigo-200 text-indigo-800' : 'bg-gray-200 text-gray-800'}
-            data-testid="render-test-profile-badge"
-          >
-            {profile === 'marketing_v2' ? 'v2' : profile === 'marketing_fast' ? 'fast' : profile}
-          </Badge>
+          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} />
           <Badge className={STATUS_COLORS[status] || 'bg-gray-200 text-gray-800'}>{status}</Badge>
           <button
             type="button"
@@ -279,12 +313,7 @@ function ServerJobCard({ job }: { job: MarketingJob }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge
-            className={profile === 'marketing_v2' ? 'bg-indigo-200 text-indigo-800' : 'bg-gray-200 text-gray-800'}
-            data-testid="render-test-profile-badge"
-          >
-            {profile === 'marketing_v2' ? 'v2' : 'fast'}
-          </Badge>
+          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} />
           <Badge className={STATUS_COLORS[job.status] || 'bg-gray-200 text-gray-800'}>{job.status}</Badge>
         </div>
       </div>
@@ -328,7 +357,8 @@ export function RenderTestSection() {
   const [search, setSearch] = useState('');
   const [manualPostId, setManualPostId] = useState('');
   const [launchingPostId, setLaunchingPostId] = useState<string | null>(null);
-  const [profileFilter, setProfileFilter] = useState<'all' | 'v2' | 'fast'>('all');
+  const [profileFilter, setProfileFilter] = useState<string>('all');
+  const [hookFilter, setHookFilter] = useState<string>('all');
 
   // WS6.6 승인 세트 렌더
   const [isRunningApprovalSet, setIsRunningApprovalSet] = useState(false);
@@ -362,7 +392,7 @@ export function RenderTestSection() {
       const testJobs = all
         .filter((j) => !j.autoPublish)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 20);
+        .slice(0, 40);
       setServerJobs(testJobs);
     } catch (err: unknown) {
       setServerJobsError(`서버 테스트 잡 목록을 불러오지 못했습니다: ${formatApiError(err)}`);
@@ -525,6 +555,13 @@ export function RenderTestSection() {
     }
   }, [cancelApprovalSetFlag, loadServerJobs]);
 
+  const filteredJobs = serverJobs.filter(
+    (j) =>
+      (profileFilter === 'all' || resolveRenderProfile(j) === profileFilter) &&
+      (hookFilter === 'all' || resolveHookRule(j) === hookFilter)
+  );
+  const comparePairs = groupVariantsByPost(filteredJobs);
+
   const filteredPosts = search.trim()
     ? posts.filter((p) => p.title.toLowerCase().includes(search.trim().toLowerCase()))
     : posts;
@@ -536,7 +573,7 @@ export function RenderTestSection() {
         생성되어 실제 X·인스타그램·유튜브에는 절대 게시되지 않습니다. LLM으로 대본·시봄이 매핑을
         새로 생성하고 WaggleBot이 실제로 렌더링하므로, 완료까지 보통 1~3분 정도 걸립니다.
         <br />
-        <strong>렌더 프로필(v2·fast)을 선택해서 같은 사연의 다른 버전을 비교해볼 수 있습니다.</strong> v2는 새로운 화질 개선 설정입니다.
+        <strong>렌더 프로필(v2·fast·hook A/B/C)을 바꿔 같은 사연을 여러 번 렌더하면 아래 「서버의 최근 테스트 잡」에서 나란히 비교할 수 있습니다.</strong> hook A/B/C는 첫 장면(훅) 디자인 실험이고, 배지의 「훅 v1/v2」는 훅 문구 생성 규칙 버전입니다. 이 화면에는 게시 버튼이 없습니다.
       </div>
 
       <Card className="p-4">
@@ -572,7 +609,7 @@ export function RenderTestSection() {
             <PostRow
               key={post.id}
               post={post}
-              onLaunch={(p, targets) => void launch(p.id, p.title, targets)}
+              onLaunch={(p, targets, profile) => void launch(p.id, p.title, targets, profile)}
               launching={launchingPostId === post.id}
             />
           ))}
@@ -614,27 +651,8 @@ export function RenderTestSection() {
               className="flex-1 rounded border px-2 py-1 text-sm font-mono"
             />
             {/* 렌더 프로필 선택 (직접 입력) */}
-            <div className="flex items-center gap-2 text-xs">
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="manual-profile"
-                  value="marketing_v2"
-                  checked={manualRenderProfile === 'marketing_v2'}
-                  onChange={(e) => setManualRenderProfile(e.target.value)}
-                />
-                <span className="text-gray-700">v2</span>
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="manual-profile"
-                  value="marketing_fast"
-                  checked={manualRenderProfile === 'marketing_fast'}
-                  onChange={(e) => setManualRenderProfile(e.target.value)}
-                />
-                <span className="text-gray-700">fast</span>
-              </label>
+            <div className="text-xs">
+              <ProfileRadioGroup name="manual-profile" value={manualRenderProfile} onChange={setManualRenderProfile} />
             </div>
             <Button size="sm" variant="outline" onClick={handleManualLaunch} disabled={!manualPostId.trim()}>
               <Play className="mr-1 h-3 w-3" />
@@ -700,40 +718,41 @@ export function RenderTestSection() {
           10초마다 자동 갱신됩니다.
         </p>
 
-        {/* 프로필 필터 */}
+        {/* 프로필·훅 규칙 필터 */}
         {serverJobs.length > 0 && (
-          <div className="mb-3 flex items-center gap-2 text-xs">
-            <span className="text-gray-600">프로필 필터:</span>
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-xs" data-testid="render-test-filters">
             <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="profile-filter"
-                value="all"
-                checked={profileFilter === 'all'}
-                onChange={(e) => setProfileFilter(e.target.value as typeof profileFilter)}
-              />
-              <span className="text-gray-700">전체</span>
+              <span className="text-gray-600">프로필</span>
+              <select
+                value={profileFilter}
+                onChange={(e) => setProfileFilter(e.target.value)}
+                className="rounded border px-1 py-0.5 text-gray-700"
+                data-testid="render-test-profile-filter"
+              >
+                <option value="all">전체</option>
+                {RENDER_PROFILE_OPTIONS.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="profile-filter"
-                value="v2"
-                checked={profileFilter === 'v2'}
-                onChange={(e) => setProfileFilter(e.target.value as typeof profileFilter)}
-              />
-              <span className="text-gray-700">v2만</span>
+              <span className="text-gray-600">훅 규칙</span>
+              <select
+                value={hookFilter}
+                onChange={(e) => setHookFilter(e.target.value)}
+                className="rounded border px-1 py-0.5 text-gray-700"
+                data-testid="render-test-hookrule-filter"
+              >
+                <option value="all">전체</option>
+                <option value="v1">v1 (태그 없음)</option>
+                <option value="v2">v2</option>
+              </select>
             </label>
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="profile-filter"
-                value="fast"
-                checked={profileFilter === 'fast'}
-                onChange={(e) => setProfileFilter(e.target.value as typeof profileFilter)}
-              />
-              <span className="text-gray-700">fast만</span>
-            </label>
+            <span className="text-gray-400">
+              {filteredJobs.length}/{serverJobs.length}건 표시
+            </span>
           </div>
         )}
 
@@ -747,69 +766,36 @@ export function RenderTestSection() {
           <p className="text-sm text-gray-400">아직 서버에 테스트 잡이 없습니다.</p>
         ) : (
           <div className="space-y-4">
-            {/* Side-by-side 비교 섹션 — 같은 postId에 v2와 fast가 둘 다 있는 경우 */}
-            {(() => {
-              const groupedByPost = new Map<string, MarketingJob[]>();
-              for (const job of serverJobs) {
-                const profile = resolveRenderProfile(job);
-                if (profileFilter === 'v2' && profile !== 'marketing_v2') continue;
-                if (profileFilter === 'fast' && profile !== 'marketing_fast') continue;
-                if (!groupedByPost.has(job.postId)) {
-                  groupedByPost.set(job.postId, []);
-                }
-                groupedByPost.get(job.postId)!.push(job);
-              }
-
-              const comparePairs = Array.from(groupedByPost.values()).filter((jobs) => jobs.length >= 2);
-
-              return comparePairs.length > 0 ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <h4 className="mb-3 text-sm font-semibold text-amber-900">프로필 비교</h4>
-                  <div className="space-y-4">
-                    {comparePairs.map((jobs) => {
-                      const v2Job = jobs.find((j) => resolveRenderProfile(j) === 'marketing_v2');
-                      const fastJob = jobs.find((j) => resolveRenderProfile(j) === 'marketing_fast');
-                      return (
-                        <div key={jobs[0].postId} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          {v2Job && (
-                            <div>
-                              <div className="mb-2 flex items-center gap-2">
-                                <Badge className="bg-indigo-200 text-indigo-800">v2</Badge>
-                                <span className="text-xs text-gray-600">Job {v2Job.id}</span>
-                              </div>
-                              <ServerJobCard job={v2Job} />
-                            </div>
-                          )}
-                          {fastJob && (
-                            <div>
-                              <div className="mb-2 flex items-center gap-2">
-                                <Badge className="bg-gray-200 text-gray-800">fast</Badge>
-                                <span className="text-xs text-gray-600">Job {fastJob.id}</span>
-                              </div>
-                              <ServerJobCard job={fastJob} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+            {/* Side-by-side 비교 — 같은 사연(postId)으로 만든 서로 다른 변형(프로필·훅 규칙) */}
+            {comparePairs.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4" data-testid="render-test-compare">
+                <h4 className="mb-1 text-sm font-semibold text-amber-900">같은 사연 변형 비교 ({comparePairs.length}건)</h4>
+                <p className="mb-3 text-xs text-amber-800">
+                  같은 사연으로 만든 변형(프로필·훅 규칙 조합당 최신 1건)을 나란히 재생합니다. 필터가 적용됩니다.
+                </p>
+                <div className="space-y-5">
+                  {comparePairs.map((jobs) => (
+                    <div key={jobs[0].postId} data-testid="render-test-compare-group">
+                      <p className="mb-2 font-mono text-xs text-gray-600">사연 {jobs[0].postId}</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        {jobs.map((j) => (
+                          <ServerJobCard key={j.id} job={j} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ) : null;
-            })()}
+              </div>
+            )}
 
             {/* 일반 잡 목록 */}
-            <div>
-              {(() => {
-                const filtered = serverJobs.filter((job) => {
-                  const profile = resolveRenderProfile(job);
-                  if (profileFilter === 'v2') return profile === 'marketing_v2';
-                  if (profileFilter === 'fast') return profile === 'marketing_fast';
-                  return true;
-                });
-                return filtered.map((job) => (
-                  <ServerJobCard key={job.id} job={job} />
-                ));
-              })()}
+            <div className="space-y-3">
+              {filteredJobs.map((job) => (
+                <ServerJobCard key={job.id} job={job} />
+              ))}
+              {filteredJobs.length === 0 && (
+                <p className="text-sm text-gray-400">필터에 맞는 테스트 잡이 없습니다.</p>
+              )}
             </div>
           </div>
         )}

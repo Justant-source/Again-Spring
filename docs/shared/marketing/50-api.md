@@ -16,9 +16,13 @@ Content-Type: application/json
   "postId": "abc123def456",              // posts.id (VARCHAR(32))
   "targets": ["x_thread"],              // x_thread·instagram_feed는 반드시 단독 잡. 영상(reels+shorts)은 한 잡에 함께 가능. 혼합 요청 시 BE가 그룹으로 쪼갠다.
   "autoPublish": false,                  // true 시 READY 도달 즉시 자동 게시
-  "renderProfile": "marketing_v2"        // [선택사항] 렌더 프로필 ('marketing_v2'|'marketing_fast') — 테스트 탭 전용
+  "renderProfile": "marketing_v2"        // [선택사항] 렌더 프로필 — 허용 목록 SSOT = BE `MarketingRenderProfiles.ALLOWED`
+                                         //   marketing_fast | marketing_v2 | marketing_hook_a | marketing_hook_b | marketing_hook_c
 }
 ```
+
+- 허용 목록 밖이면 400. `marketing_hook_a/b/c`(훅 구간 디자인 실험: 숫자 강조·대형 글자 / 키네틱 타이포 / 캐릭터 리액션 먼저)는 **테스트 전용** — `autoPublish=true` 와 함께 요청하면 400(서비스 계층도 동일하게 거부).
+- 응답에는 `renderProfile` 과 `hookRule`(훅 프롬프트 규칙 버전, 태그 없는 과거 잡 = `v1`)이 포함된다. 테스트 탭이 배지·필터·나란히 비교에 쓴다.
 
 **Response 201**
 ```json
@@ -340,6 +344,7 @@ Idempotency-Key: <uuid>
 | `promo_title` / `hook_text` | 1 유지 | 마스터 훅 |
 | `hook_emotion` | 1+2 | enum 5종. **Phase 2: TTS에 전달** |
 | `hook_reels` / `hook_shorts` | **2 SSOT** | 영상 슬롯 확정 시 변형 훅 (`VideoVariantService`). `/`·`／`는 공백으로 정규화 |
+| `hook_rule` | 선택 | 훅 규칙 버전 태그(영상 잡만 `"v2"`, 없으면 v1). `job.brief_json.hook_rule` 로 저장 |
 | `script_reels` / `script_shorts` | **2 SSOT** | 요약 대본 (전문 낭독 금지) |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | **2 SSOT** | 30 / 45 |
 | `max_duration_sec` | **2 SSOT** | alone 잡 활성 캡 |

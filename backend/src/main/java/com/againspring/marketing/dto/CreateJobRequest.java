@@ -65,6 +65,10 @@ public class CreateJobRequest {
         @JsonProperty("hook_reels")
         private String hookReels;
 
+        /** 훅 규칙 버전 태그(실험 추적, 영상 잡만). 없으면 v1 취급. ASM StoryBrief.hook_rule → job.brief_json. */
+        @JsonProperty("hook_rule")
+        private String hookRule;
+
         /** YouTube Shorts variant hook (stage-2). */
         @JsonProperty("hook_shorts")
         private String hookShorts;

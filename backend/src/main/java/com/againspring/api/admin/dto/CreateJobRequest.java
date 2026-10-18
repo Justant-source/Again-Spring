@@ -23,6 +23,6 @@ public class CreateJobRequest {
 
     private boolean autoPublish;
 
-    /** Render profile: "marketing_fast" | "marketing_v2". Nullable; uses env default if not specified. */
+    /** Render profile: MarketingRenderProfiles.ALLOWED 중 하나. Nullable; uses env default if not specified. */
     private String renderProfile;
 }

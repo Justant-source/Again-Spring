@@ -5,7 +5,7 @@ last_updated: 2026-09-01
 
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V127.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V129.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -552,6 +552,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V114** | `marketing_holding.platform_rank_snapshot` JSON — T+24h 자동 선정의 실제 플랫폼별 순위 잠금 |
 | **V117** | `marketing_job.scheduled_publish_at` **NOT NULL** 승격(2026-08-15) — 슬롯 조회 실패 시 폴백 로직으로 항상 값을 채우도록 코드가 먼저 바뀐 뒤 승격. 잔여 NULL 행은 `created_at`으로 백필 |
 | **V119** | `marketing_generation_trace` — 영상 변형 단계에서 LLM 호출·시봄이 선택 이력 저장(프롬프트·응답·가드 로그 포함). **사연 본문은 30일 후 NULL이지만 trace에 영구 보관** |
+| **V129** | `marketing_job.hook_rule` VARCHAR(16) NULL — 훅 프롬프트 규칙 버전 태그(NULL=v1). 테스트 탭 배지·필터, `scripts/marketing_ab_report.py` 코호트 분리용 |
 
 ### `marketing_generation_trace` (**V119**)
 
@@ -567,7 +568,7 @@ Phase 1 = VIDEO_VARIANT 스테이지(instagram_reels/youtube_shorts). Phase 2+ �
 | `post_id` | VARCHAR(32) FK | posts.id |
 | `platform` | VARCHAR(32) NOT NULL | `instagram_reels` \| `youtube_shorts` |
 | `stage` | VARCHAR(32) NOT NULL | `VIDEO_VARIANT` \| `PROMO_TITLE` (향후) |
-| `render_profile` | VARCHAR(64) | 마케팅 렌더 프로필 (`marketing_fast`, `marketing_v2` 등) |
+| `render_profile` | VARCHAR(64) | 마케팅 렌더 프로필 (`marketing_fast`, `marketing_v2`, `marketing_hook_a/b/c`) |
 | `llm_model` | VARCHAR(64) | `claude-haiku-4-5-20251001` 등. 재시도 후 폴백 모델명 가능 |
 | `llm_prompt` | LONGTEXT | LLM 호출 시 전송된 완전 프롬프트(**사연 본문 포함, 영구 보관**) |
 | `llm_response` | LONGTEXT | LLM 응답 원문 (파싱 전) |

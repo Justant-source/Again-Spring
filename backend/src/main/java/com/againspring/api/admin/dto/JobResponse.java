@@ -51,6 +51,8 @@ public class JobResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private String renderProfile;
+    /** 훅 규칙 버전(v1 = 태그 없음). */
+    private String hookRule;
 
     /**
      * Convert MarketingJob entity to response DTO
@@ -116,6 +118,7 @@ public class JobResponse {
             .createdAt(job.getCreatedAt())
             .updatedAt(job.getUpdatedAt())
             .renderProfile(profile)
+            .hookRule(job.getHookRule() == null ? "v1" : job.getHookRule())
             .build();
     }
 }
