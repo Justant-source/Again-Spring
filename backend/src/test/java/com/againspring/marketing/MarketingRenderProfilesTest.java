@@ -22,8 +22,10 @@ class MarketingRenderProfilesTest {
     }
 
     @Test
-    void onlyHookProfilesAreExperimental() {
+    void onlyHookBAndCAreExperimental() {
         assertThat(MarketingRenderProfiles.isExperimental("marketing_hook_b")).isTrue();
+        assertThat(MarketingRenderProfiles.isExperimental("marketing_hook_c")).isTrue();
+        assertThat(MarketingRenderProfiles.isExperimental("marketing_hook_a")).isFalse();
         assertThat(MarketingRenderProfiles.isExperimental("marketing_v2")).isFalse();
         assertThat(MarketingRenderProfiles.isExperimental("marketing_fast")).isFalse();
     }

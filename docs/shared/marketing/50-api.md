@@ -21,7 +21,7 @@ Content-Type: application/json
 }
 ```
 
-- 허용 목록 밖이면 400. `marketing_hook_a/b/c`(훅 구간 디자인 실험: 숫자 강조·대형 글자 / 키네틱 타이포 / 캐릭터 리액션 먼저)는 **테스트 전용** — `autoPublish=true` 와 함께 요청하면 400(서비스 계층도 동일하게 거부).
+- 허용 목록 밖이면 400. `marketing_hook_a`(숫자 강조·대형 글자)는 2026-10-18 **운영 기본으로 채택**(자동 게시 허용, `.env.prod` `MARKETING_RENDER_PROFILE`). `marketing_hook_b/c`(키네틱 타이포 / 캐릭터 리액션 먼저)는 **테스트 전용** — `autoPublish=true` 와 함께 요청하면 400(서비스 계층도 동일하게 거부).
 - 응답에는 `renderProfile` 과 `hookRule`(훅 프롬프트 규칙 버전, 태그 없는 과거 잡 = `v1`)이 포함된다. 테스트 탭이 배지·필터·나란히 비교에 쓴다.
 
 **Response 201**

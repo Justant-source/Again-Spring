@@ -50,12 +50,12 @@ export interface RenderProfileOption {
 
 /**
  * 허용 렌더 프로필 — 백엔드 MarketingRenderProfiles.ALLOWED 와 같은 목록을 유지한다.
- * hook_* 3종은 훅 구간 디자인 실험용(테스트 탭 전용, 자동 게시 불가).
+ * hook A는 2026-10-18 운영 채택(자동 게시 가능). hook B·C는 실험용(테스트 탭 전용, 자동 게시 불가).
  */
 export const RENDER_PROFILE_OPTIONS: RenderProfileOption[] = [
-  { key: 'marketing_v2', short: 'v2', label: 'v2 · 현재 운영 기본', badgeClass: 'bg-indigo-200 text-indigo-800' },
+  { key: 'marketing_v2', short: 'v2', label: 'v2 · 이전 운영 기본', badgeClass: 'bg-indigo-200 text-indigo-800' },
   { key: 'marketing_fast', short: 'fast', label: 'fast · 기존(앱 UI 노출형)', badgeClass: 'bg-gray-200 text-gray-800' },
-  { key: 'marketing_hook_a', short: 'hook A', label: 'hook A · 숫자 강조·대형 글자', badgeClass: 'bg-rose-200 text-rose-800' },
+  { key: 'marketing_hook_a', short: 'hook A', label: 'hook A · 숫자 강조·대형 글자 (운영 기본)', badgeClass: 'bg-rose-200 text-rose-800' },
   { key: 'marketing_hook_b', short: 'hook B', label: 'hook B · 키네틱 타이포', badgeClass: 'bg-emerald-200 text-emerald-800' },
   { key: 'marketing_hook_c', short: 'hook C', label: 'hook C · 캐릭터 리액션 먼저', badgeClass: 'bg-amber-200 text-amber-800' },
 ];
