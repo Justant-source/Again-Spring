@@ -27,6 +27,15 @@ class VisitorClassifierTest {
     }
 
     @Test
+    @DisplayName("ASM 캡처 트래픽은 봇이다 — 표식 UA와 과거 Playwright 기본 UA 전체 일치")
+    void treatsAsmCaptureAsBot() {
+        assertThat(classifier.isBot("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")).isTrue();
+        assertThat(classifier.isBot("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 AgainSpringCapture")).isTrue();
+        // 다른 버전의 Linux 데스크톱 사용자는 사람으로 남는다
+        assertThat(classifier.isBot("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")).isFalse();
+    }
+
+    @Test
     @DisplayName("UA가 없거나 Mozilla로 시작하지 않으면 사람으로 세지 않는다")
     void treatsNonBrowserAsBot() {
         assertThat(classifier.isBot(null)).isTrue();

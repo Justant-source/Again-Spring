@@ -33,8 +33,18 @@ public class VisitorClassifier {
         "headlesschrome", "phantomjs", "puppeteer", "playwright", "lighthouse",
         "google-safety", "paloaltonetworks", "censys", "masscan", "zgrab",
         "ahrefsbot", "semrushbot", "mj12bot", "dotbot", "petalbot", "trendictionbot",
-        "applebot", "pinterestbot", "redditbot", "linkfluence", "expanse"
+        "applebot", "pinterestbot", "redditbot", "linkfluence", "expanse",
+        // ASM 스크린샷 캡처가 다시봄 사연 페이지를 열 때 스스로 붙이는 표식(2026-10-18~)
+        "againspringcapture"
     );
+
+    /**
+     * 표식 도입(2026-10-18) 이전 ASM 캡처가 보낸 Playwright 기본 UA 전체 문자열.
+     * 부분 일치가 아니라 전체 일치만 봇으로 본다 — 실제 Linux 데스크톱 사용자를 지우지 않기 위해서다.
+     * 최근 30일 "사람" 방문 1,117건 중 936건(84%)이 이 문자열이었다.
+     */
+    private static final String LEGACY_ASM_CAPTURE_UA =
+        "mozilla/5.0 (x11; linux x86_64) applewebkit/537.36 (khtml, like gecko) chrome/125.0.0.0 safari/537.36";
 
     /** 데이터센터 사업자 대역에서 온 브라우저 UA는 사람으로 치지 않는다(t.co 검사 봇 사례). */
     private static final List<String> DATACENTER_ASN_HINTS = List.of(
@@ -47,6 +57,9 @@ public class VisitorClassifier {
             return true;
         }
         String ua = userAgent.toLowerCase(Locale.ROOT);
+        if (ua.equals(LEGACY_ASM_CAPTURE_UA)) {
+            return true;
+        }
         for (String token : BOT_TOKENS) {
             if (ua.contains(token)) {
                 return true;
