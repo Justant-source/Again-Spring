@@ -62,6 +62,14 @@ public class VisitEvent {
     @Builder.Default
     private boolean bot = false;
 
+    /** 방문자 분류(VisitorClass.name()). NULL = 분류 도입 전 행. */
+    @Column(name = "visitor_class", length = 32)
+    private String visitorClass;
+
+    /** 분류 근거(예: ua:google-safety, scanner<=10s:campaign,...). */
+    @Column(name = "class_reason", length = 80)
+    private String classReason;
+
     @Column(length = 8)
     private String country;
 

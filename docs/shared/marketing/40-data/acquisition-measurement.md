@@ -72,12 +72,27 @@ snake_case로 보내면 **예외 없이 조용히 버려진다**(`FAIL_ON_UNKNOW
 
 ### 2.4 봇 분류
 
-`VisitorClassifier`가 저장 시점에 User-Agent로 판정해 `is_bot`에 남긴다.
+`VisitorClassifier`가 저장 시점에 `visitor_class`(+근거 `class_reason`)를 정하고 `is_bot`은 그 파생값이다
+(HUMAN_*·UNKNOWN_LEGACY=0, BOT_*·SUSPECT_SCANNER_PROXY=1). 우선순위(위가 이긴다):
 
-- **집계는 항상 `is_bot = 0`으로 필터**한다.
-- 봇 행도 **버리지 않는다** — `user_agent`를 함께 보존해 규칙이 바뀌면 과거 행을 재분류할 수 있어야 한다.
+| 순위 | 분류 | 기준 |
+|---|---|---|
+| 1 | `BOT_SELF` | UA에 `againspringcapture` 또는 과거 Playwright 기본 UA 전체 일치(ASM 캡처) |
+| 2 | `BOT_SCANNER` | google-safety · paloaltonetworks · censys · masscan · zgrab · expanse |
+| 3 | `BOT_CRAWLER` | googlebot · bingbot · yeti · ahrefs · semrush 등 + 범용 bot/spider/crawl |
+| 4 | `BOT_SOCIAL_PREVIEW` | twitterbot · facebookexternalhit · kakaotalk-scrap · telegrambot · slackbot · discordbot · whatsapp · linkedinbot 등 |
+| 5 | `BOT_AUTOMATION` | headless/curl/python/go-http-client 등 · UA 없음 · `Mozilla/`로 시작 안 함 |
+| 6 | `SUSPECT_SCANNER_PROXY` | 아래 규칙 |
+| 7 | `HUMAN_KR` / `HUMAN_OVERSEAS` / `HUMAN_UNKNOWN_GEO` | 국가 KR / 그 외 / 없음 |
+| - | `UNKNOWN_LEGACY` | UA 수집 이전 `user_agent IS NULL` 과거 행(백필 전용, is_bot=0 유지) |
+
+**SUSPECT_SCANNER_PROXY(보수적)**: 브라우저 UA · **해외** · **referrer 없음** · 같은 `utm_campaign`(utm이 없으면 같은 path의 utm 없는 행)의
+`BOT_SCANNER` 행이 **직전 10초** 안에 있을 때만. 한국·국가 불명·referrer 있음은 절대 의심하지 않는다. 구글 링크 안전검사가 URL을 연 직후
+해외 IP의 Windows Chrome이 같은 링크를 다시 여는 패턴(2026-10-18 실측)을 잡는다.
+
+- **기본 집계 필터는 여전히 `is_bot = 0`**. "실제 한국 방문자"는 `visitor_class='HUMAN_KR'`(퍼널 `realVisitors`).
+- 봇 행도 **버리지 않는다** — `user_agent`를 보존해 규칙이 바뀌면 재분류한다(V130 백필이 전례).
 - 오탐이 미탐보다 비싸다. 실제 방문자를 통계에서 지우는 쪽이 더 큰 손해다.
-- UA가 없거나 `Mozilla/`로 시작하지 않으면 봇으로 본다.
 
 ### 2.5 rate limit
 
@@ -115,11 +130,13 @@ IP당 **60초 슬라이딩 윈도우 30건**.
 ```
 GET /api/admin/marketing/stats/acquisition?days=30
 → { days, totalVisits, totalVisitors, totalSignups, botSplit{human,bot},
-    byChannel[{source,visits,visitors,sessions,signups}],
+    byChannel[{source,visits,visitors,sessions,signups,realVisitors}],
+    byClass[{visitorClass,visits,visitors}],
     daily[{date,visits,visitors,signups}], topReferrers[], topPaths[] }
 ```
 
 - 서비스: `AcquisitionFunnelService` · 화면: 어드민 마케팅 → 통계 탭 `AcquisitionFunnelPanel`
+- 화면 "방문자 구성": byClass 를 5그룹(실제 한국/해외·위치불명/봇·자동화/링크검사 의심/구형)으로 묶은 누적 막대 + 분류별 표(한글 라벨·설명·방문·방문자·비중), 채널 표에 `realVisitors`(실제 한국 방문자) 열. 라벨 상수 SSOT = `frontend/components/admin/marketing/visitorClasses.ts`. `byClass`/`realVisitors` 는 서버 배포 전 없을 수 있어 FE가 undefined 허용.
 - **0을 회색으로 죽이지 않고 눈에 띄게 표시**한다. 이 화면의 존재 이유가 "0을 보이게 하는 것"이다.
 
 ### 집계 규칙

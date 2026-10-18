@@ -229,4 +229,97 @@ class PublicVisitControllerTest {
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(visitEventRepository, never()).save(any());
     }
+
+    // ── 3. 방문자 분류 / 스캐너 근접 ─────────────────────────────────────
+
+    private static final String CHROME_WIN =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+
+    private VisitEvent record(String ip, String ua, String country, PublicVisitController.VisitRequest req) {
+        when(visitEventRepository.save(any(VisitEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        MockHttpServletRequest http = new MockHttpServletRequest();
+        http.setRemoteAddr(ip);
+        http.addHeader("User-Agent", ua);
+        if (country != null) {
+            http.addHeader("CF-IPCountry", country);
+        }
+        controller().recordVisit(req, http);
+        ArgumentCaptor<VisitEvent> captor = ArgumentCaptor.forClass(VisitEvent.class);
+        verify(visitEventRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    private static PublicVisitController.VisitRequest visit(String campaign, String referrer) {
+        return PublicVisitController.VisitRequest.builder().path("/post/1")
+            .utmCampaign(campaign).referrer(referrer).build();
+    }
+
+    @Test
+    @DisplayName("분류값·근거·is_bot이 함께 저장된다 (Google-Safety → BOT_SCANNER)")
+    void storesClassAndReason() {
+        VisitEvent saved = record("10.0.1.1", "Google-Safety", "US", visit("c1", null));
+        assertThat(saved.getVisitorClass()).isEqualTo("BOT_SCANNER");
+        assertThat(saved.getClassReason()).isEqualTo("ua:google-safety");
+        assertThat(saved.isBot()).isTrue();
+    }
+
+    @Test
+    @DisplayName("해외 브라우저 + referrer 없음 + 직전 10초 스캐너(같은 campaign) → SUSPECT_SCANNER_PROXY, is_bot=true")
+    void overseasAfterScanner_isSuspect() {
+        when(visitEventRepository.existsByVisitorClassAndUtmCampaignAndOccurredAtGreaterThanEqual(
+            org.mockito.ArgumentMatchers.eq("BOT_SCANNER"), org.mockito.ArgumentMatchers.eq("c1"),
+            any(java.time.Instant.class))).thenReturn(true);
+        VisitEvent saved = record("10.0.1.2", CHROME_WIN, "BR", visit("c1", null));
+        assertThat(saved.getVisitorClass()).isEqualTo("SUSPECT_SCANNER_PROXY");
+        assertThat(saved.getClassReason()).contains("campaign");
+        assertThat(saved.isBot()).isTrue();
+    }
+
+    @Test
+    @DisplayName("스캐너가 10초 밖이면(조회 false) 해외 사람으로 남는다")
+    void overseasWithoutRecentScanner_staysHuman() {
+        VisitEvent saved = record("10.0.1.3", CHROME_WIN, "BR", visit("c1", null));
+        assertThat(saved.getVisitorClass()).isEqualTo("HUMAN_OVERSEAS");
+        assertThat(saved.isBot()).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 campaign의 스캐너는 무관 — campaign 불일치(조회 false)면 사람")
+    void otherCampaignScanner_staysHuman() {
+        when(visitEventRepository.existsByVisitorClassAndUtmCampaignAndOccurredAtGreaterThanEqual(
+            org.mockito.ArgumentMatchers.eq("BOT_SCANNER"), org.mockito.ArgumentMatchers.eq("other"),
+            any(java.time.Instant.class))).thenReturn(false);
+        VisitEvent saved = record("10.0.1.4", CHROME_WIN, "BR", visit("other", null));
+        assertThat(saved.getVisitorClass()).isEqualTo("HUMAN_OVERSEAS");
+    }
+
+    @Test
+    @DisplayName("referrer가 있으면 스캐너 조회조차 하지 않고 사람 — 오탐 방지")
+    void withReferrer_noLookup() {
+        VisitEvent saved = record("10.0.1.5", CHROME_WIN, "BR", visit("c1", "https://t.co/abc"));
+        assertThat(saved.getVisitorClass()).isEqualTo("HUMAN_OVERSEAS");
+        verify(visitEventRepository, never())
+            .existsByVisitorClassAndUtmCampaignAndOccurredAtGreaterThanEqual(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("한국 방문자는 스캐너 직후여도 SUSPECT로 바꾸지 않는다")
+    void korea_neverSuspect() {
+        VisitEvent saved = record("10.0.1.6", CHROME_WIN, "KR", visit("c1", null));
+        assertThat(saved.getVisitorClass()).isEqualTo("HUMAN_KR");
+        assertThat(saved.isBot()).isFalse();
+        verify(visitEventRepository, never())
+            .existsByVisitorClassAndUtmCampaignAndOccurredAtGreaterThanEqual(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("utm 없는 해외 방문은 같은 path 스캐너로 판정한다")
+    void noUtm_usesPath() {
+        when(visitEventRepository.existsByVisitorClassAndPathAndUtmCampaignIsNullAndOccurredAtGreaterThanEqual(
+            org.mockito.ArgumentMatchers.eq("BOT_SCANNER"), org.mockito.ArgumentMatchers.eq("/post/1"),
+            any(java.time.Instant.class))).thenReturn(true);
+        VisitEvent saved = record("10.0.1.7", CHROME_WIN, "US", visit(null, null));
+        assertThat(saved.getVisitorClass()).isEqualTo("SUSPECT_SCANNER_PROXY");
+        assertThat(saved.getClassReason()).contains("path");
+    }
 }

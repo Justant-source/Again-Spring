@@ -14,6 +14,8 @@ export interface AcquisitionChannelRow {
   visitors: number;
   sessions: number;
   signups: number;
+  /** HUMAN_KR 방문자 수 (백엔드 배포 전엔 없을 수 있음) */
+  realVisitors?: number;
 }
 
 export interface AcquisitionDailyRow {
@@ -26,6 +28,12 @@ export interface AcquisitionDailyRow {
 export interface AcquisitionBotSplit {
   human: number;
   bot: number;
+}
+
+export interface AcquisitionClassRow {
+  visitorClass: string;
+  visits: number;
+  visitors: number;
 }
 
 export interface AcquisitionReferrerRow {
@@ -45,6 +53,8 @@ export interface AcquisitionFunnel {
   totalVisitors: number;
   totalSignups: number;
   botSplit: AcquisitionBotSplit;
+  /** 방문자 분류별 집계(방문 많은 순). 백엔드 배포 전엔 없을 수 있음 */
+  byClass?: AcquisitionClassRow[];
   byChannel: AcquisitionChannelRow[];
   daily: AcquisitionDailyRow[];
   topReferrers: AcquisitionReferrerRow[];

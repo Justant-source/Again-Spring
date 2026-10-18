@@ -2,6 +2,7 @@ package com.againspring.api.visits;
 
 import com.againspring.domain.VisitEvent;
 import com.againspring.repository.VisitEventRepository;
+import com.againspring.service.acquisition.VisitorClass;
 import com.againspring.service.acquisition.VisitorClassifier;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -94,6 +95,8 @@ public class PublicVisitController {
         }
 
         String userAgent = httpReq.getHeader("User-Agent");
+        String country = visitorClassifier.country(httpReq);
+        VisitorClassifier.Classification cls = classify(req, userAgent, country);
 
         // 저장
         try {
@@ -109,8 +112,10 @@ public class PublicVisitController {
                     .visitorKey(req.visitorKey)
                     .userAgent(truncate(userAgent, 300))
                     // 봇도 저장하되 표시해 둔다. 지우면 오탐을 영영 검증할 수 없다.
-                    .bot(visitorClassifier.isBot(userAgent))
-                    .country(visitorClassifier.country(httpReq))
+                    .bot(cls.bot())
+                    .visitorClass(cls.visitorClass().name())
+                    .classReason(truncate(cls.reason(), 80))
+                    .country(country)
                     .deviceType(visitorClassifier.deviceType(userAgent))
                     .userId(currentUserId())
                     .build();
@@ -124,6 +129,31 @@ public class PublicVisitController {
             log.error("Failed to record visit", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "failed to record visit"));
+        }
+    }
+
+    /**
+     * UA·국가 분류 후, 해외 사람 후보만 직전 스캐너 행을 한 번 조회해 의심 여부를 정한다.
+     * 조회 실패가 방문 기록을 막지 않도록 예외는 삼키고 기본 분류를 쓴다.
+     */
+    private VisitorClassifier.Classification classify(VisitRequest req, String userAgent, String country) {
+        VisitorClassifier.Classification base = visitorClassifier.classify(userAgent, country);
+        if (!visitorClassifier.needsScannerProximityCheck(base, req.referrer)) {
+            return base;
+        }
+        try {
+            Instant since = Instant.now().minusSeconds(VisitorClassifier.SCANNER_PROXIMITY_SECONDS);
+            String scanner = VisitorClass.BOT_SCANNER.name();
+            boolean byCampaign = req.utmCampaign != null && !req.utmCampaign.isBlank();
+            boolean nearby = byCampaign
+                ? visitEventRepository.existsByVisitorClassAndUtmCampaignAndOccurredAtGreaterThanEqual(
+                    scanner, req.utmCampaign, since)
+                : visitEventRepository.existsByVisitorClassAndPathAndUtmCampaignIsNullAndOccurredAtGreaterThanEqual(
+                    scanner, req.path, since);
+            return visitorClassifier.applyScannerProximity(base, nearby, byCampaign);
+        } catch (Exception e) {
+            log.warn("scanner proximity lookup failed: {}", e.toString());
+            return base;
         }
     }
 

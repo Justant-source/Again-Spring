@@ -24,7 +24,13 @@ import { AdminTable } from '@/components/admin/AdminTable';
 import {
   getAcquisitionFunnel,
   type AcquisitionFunnel,
+  type AcquisitionClassRow,
 } from '@/lib/api/admin/acquisition';
+import {
+  VISITOR_GROUPS,
+  visitorClassMeta,
+  type VisitorGroupKey,
+} from './visitorClasses';
 
 const DAY_OPTIONS = [7, 30, 90] as const;
 
@@ -36,6 +42,115 @@ function formatNumber(n: number): string {
 function formatPct(n: number): string {
   if (!Number.isFinite(n)) return '—';
   return `${n.toFixed(1)}%`;
+}
+
+/** 분류 구성 요약 + 분류별 표. byClass 가 없거나 비면 안내만 보여준다. */
+function VisitorComposition({ byClass }: { byClass: AcquisitionClassRow[] | undefined }) {
+  const rows = byClass ?? [];
+  const totalVisits = rows.reduce((a, r) => a + r.visits, 0);
+  const groupVisits: Record<VisitorGroupKey, number> = {
+    realKr: 0,
+    overseas: 0,
+    bot: 0,
+    suspect: 0,
+    legacy: 0,
+  };
+  for (const r of rows) groupVisits[visitorClassMeta(r.visitorClass).group] += r.visits;
+
+  return (
+    <div data-testid="acquisition-composition">
+      <h4 className="text-xs font-medium text-gray-700 mb-1">방문자 구성</h4>
+      <p className="mb-2 text-xs text-gray-500">
+        &apos;고유 방문자&apos;는 해외·봇 일부를 포함할 수 있습니다. 실제 한국 방문자만 따로
+        보려면 아래 구성을 보세요. 막대는 방문 수 기준입니다.
+      </p>
+      {rows.length === 0 || totalVisits === 0 ? (
+        <div
+          data-testid="acquisition-composition-empty"
+          className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+        >
+          {byClass === undefined
+            ? '방문자 분류 데이터가 아직 없습니다 (서버 배포 전).'
+            : '분류할 방문이 없습니다.'}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div
+            role="img"
+            aria-label={VISITOR_GROUPS.map(
+              (g) => `${g.label} ${formatNumber(groupVisits[g.key])}건`
+            ).join(', ')}
+            data-testid="acquisition-composition-bar"
+            className="flex h-4 w-full overflow-hidden rounded bg-gray-100"
+          >
+            {VISITOR_GROUPS.filter((g) => groupVisits[g.key] > 0).map((g) => (
+              <div
+                key={g.key}
+                style={{
+                  width: `${(groupVisits[g.key] / totalVisits) * 100}%`,
+                  backgroundColor: g.color,
+                }}
+              />
+            ))}
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+            {VISITOR_GROUPS.map((g) => (
+              <li
+                key={g.key}
+                data-testid={g.testId}
+                className="flex items-start gap-2 rounded border border-gray-200 px-2 py-1.5"
+              >
+                <span
+                  aria-hidden
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ backgroundColor: g.color }}
+                />
+                <span className="text-xs text-gray-600">
+                  {g.label}
+                  <span className="block text-sm font-semibold tabular-nums text-gray-900">
+                    {formatNumber(groupVisits[g.key])}
+                    <span className="ml-1 text-xs font-normal text-gray-500">
+                      ({formatPct((groupVisits[g.key] / totalVisits) * 100)})
+                    </span>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div data-testid="acquisition-class-table">
+            <AdminTable
+              data={rows}
+              rowKey={(r) => r.visitorClass}
+              emptyMessage="분류 데이터 없음"
+              className="text-sm"
+              columns={[
+                {
+                  key: 'label',
+                  header: '분류',
+                  render: (r) => {
+                    const m = visitorClassMeta(r.visitorClass);
+                    return (
+                      <span title={m.description}>
+                        <span className="font-medium">{m.label}</span>
+                        <span className="block text-xs text-gray-500">{m.description}</span>
+                      </span>
+                    );
+                  },
+                },
+                { key: 'visits', header: '방문', render: (r) => formatNumber(r.visits) },
+                { key: 'visitors', header: '방문자', render: (r) => formatNumber(r.visitors) },
+                {
+                  key: 'share',
+                  header: '비중',
+                  render: (r) => formatPct((r.visits / totalVisits) * 100),
+                },
+              ]}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface KpiCardProps {
@@ -121,7 +236,7 @@ export function AcquisitionFunnelPanel() {
         <div>
           <h3 className="font-semibold text-gray-800">유입 퍼널 — 방문 → 가입</h3>
           <p className="mt-1 text-sm text-gray-500">
-            발행 다음 칸입니다. 봇(크롤러)은 제외했습니다. 0은 숨기지 않고 그대로
+            발행 다음 칸입니다. 봇(크롤러)은 제외했습니다(분류별 구성은 아래 참고). 0은 숨기지 않고 그대로
             보여줍니다.
           </p>
         </div>
@@ -187,7 +302,7 @@ export function AcquisitionFunnelPanel() {
             />
             <KpiCard
               testId="acquisition-kpi-visitors"
-              label="고유 방문자"
+              label="고유 방문자 (해외·일부 봇 포함)"
               value={formatNumber(totalVisitors)}
               isZero={totalVisitors === 0}
               zeroNote="고유 방문자 0명"
@@ -201,12 +316,14 @@ export function AcquisitionFunnelPanel() {
             />
             <KpiCard
               testId="acquisition-kpi-bot-rate"
-              label="봇 비율"
+              label="봇 비율 (구형 UA 기준)"
               value={formatPct(botRate)}
               isZero={botTotal === 0}
               zeroNote="봇 트래픽 없음"
             />
           </div>
+
+          <VisitorComposition byClass={data.byClass} />
 
           <div>
             <h4 className="text-xs font-medium text-gray-700 mb-2">
@@ -229,6 +346,12 @@ export function AcquisitionFunnelPanel() {
                     key: 'visitors',
                     header: '고유방문자',
                     render: (r) => formatNumber(r.visitors),
+                  },
+                  {
+                    key: 'realVisitors',
+                    header: '실제 한국 방문자',
+                    render: (r) =>
+                      r.realVisitors === undefined ? '—' : formatNumber(r.realVisitors),
                   },
                   {
                     key: 'signups',

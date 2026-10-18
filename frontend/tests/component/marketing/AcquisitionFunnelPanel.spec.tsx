@@ -114,6 +114,71 @@ describe('AcquisitionFunnelPanel', () => {
     expect(screen.getByTestId('acquisition-top-paths')).toHaveTextContent('/posts/abc');
   });
 
+  it('renders visitor composition, class table and realVisitors column when byClass exists', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: buildFunnel({
+        totalVisits: 100,
+        totalVisitors: 80,
+        byClass: [
+          { visitorClass: 'HUMAN_KR', visits: 40, visitors: 30 },
+          { visitorClass: 'BOT_SELF', visits: 30, visitors: 2 },
+          { visitorClass: 'SUSPECT_SCANNER_PROXY', visits: 20, visitors: 15 },
+          { visitorClass: 'HUMAN_OVERSEAS', visits: 10, visitors: 8 },
+        ],
+        byChannel: [
+          { source: 'x_thread', visits: 100, visitors: 80, sessions: 80, signups: 0, realVisitors: 30 },
+        ],
+      }),
+    });
+
+    render(<AcquisitionFunnelPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acquisition-composition-bar')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('acquisition-composition-realKr')).toHaveTextContent('40');
+    expect(screen.getByTestId('acquisition-composition-realKr')).toHaveTextContent('40.0%');
+    expect(screen.getByTestId('acquisition-composition-bot')).toHaveTextContent('30');
+    expect(screen.getByTestId('acquisition-composition-suspect')).toHaveTextContent('20');
+    expect(screen.getByTestId('acquisition-composition-legacy')).toHaveTextContent('0');
+    const table = screen.getByTestId('acquisition-class-table');
+    expect(table).toHaveTextContent('한국 방문자');
+    expect(table).toHaveTextContent('우리 영상 캡처');
+    expect(table).toHaveTextContent('구글 링크검사 직후');
+    expect(screen.getByTestId('acquisition-channel-table')).toHaveTextContent('실제 한국 방문자');
+    expect(screen.getByTestId('acquisition-channel-table')).toHaveTextContent('30');
+  });
+
+  it('does not break when byClass is missing (backend not deployed yet)', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: buildFunnel({
+        totalVisits: 5,
+        byChannel: [{ source: 'x_thread', visits: 5, visitors: 4, sessions: 4, signups: 0 }],
+      }),
+    });
+
+    render(<AcquisitionFunnelPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acquisition-composition-empty')).toHaveTextContent('서버 배포 전');
+    });
+    expect(screen.getByTestId('acquisition-channel-table')).toHaveTextContent('x_thread');
+  });
+
+  it('shows the empty composition note when byClass is an empty array / zero visits', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: buildFunnel({ byClass: [] }),
+    });
+
+    render(<AcquisitionFunnelPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acquisition-composition-empty')).toHaveTextContent(
+        '분류할 방문이 없습니다'
+      );
+    });
+  });
+
   it('shows an error message when the request fails', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
 

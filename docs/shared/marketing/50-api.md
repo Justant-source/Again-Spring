@@ -769,7 +769,8 @@ GET  /api/admin/marketing/stats/dashboard
 
 GET  /api/admin/marketing/stats/acquisition?days=30
      → { days, totalVisits, totalVisitors, totalSignups, botSplit{human,bot},
-         byChannel[{source,visits,visitors,sessions,signups}],
+         byChannel[{source,visits,visitors,sessions,signups,realVisitors}],
+         byClass[{visitorClass,visits,visitors}],
          daily[{date,visits,visitors,signups}], topReferrers[], topPaths[] }
      유입 퍼널 — 발행 건수 다음 칸(방문·고유방문자·가입)을 채운다 (2026-08-29).
      집계에서 is_bot=1 행은 항상 제외. 가입은 users.acquisition_source 기준이며

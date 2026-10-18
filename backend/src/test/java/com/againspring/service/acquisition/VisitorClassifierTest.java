@@ -81,4 +81,82 @@ class VisitorClassifierTest {
         assertThat(classifier.country(new MockHttpServletRequest())).isNull();
         assertThat(classifier.country((HttpServletRequest) null)).isNull();
     }
+
+    private static final String CHROME_WIN =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+    private static final String MOBILE_KR =
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1";
+
+    private VisitorClass cls(String ua, String cc) {
+        return classifier.classify(ua, cc).visitorClass();
+    }
+
+    @Test
+    @DisplayName("각 클래스의 대표 UA가 올바른 분류와 is_bot 파생값을 갖는다")
+    void classifiesRepresentativeUserAgents() {
+        assertThat(cls("Google-Safety", "US")).isEqualTo(VisitorClass.BOT_SCANNER);
+        assertThat(cls("Hello from Palo Alto Networks, find out more", "US")).isEqualTo(VisitorClass.BOT_SCANNER);
+        assertThat(cls("Twitterbot/1.0", "US")).isEqualTo(VisitorClass.BOT_SOCIAL_PREVIEW);
+        assertThat(cls("TelegramBot (like TwitterBot)", null)).isEqualTo(VisitorClass.BOT_SOCIAL_PREVIEW);
+        assertThat(cls("facebookexternalhit/1.1", null)).isEqualTo(VisitorClass.BOT_SOCIAL_PREVIEW);
+        assertThat(cls("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "US"))
+            .isEqualTo(VisitorClass.BOT_CRAWLER);
+        assertThat(cls("Mozilla/5.0 (compatible; Yeti/1.1; +https://naver.me/spd)", "KR")).isEqualTo(VisitorClass.BOT_CRAWLER);
+        assertThat(cls("Mozilla/5.0 (compatible; SomeNewBot/1.0)", null)).isEqualTo(VisitorClass.BOT_CRAWLER);
+        assertThat(cls("curl/8.5.0", null)).isEqualTo(VisitorClass.BOT_AUTOMATION);
+        assertThat(cls("Go-http-client/2.0", null)).isEqualTo(VisitorClass.BOT_AUTOMATION);
+        assertThat(cls("HeadlessChrome/120 Mozilla/5.0", null)).isEqualTo(VisitorClass.BOT_AUTOMATION);
+        assertThat(cls(null, "KR")).isEqualTo(VisitorClass.BOT_AUTOMATION);
+        assertThat(cls(MOBILE_KR, "KR")).isEqualTo(VisitorClass.HUMAN_KR);
+        assertThat(cls(CHROME_WIN, "US")).isEqualTo(VisitorClass.HUMAN_OVERSEAS);
+        assertThat(cls(CHROME_WIN, null)).isEqualTo(VisitorClass.HUMAN_UNKNOWN_GEO);
+        assertThat(cls(CHROME_WIN, "kr")).isEqualTo(VisitorClass.HUMAN_KR);
+
+        assertThat(classifier.classify(MOBILE_KR, "KR").bot()).isFalse();
+        assertThat(classifier.classify("Google-Safety", "US").bot()).isTrue();
+        assertThat(VisitorClass.UNKNOWN_LEGACY.bot()).isFalse();
+        assertThat(VisitorClass.SUSPECT_SCANNER_PROXY.bot()).isTrue();
+    }
+
+    @Test
+    @DisplayName("ASM 캡처는 BOT_SELF — 표식 UA와 과거 Playwright 기본 UA 전체 일치")
+    void classifiesSelfCapture() {
+        assertThat(cls("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36", "KR"))
+            .isEqualTo(VisitorClass.BOT_SELF);
+        assertThat(cls(CHROME_WIN + " AgainSpringCapture", "KR")).isEqualTo(VisitorClass.BOT_SELF);
+        assertThat(cls("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", "KR"))
+            .isEqualTo(VisitorClass.HUMAN_KR);
+    }
+
+    @Test
+    @DisplayName("우선순위 — SELF > SCANNER > CRAWLER > SOCIAL_PREVIEW > AUTOMATION")
+    void priorityOrder() {
+        assertThat(cls("curl/8 AgainSpringCapture Google-Safety Googlebot", null)).isEqualTo(VisitorClass.BOT_SELF);
+        assertThat(cls("Google-Safety Googlebot Twitterbot curl/8", null)).isEqualTo(VisitorClass.BOT_SCANNER);
+        assertThat(cls("Googlebot Twitterbot curl/8", null)).isEqualTo(VisitorClass.BOT_CRAWLER);
+        assertThat(cls("Twitterbot curl/8", null)).isEqualTo(VisitorClass.BOT_SOCIAL_PREVIEW);
+        assertThat(cls("Mozilla/5.0 curl/8", "KR")).isEqualTo(VisitorClass.BOT_AUTOMATION);
+    }
+
+    @Test
+    @DisplayName("스캐너 근접 의심은 해외 + referrer 없음 + 스캐너 직후일 때만 SUSPECT, reason에 근거를 남긴다")
+    void scannerProximity() {
+        VisitorClassifier.Classification overseas = classifier.classify(CHROME_WIN, "US");
+        VisitorClassifier.Classification kr = classifier.classify(CHROME_WIN, "KR");
+        VisitorClassifier.Classification unknown = classifier.classify(CHROME_WIN, null);
+
+        assertThat(classifier.needsScannerProximityCheck(overseas, null)).isTrue();
+        assertThat(classifier.needsScannerProximityCheck(overseas, "")).isTrue();
+        assertThat(classifier.needsScannerProximityCheck(overseas, "https://t.co/x")).isFalse();
+        assertThat(classifier.needsScannerProximityCheck(kr, null)).isFalse();
+        assertThat(classifier.needsScannerProximityCheck(unknown, null)).isFalse();
+
+        VisitorClassifier.Classification suspect = classifier.applyScannerProximity(overseas, true, true);
+        assertThat(suspect.visitorClass()).isEqualTo(VisitorClass.SUSPECT_SCANNER_PROXY);
+        assertThat(suspect.bot()).isTrue();
+        assertThat(suspect.reason()).contains("campaign").contains("no-referrer").contains("10s");
+        assertThat(classifier.applyScannerProximity(overseas, false, true)).isEqualTo(overseas);
+        assertThat(classifier.applyScannerProximity(kr, true, true)).isEqualTo(kr);
+        assertThat(classifier.applyScannerProximity(overseas, true, false).reason()).contains("path");
+    }
 }

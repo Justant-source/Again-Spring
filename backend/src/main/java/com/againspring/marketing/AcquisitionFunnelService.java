@@ -51,8 +51,13 @@ public class AcquisitionFunnelService {
         long visits,
         long visitors,
         long sessions,
-        long signups
+        long signups,
+        /** HUMAN_KR 분류 방문자 수 — "실제 한국 방문자" 기준. */
+        long realVisitors
     ) {}
+
+    /** 방문자 분류별 집계(봇 포함). visitorClass가 NULL이면 "UNCLASSIFIED". */
+    public record ClassRow(String visitorClass, long visits, long visitors) {}
 
     public record DailyRow(
         String date,
@@ -69,6 +74,7 @@ public class AcquisitionFunnelService {
         long totalVisitors,
         long totalSignups,
         BotSplit botSplit,
+        List<ClassRow> byClass,
         List<ChannelRow> byChannel,
         List<DailyRow> daily,
         List<Map<String, Object>> topReferrers,
@@ -115,7 +121,24 @@ public class AcquisitionFunnelService {
 
         return new FunnelDto(
             window, totalVisits, totalVisitors, totalSignups,
-            new BotSplit(humans, bots), byChannel, daily, referrers, paths);
+            new BotSplit(humans, bots), classRows(window), byChannel, daily, referrers, paths);
+    }
+
+    private List<ClassRow> classRows(int window) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+            SELECT COALESCE(visitor_class, 'UNCLASSIFIED') AS visitor_class,
+                   COUNT(*) AS visits,
+                   COUNT(DISTINCT visitor_key) AS visitors
+            FROM visit_events
+            WHERE occurred_at >= NOW() - INTERVAL ? DAY
+            GROUP BY visitor_class ORDER BY visits DESC
+            """, window);
+        List<ClassRow> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            out.add(new ClassRow(String.valueOf(row.get("visitor_class")),
+                num(row.get("visits")), num(row.get("visitors"))));
+        }
+        return out;
     }
 
     private List<ChannelRow> channelRows(int window) {
@@ -124,7 +147,8 @@ public class AcquisitionFunnelService {
             SELECT COALESCE(utm_source, '(direct/organic)') AS source,
                    COUNT(*) AS visits,
                    COUNT(DISTINCT visitor_key) AS visitors,
-                   COUNT(DISTINCT session_key) AS sessions
+                   COUNT(DISTINCT session_key) AS sessions,
+                   COUNT(DISTINCT CASE WHEN visitor_class = 'HUMAN_KR' THEN visitor_key END) AS real_visitors
             FROM visit_events
             WHERE is_bot = 0 AND occurred_at >= NOW() - INTERVAL ? DAY
             GROUP BY source
@@ -151,12 +175,13 @@ public class AcquisitionFunnelService {
                 num(row.get("visits")),
                 num(row.get("visitors")),
                 num(row.get("sessions")),
-                signupBySource.getOrDefault(source, 0L)));
+                signupBySource.getOrDefault(source, 0L),
+                num(row.get("real_visitors"))));
         }
         // 방문 기록 없이 가입만 있는 채널(쿠키만 남고 방문 기록이 유실된 경우)도 보여준다.
         signupBySource.forEach((source, signups) -> {
             if (!seen.contains(source)) {
-                out.add(new ChannelRow(source, 0, 0, 0, signups));
+                out.add(new ChannelRow(source, 0, 0, 0, signups, 0));
             }
         });
         out.sort((a, b) -> Long.compare(b.visits(), a.visits()));
