@@ -510,6 +510,36 @@ public class AsmClient {
         }
     }
 
+    /** Result of one verified-follower follow-back pass (ASM {@code POST /api/v1/x/follow-back}). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XFollowBackResult(int seen, int alreadyFollowing, List<String> followed) {
+        public XFollowBackResult {
+            if (followed == null) {
+                followed = List.of();
+            }
+        }
+    }
+
+    /**
+     * Follow back verified (blue-check) followers, at most {@code maxFollows} per call.
+     * Playwright pass, so it uses the long-read client.
+     */
+    public XFollowBackResult followBackVerified(int maxFollows) {
+        try {
+            XFollowBackResult body = statsRestClient
+                .post()
+                .uri("/api/v1/x/follow-back")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(java.util.Map.of("maxFollows", maxFollows))
+                .retrieve()
+                .body(XFollowBackResult.class);
+            return body == null ? new XFollowBackResult(0, 0, List.of()) : body;
+        } catch (Exception e) {
+            log.error("Failed to follow back X verified followers", e);
+            throw new AsmUnavailableException("Failed to follow back: " + e.getMessage(), e);
+        }
+    }
+
     private static XPublishResult toPublishResult(XPublishResponse body) {
         if (body == null) {
             return new XPublishResult(false, null, null, null);

@@ -28,7 +28,8 @@ public class XOpsAction {
         RITUAL,
         INBOUND,
         OUTBOUND,
-        ORIGINAL
+        ORIGINAL,
+        FOLLOW
     }
 
     public enum Status {

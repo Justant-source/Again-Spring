@@ -26,7 +26,7 @@ public class UpdateMarketingXOpsSettingsRequest {
     private Integer storyScoopsPerDay;
 
     @Min(0)
-    @Max(100)
+    @Max(300)
     private Integer outboundDailyCap;
 
     @Min(0)
@@ -58,7 +58,7 @@ public class UpdateMarketingXOpsSettingsRequest {
     private Integer originalPostDailyCap;
 
     @Min(1)
-    @Max(5)
+    @Max(10)
     private Integer outboundPerTick;
 
     @Min(1)

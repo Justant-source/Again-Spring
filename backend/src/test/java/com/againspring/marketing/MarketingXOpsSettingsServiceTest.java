@@ -166,7 +166,7 @@ class MarketingXOpsSettingsServiceTest {
             .isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> service.update(new MarketingXOpsSettingsService.XOpsSettings(
             "07:30", "22:00", 2, 20, 40, 12, 3, 6,
-            false, false, false, true, "04:30", true, false, 1, 6, 3), "admin"))
+            false, false, false, true, "04:30", true, false, 1, 11, 3), "admin"))
             .isInstanceOf(ResponseStatusException.class);
     }
 

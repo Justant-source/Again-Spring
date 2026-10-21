@@ -337,7 +337,7 @@ export function XOpsSettingsSection() {
               id="x-ops-outbound-cap"
               type="number"
               min={0}
-              max={100}
+              max={300}
               value={settings.outboundDailyCap}
               onChange={(e) => patch('outboundDailyCap', Number(e.target.value))}
             />
@@ -348,11 +348,11 @@ export function XOpsSettingsSection() {
               id="x-ops-outbound-tick"
               type="number"
               min={1}
-              max={5}
+              max={10}
               value={settings.outboundPerTick ?? 1}
               onChange={(e) => {
                 const n = Number(e.target.value);
-                const clamped = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 1;
+                const clamped = Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 1;
                 patch('outboundPerTick', clamped);
               }}
             />

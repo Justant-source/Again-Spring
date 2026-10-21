@@ -49,8 +49,8 @@ last_updated: 2026-10-08
 | 아침 시각 | 07:30 KST | `marketing.x.morning_time` |
 | 밤 시각 | 22:00 KST | `marketing.x.night_time` |
 | 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` (**원글 파이프가 켜져 있을 때 소비**. 실제 발행 = `min(original_post_daily_cap, story_scoops_per_day)`) |
-| 선댓글 /일 | 20 | `marketing.x.outbound_daily_cap` |
-| 선댓글 /틱 | 1 (1–5) | `marketing.x.outbound_per_tick` |
+| 선댓글 /일 | 20 (0–300) | `marketing.x.outbound_daily_cap` |
+| 선댓글 /틱 | 1 (1–10) | `marketing.x.outbound_per_tick` |
 | 선댓글 계정당 /일 | 2 (1–10) | `marketing.x.outbound_per_account_daily_cap` |
 | 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
 | 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
@@ -61,6 +61,18 @@ last_updated: 2026-10-08
 | 페르소나 학습 | **true** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
 | 페르소나 채점 | **true** (게시 아님) | `marketing.x.persona_eval_enabled` |
 | 원글 자동 작성 | **false** · 한도 1 (0–5) | `marketing.x.original_post_enabled` · `original_post_daily_cap` |
+
+**맞팔로우 (verified 팔로워, 2026-10-22)** — `XFollowBackService`. 우리를 팔로우한 **유료 인증(파란 딱지) 계정만** 맞팔로우한다(ASM `POST /api/v1/x/follow-back` → social-poster가 `x.com/<own>/verified_followers`에서 `-follow` 버튼을 클릭). 맞팔로우한 계정은 Following 타임라인에 들어와 선댓글 후보가 된다. 키는 **어드민 UI 없이 `system_setting` 직접 편집**:
+
+| 항목 | 폴백 | 키 |
+|---|---|---|
+| 켜기 | **false** | `marketing.x.follow_back_enabled` |
+| 맞팔로우 /일 | 30 (0–100) | `marketing.x.follow_back_daily_cap` |
+| 맞팔로우 /틱 | 5 (1–10) | `marketing.x.follow_back_per_tick` |
+
+틱은 매일 08:10~23:40 KST의 :10/:40 (선댓글 틱 10분 뒤). 장부는 `x_ops_action` `kind=FOLLOW`, `target_tweet_id=follow:<handle>`(한 계정 두 번 팔로우 안 함). 팔로우 확인(`-unfollow` 버튼 전환)이 안 되거나 클릭이 실패하면 그 틱은 즉시 중단한다.
+
+**선댓글 처리량 상한** — 후보는 Following 타임라인에서 틱당 최대 24건을 긁고(스크롤 6회), 계정당 하루 `outbound_per_account_daily_cap`건, 틱 08:00~23:30 KST 32회 × `outbound_per_tick`(≤10). `outbound_daily_cap`을 300으로 올려도 **후보가 되는 팔로잉 계정 수가 실제 병목**이다.
 
 코드 기본값이 꺼져 있어도 **prod DB의 `system_setting`이 켜져 있으면 실제로 게시한다.** 문서가 “prod는 꺼져 있다”고 가정하지 말 것. 현재 on/off는 어드민 GET 또는 DB를 본다.
 

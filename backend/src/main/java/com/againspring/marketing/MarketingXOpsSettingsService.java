@@ -173,7 +173,7 @@ public class MarketingXOpsSettingsService {
             readTime(KEY_MORNING_TIME, DEFAULT_MORNING_TIME),
             readTime(KEY_NIGHT_TIME, DEFAULT_NIGHT_TIME),
             readInt(KEY_STORY_SCOOPS_PER_DAY, DEFAULT_STORY_SCOOPS_PER_DAY, 0, 10),
-            readInt(KEY_OUTBOUND_DAILY_CAP, DEFAULT_OUTBOUND_DAILY_CAP, 0, 100),
+            readInt(KEY_OUTBOUND_DAILY_CAP, DEFAULT_OUTBOUND_DAILY_CAP, 0, 300),
             readInt(KEY_INBOUND_DAILY_CAP, DEFAULT_INBOUND_DAILY_CAP, 0, 200),
             readInt(KEY_INBOUND_PER_POST_CAP, DEFAULT_INBOUND_PER_POST_CAP, 0, 50),
             readInt(KEY_HOT_MIN_REPLIES, DEFAULT_HOT_MIN_REPLIES, 0, 50),
@@ -186,7 +186,7 @@ public class MarketingXOpsSettingsService {
             readBool(KEY_PERSONA_EVAL_ENABLED, DEFAULT_PERSONA_EVAL_ENABLED),
             readBool(KEY_ORIGINAL_POST_ENABLED, DEFAULT_ORIGINAL_POST_ENABLED),
             readInt(KEY_ORIGINAL_POST_DAILY_CAP, DEFAULT_ORIGINAL_POST_DAILY_CAP, 0, 5),
-            readInt(KEY_OUTBOUND_PER_TICK, DEFAULT_OUTBOUND_PER_TICK, 1, 5),
+            readInt(KEY_OUTBOUND_PER_TICK, DEFAULT_OUTBOUND_PER_TICK, 1, 10),
             readInt(KEY_INBOUND_PER_TICK, DEFAULT_INBOUND_PER_TICK, 1, 10),
             readInt(KEY_OUTBOUND_PER_ACCOUNT_DAILY_CAP, DEFAULT_OUTBOUND_PER_ACCOUNT_DAILY_CAP, 1, 10)
         );
@@ -224,14 +224,14 @@ public class MarketingXOpsSettingsService {
         requireHhMm("morningTime", s.morningTime());
         requireHhMm("nightTime", s.nightTime());
         requireRange("storyScoopsPerDay", s.storyScoopsPerDay(), 0, 10);
-        requireRange("outboundDailyCap", s.outboundDailyCap(), 0, 100);
+        requireRange("outboundDailyCap", s.outboundDailyCap(), 0, 300);
         requireRange("inboundDailyCap", s.inboundDailyCap(), 0, 200);
         requireRange("inboundPerPostCap", s.inboundPerPostCap(), 0, 50);
         requireRange("hotMinReplies", s.hotMinReplies(), 0, 50);
         requireRange("hotMaxAgeHours", s.hotMaxAgeHours(), 1, 48);
         requireHhMm("personaLearnAt", s.personaLearnAt());
         requireRange("originalPostDailyCap", s.originalPostDailyCap(), 0, 5);
-        requireRange("outboundPerTick", s.outboundPerTick(), 1, 5);
+        requireRange("outboundPerTick", s.outboundPerTick(), 1, 10);
         requireRange("inboundPerTick", s.inboundPerTick(), 1, 10);
         requireRange("outboundPerAccountDailyCap", s.outboundPerAccountDailyCap(), 1, 10);
     }
