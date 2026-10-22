@@ -226,9 +226,13 @@ public class XOutboundService {
                     continue;
                 }
                 remember(ledger.recordOutboundFailed(replyTo, "PUBLISH_FAILED", now, author), draft, c);
+                break;
             } catch (Exception e) {
                 log.warn("[x-outbound] publish failed tweetId={}: {}", replyTo, e.getMessage());
                 remember(ledger.recordOutboundFailed(replyTo, "ASM_ERROR", now, author), draft, c);
+                // Publish path is shared with x_thread posting; hammering it with the next
+                // candidates only burns candidates. Stop this tick and let the pacer retry later.
+                break;
             }
         }
         log.info("[x-outbound] posted={} accountCapSkipped={} accountCap={}",

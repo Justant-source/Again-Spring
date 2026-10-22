@@ -122,7 +122,9 @@ flowchart TD
 
 코드: `XOutboundService`. ASM `GET /api/v1/x/outbound-candidates`.
 
-- 후보 = **팔로우 중 원글**(맞팔 필수 아님). 필터 `hotMinReplies` / `hotMaxAgeHours`.
+- 후보 = **팔로우 중 원글**(맞팔 필수 아님) + **유료 인증(파란 딱지) 계정의 비팔로우 원글**(2026-10-22). 수집 출처 3곳: Following 탭(회당 24건) · For you 탭 · 검색 `lang:ko filter:blue_verified -filter:replies -filter:retweets min_replies:1`(최신순). For you/검색에서는 파란 딱지(`icon-verified`)만 통과하고 비팔로우 후보는 회당 16건까지다. social-poster가 비팔로우 인증 계정의 프로필에서 호출당 2명·하루 15명까지 자동 팔로우한다(KST 일일 카운터는 프로세스 메모리, 재시작 시 초기화). 필터 `hotMinReplies` / `hotMaxAgeHours`.
+- 선댓글 게시가 한 번 실패(`PUBLISH_FAILED`/`ASM_ERROR`)하면 그 틱은 즉시 중단한다(같은 틱에서 후보를 연달아 태우던 문제 수정). 실패 원인 후보는 x_thread 영상 게시와 social-poster 브라우저를 공유하는 시간대에 몰렸다.
+- 작문 프롬프트는 일상·가벼운 글은 스킵하지 않고 한 줄을 쓰게 하고, 슬픈 소식·정치·광고·내용 불명만 `UNSURE`로 거른다.
 - 그 글에 우리 댓글이 없으면 **원글(root)** 에 달고, 있으면 `ourReplyTweetId` 아래로 스레드.
 - `hasVideo` (네이티브 영상) → `VIDEO` 스킵 후 다음. GIF 배지는 영상이 아님.
 - `hasPhoto`인데 `photoJpegBase64` 없음 → `VISION_FAIL`. AS는 x.com CDN을 직접 받지 않음(ASM Playwright JPEG, 첫 장·긴 변 ~768).
