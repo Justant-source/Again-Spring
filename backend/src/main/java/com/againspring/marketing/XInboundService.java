@@ -9,11 +9,15 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 /**
  * Replies to comments on our X posts: 3–25 min jitter, 30 min window, daily/per-post caps.
+ * Shares the daily budget with outbound ({@link XDailyQuota}): inbound + outbound ≤ today's target.
+ * One reply per call with a 1–7 min pause; the inbox is scraped every 4–9 min.
  */
 @Slf4j
 @Service
@@ -36,6 +40,11 @@ public class XInboundService {
     private final XOpsActionLedger ledger;
     private final XCommentTraceRecorder commentTrace;
     private final TelegramNotifier telegramNotifier;
+    private final XDailyQuota dailyQuota;
+
+    private List<AsmClient.XInboxItem> inboxPool = new ArrayList<>();
+    private Instant nextFetchAt;
+    private Instant nextReplyAt;
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
@@ -49,20 +58,37 @@ public class XInboundService {
             return;
         }
 
-        List<AsmClient.XInboxItem> inbox;
-        try {
-            inbox = asmClient.listXInbox(INBOX_SINCE_MINUTES);
-        } catch (Exception e) {
-            log.warn("[x-inbound] inbox fetch failed: {}", e.getMessage());
+        if (XHumanPacer.weight(now) <= 0) {
+            return; // asleep
+        }
+        if (nextReplyAt != null && now.isBefore(nextReplyAt)) {
             return;
         }
-        if (inbox == null || inbox.isEmpty()) {
+        int total = ledger.countPostedToday(XOpsAction.Kind.INBOUND, now)
+            + ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now);
+        int cap = Math.min(dailyQuota.targetFor(now), settings.outboundDailyCap());
+        if (total >= cap) {
             return;
         }
 
-        int perTick = Math.max(1, settings.inboundPerTick());
-        int batch = 0;
-        for (AsmClient.XInboxItem item : inbox) {
+        // The inbox scrape is a full Playwright pass — poll every 4–9 min, not every minute.
+        if (nextFetchAt == null || !now.isBefore(nextFetchAt)) {
+            try {
+                List<AsmClient.XInboxItem> fresh = asmClient.listXInbox(INBOX_SINCE_MINUTES);
+                inboxPool = fresh == null ? new ArrayList<>() : new ArrayList<>(fresh);
+                nextFetchAt = now.plus(Duration.ofSeconds(
+                    240 + ThreadLocalRandom.current().nextInt(0, 301)));
+            } catch (Exception e) {
+                log.warn("[x-inbound] inbox fetch failed: {}", e.getMessage());
+                nextFetchAt = now.plus(Duration.ofMinutes(3));
+                return;
+            }
+        }
+        if (inboxPool.isEmpty()) {
+            return;
+        }
+
+        for (AsmClient.XInboxItem item : inboxPool) {
             if (item == null || item.tweetId() == null || item.tweetId().isBlank()) {
                 continue;
             }
@@ -93,11 +119,8 @@ public class XInboundService {
                     ? draft.skipReason() : "NO_VOICE";
                 remember(ledger.recordSkipped(XOpsAction.Kind.INBOUND, item.tweetId(), reason, now),
                     draft, item, context);
-                batch++;
-                if (batch >= perTick) {
-                    return;
-                }
-                continue;
+                nextReplyAt = now.plusSeconds(20 + ThreadLocalRandom.current().nextInt(0, 41));
+                return;
             }
 
             try {
@@ -125,10 +148,9 @@ public class XInboundService {
                     XOpsAction.Kind.INBOUND, item.tweetId(), "ASM_ERROR", now),
                     draft, item, context);
             }
-            batch++;
-            if (batch >= perTick) {
-                return;
-            }
+            // One reply per call, then a human-ish pause (1–7 min) before the next one.
+            nextReplyAt = now.plusSeconds(60 + ThreadLocalRandom.current().nextInt(0, 361));
+            return;
         }
     }
 

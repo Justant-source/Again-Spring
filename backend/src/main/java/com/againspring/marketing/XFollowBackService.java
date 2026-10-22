@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 
 /**
- * Follows back verified (blue-check) followers every 30 minutes. Followed accounts
+ * Follows back verified (blue-check) followers in small irregular batches (1–3, driven by
+ * {@link XHumanPacer} roughly every 20–55 min). Today's target is a date-seeded draw in
+ * 60–100% of {@code follow_back_daily_cap}. Followed accounts
  * show up in the Following timeline, which is the outbound reply candidate source.
  *
  * <p>Gate: {@code marketing.x.follow_back_enabled} (default <b>false</b>, DB only).
@@ -40,10 +42,13 @@ public class XFollowBackService {
         }
         int dailyCap = readInt(KEY_DAILY_CAP, DEFAULT_DAILY_CAP, 0, 100);
         int perTick = readInt(KEY_PER_TICK, DEFAULT_PER_TICK, 1, 10);
-        int remaining = dailyCap - ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now);
+        int todayTarget = XDailyQuota.pick(
+            now.atZone(XDailyQuota.KST).toLocalDate(), (int) Math.ceil(dailyCap * 0.6), dailyCap);
+        int remaining = todayTarget - ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now);
         if (remaining <= 0) {
             return;
         }
+        perTick = 1 + java.util.concurrent.ThreadLocalRandom.current().nextInt(Math.min(3, perTick));
         AsmClient.XFollowBackResult result;
         try {
             result = asmClient.followBackVerified(Math.min(perTick, remaining));

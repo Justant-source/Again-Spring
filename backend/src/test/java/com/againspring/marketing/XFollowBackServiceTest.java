@@ -40,18 +40,18 @@ class XFollowBackServiceTest {
     void stopsWhenDailyCapReached() {
         set(XFollowBackService.KEY_ENABLED, "true");
         set(XFollowBackService.KEY_DAILY_CAP, "30");
-        when(ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now)).thenReturn(30);
+        when(ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now)).thenReturn(31);
         service.run(now);
         verify(asm, never()).followBackVerified(anyInt());
     }
 
     @Test
-    void asksOnlyForRemainingBudgetAndRecordsEachNewHandleOnce() {
+    void recordsEachNewHandleOnce() {
         set(XFollowBackService.KEY_ENABLED, "true");
         set(XFollowBackService.KEY_DAILY_CAP, "30");
         set(XFollowBackService.KEY_PER_TICK, "5");
-        when(ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now)).thenReturn(28);
-        when(asm.followBackVerified(2)).thenReturn(
+        when(ledger.countPostedToday(XOpsAction.Kind.FOLLOW, now)).thenReturn(0);
+        when(asm.followBackVerified(anyInt())).thenReturn(
             new AsmClient.XFollowBackResult(10, 6, List.of("@Alice", "bob")));
         when(ledger.alreadyHandled("follow:bob")).thenReturn(true);
 

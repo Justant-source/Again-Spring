@@ -49,12 +49,12 @@ last_updated: 2026-10-08
 | 아침 시각 | 07:30 KST | `marketing.x.morning_time` |
 | 밤 시각 | 22:00 KST | `marketing.x.night_time` |
 | 사연 퍼오기 /일 | 2 | `marketing.x.story_scoops_per_day` (**원글 파이프가 켜져 있을 때 소비**. 실제 발행 = `min(original_post_daily_cap, story_scoops_per_day)`) |
-| 선댓글 /일 | 20 (0–300) | `marketing.x.outbound_daily_cap` |
+| 선댓글 /일 | 20 (0–300) | `marketing.x.outbound_daily_cap` (천장; 일일 목표는 위 `XDailyQuota`) |
 | 선댓글 /틱 | 1 (1–10) | `marketing.x.outbound_per_tick` |
 | 선댓글 계정당 /일 | 2 (1–10) | `marketing.x.outbound_per_account_daily_cap` |
 | 우리 글 대댓글 /일 | 40 | `marketing.x.inbound_daily_cap` |
 | 우리 글당 대댓글 | 12 | `marketing.x.inbound_per_post_cap` |
-| 대댓글 /틱 | 3 (1–10) | `marketing.x.inbound_per_tick` |
+| 대댓글 /틱 | (폐지: 항상 1건씩) | `marketing.x.inbound_per_tick` |
 | 불 난 글 최소 댓글 | 3 (`0`이면 댓글 0도 후보) | `marketing.x.hot_min_replies` |
 | 불 난 글 최대 나이 | 6시간 | `marketing.x.hot_max_age_hours` |
 | ritual / inbound / outbound | **false** | `marketing.x.{ritual,inbound,outbound}_enabled` |
@@ -62,17 +62,24 @@ last_updated: 2026-10-08
 | 페르소나 채점 | **true** (게시 아님) | `marketing.x.persona_eval_enabled` |
 | 원글 자동 작성 | **false** · 한도 1 (0–5) | `marketing.x.original_post_enabled` · `original_post_daily_cap` |
 
+**사람 같은 게시 패턴 (2026-10-22)** — 선댓글·맞팔로우는 cron이 아니라 `XHumanPacer`(1분 폴링)가 불규칙 간격으로 실행한다.
+- **하루 목표(`XDailyQuota`)**: KST 평일 200–250, 토·일·공휴일 230–300. 날짜 시드 추첨이라 재시작해도 같은 값. 키 `marketing.x.outbound_weekday_range`·`outbound_offday_range`(`"200-250"` 형식), 공휴일 추가 `marketing.x.holidays_extra`(CSV `yyyy-MM-dd`; 내장 목록은 2026-10~2027-05만). 실제 상한 = `min(오늘 목표, outbound_daily_cap)` — `outbound_daily_cap`(≤300)은 비상 천장이다.
+- **하루 목표는 선댓글(OUTBOUND)+우리 글 대댓글(INBOUND) 합산**이다. 대댓글(`XInboundService`)은 이미 구현돼 있고 `marketing.x.inbound_enabled`(prod 기본 false)로 켠다. 대댓글은 받은 시각 기준 3–25분 지터·30분 창이라 시간 민감하므로 목표 안에서 먼저 처리하고, 선댓글이 남는 몫을 채운다. 대댓글도 1건씩(다음까지 1–7분), 알림함 스크랩은 4–9분마다, 수면 시간(KST 0–7시)엔 안 한다. `inbound_daily_cap`·`inbound_per_post_cap`은 그대로 별도 천장이고 `inbound_per_tick`은 폐지(항상 1).
+- **간격**: 1건씩. 남은 목표를 시간대 가중치(0시~6시 0, 12시·18–22시 높음)로 나눈 평균에 로그정규 지터(0.4–2.2×)를 곱하고, 8% 확률로 15–45분 휴식. 최소 60초·최대 90분. 못 채우면 남은 시간에 더 빠르게(따라잡기).
+- **후보 풀**: Following 스크랩은 20–40분마다만(풀 소진 시 포함) 하고 한 번에 여러 건을 소비한다. `outbound_per_tick`은 어드민 수동 "지금 실행"(`POST /x-ops/outbound`)에만 쓰인다(수동 실행은 오늘 목표가 아닌 `outbound_daily_cap` 기준).
+- **맞팔로우**: 20–55분마다 1–3명(간격 12–40초). 하루 목표는 `follow_back_daily_cap`의 60–100% 날짜 시드 추첨.
+
 **맞팔로우 (verified 팔로워, 2026-10-22)** — `XFollowBackService`. 우리를 팔로우한 **유료 인증(파란 딱지) 계정만** 맞팔로우한다(ASM `POST /api/v1/x/follow-back` → social-poster가 `x.com/<own>/verified_followers`에서 `-follow` 버튼을 클릭). 맞팔로우한 계정은 Following 타임라인에 들어와 선댓글 후보가 된다. 키는 **어드민 UI 없이 `system_setting` 직접 편집**:
 
 | 항목 | 폴백 | 키 |
 |---|---|---|
 | 켜기 | **false** | `marketing.x.follow_back_enabled` |
-| 맞팔로우 /일 | 30 (0–100) | `marketing.x.follow_back_daily_cap` |
-| 맞팔로우 /틱 | 5 (1–10) | `marketing.x.follow_back_per_tick` |
+| 맞팔로우 /일 (천장) | 30 (0–100) | `marketing.x.follow_back_daily_cap` |
+| 맞팔로우 /회 (상한) | 5 (1–10, 실제 1–3) | `marketing.x.follow_back_per_tick` |
 
-틱은 매일 08:10~23:40 KST의 :10/:40 (선댓글 틱 10분 뒤). 장부는 `x_ops_action` `kind=FOLLOW`, `target_tweet_id=follow:<handle>`(한 계정 두 번 팔로우 안 함). 팔로우 확인(`-unfollow` 버튼 전환)이 안 되거나 클릭이 실패하면 그 틱은 즉시 중단한다.
+장부는 `x_ops_action` `kind=FOLLOW`, `target_tweet_id=follow:<handle>`(한 계정 두 번 팔로우 안 함). 팔로우 확인(`-unfollow` 버튼 전환)이 안 되거나 클릭이 실패하면 그 회차는 즉시 중단한다.
 
-**선댓글 처리량 상한** — 후보는 Following 타임라인에서 틱당 최대 24건을 긁고(스크롤 6회), 계정당 하루 `outbound_per_account_daily_cap`건, 틱 08:00~23:30 KST 32회 × `outbound_per_tick`(≤10). `outbound_daily_cap`을 300으로 올려도 **후보가 되는 팔로잉 계정 수가 실제 병목**이다.
+**선댓글 처리량 상한** — 후보는 Following 타임라인에서 회당 최대 24건을 긁고(스크롤 6회), 계정당 하루 `outbound_per_account_daily_cap`건이다. 목표를 300으로 잡아도 **후보가 되는 팔로잉 계정 수가 실제 병목**이다.
 
 코드 기본값이 꺼져 있어도 **prod DB의 `system_setting`이 켜져 있으면 실제로 게시한다.** 문서가 “prod는 꺼져 있다”고 가정하지 말 것. 현재 on/off는 어드민 GET 또는 DB를 본다.
 
@@ -89,14 +96,14 @@ flowchart TD
   tick["tick 매분 KST"] --> ritual["XRitualPublisher.runIfDue"]
   tick --> inbound["XInboundService.run"]
   tick --> original["XOriginalPostService.runIfDue"]
-  outTick["outboundTick 08:00-22:30 30분 · 틱당 = outbound_per_tick"] --> outbound["XOutboundService.run"]
+  outTick["XHumanPacer 1분 폴링 · 불규칙 간격 1건씩 · 일일 목표 XDailyQuota"] --> outbound["XOutboundService.runOne"]
   learnTick["XPersonaLearnScheduler 매분"] --> learn["runIfDue personaLearnAt 하루 1회"]
   learn --> eval["Shadow eval persona_eval_enabled"]
   vaultCron["호스트 cron 05:00"] --> export["GET persona-export → .temp 볼트"]
 ```
 
 - `XGrowthLoopScheduler.tick`: `0 * * * * *` Asia/Seoul — ritual + inbound + original(`runIfDue`, 스위치 기본 false).
-- `outboundTick`: `0 0,30 8-22 * * *` — 08:00, 08:30, … **22:30** KST. 틱당 게시 성공 상한 = `marketing.x.outbound_per_tick`. 스킵은 다음 후보.
+- `XHumanPacer.tick`(1분 폴링): 선댓글 1건씩 불규칙 간격(위 「사람 같은 게시 패턴」). 구 `outboundTick`(30분 cron)은 폐지. 수동 `POST /x-ops/outbound`는 기존 `run()`(틱당 `outbound_per_tick`).
 - **계정 다양화 (선댓글)**: 후보를 (최근 7일 해당 계정 댓글 수 ↑, 마지막 댓글 오래된 순)으로 재정렬한 뒤 처리. KST 하루 계정당 `outbound_per_account_daily_cap`건 초과 계정과 같은 틱의 동일 계정 두 번째 후보는 건너뜀(`[x-outbound] accountCapSkipped` 로그). 상한 때문에 `outbound_daily_cap`을 못 채우는 것은 의도된 동작이다.
 - **계정 통계는 DB로**: `x_ops_action.target_author_handle`(V128), 후보 노출·게시 누계 `x_target_account`. 예: `SELECT target_author_handle, COUNT(*) FROM x_ops_action WHERE kind='OUTBOUND' AND status='POSTED' AND created_at >= NOW() - INTERVAL 7 DAY GROUP BY 1 ORDER BY 2 DESC;` (V128 이전 행은 NULL — 백필 전까지 제외됨)
 - `XPersonaLearnScheduler.tick`: 매분. 실제 학습은 `personaLearnAt` 그 시각에만 (`runIfDue`). 말미에 shadow eval (`llmEnabled ∧ persona_eval_enabled`).
@@ -278,7 +285,7 @@ flowchart TD
 
 | 역할 | 클래스 |
 |---|---|
-| 분 틱 / 30분 틱 | `XGrowthLoopScheduler` |
+| 분 틱 | `XGrowthLoopScheduler` (선댓글·맞팔로우는 `XHumanPacer`) |
 | 선댓글 | `XOutboundService` |
 | 대댓글 | `XInboundService` |
 | 의식 | `XRitualPublisher` |

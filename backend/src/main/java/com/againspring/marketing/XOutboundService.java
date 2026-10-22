@@ -16,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * One outbound reply per daytime 30-minute tick on followed accounts' recent
@@ -41,8 +42,18 @@ public class XOutboundService {
     private final XCommentTraceRecorder commentTrace;
     private final TelegramNotifier telegramNotifier;
 
+    private List<AsmClient.XOutboundCandidate> pool = new ArrayList<>();
+    private Instant poolFetchedAt;
+    private Duration poolTtl = Duration.ofMinutes(25);
+
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
+
+    /** Replies posted today across outbound + inbound — both draw on one daily budget. */
+    public int countPostedToday(Instant now) {
+        return ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now)
+            + ledger.countPostedToday(XOpsAction.Kind.INBOUND, now);
+    }
 
     public void run(Instant now) {
         MarketingXOpsSettingsService.XOpsSettings settings = settingsService.get();
@@ -70,22 +81,81 @@ public class XOutboundService {
         }
 
         recordSeen(candidates, now);
+        processCandidates(candidates, settings, now, settings.outboundPerTick(),
+            settings.outboundDailyCap());
+    }
+
+    /**
+     * Paced entry point: posts at most ONE reply per call, drawing from a pooled
+     * candidate list that is refreshed only when stale (the Following scrape is
+     * the expensive, bot-looking part, so it must not run once per reply).
+     * {@code effectiveCap} is today's randomised target (never above
+     * {@code outbound_daily_cap}).
+     *
+     * @return true when a reply was posted
+     */
+    public synchronized boolean runOne(Instant now, int effectiveCap) {
+        MarketingXOpsSettingsService.XOpsSettings settings = settingsService.get();
+        if (!settings.outboundEnabled() || !llmEnabled) {
+            return false;
+        }
+        int cap = Math.min(effectiveCap, settings.outboundDailyCap());
+        int inboundToday = ledger.countPostedToday(XOpsAction.Kind.INBOUND, now);
+        if (ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now) + inboundToday >= cap) {
+            return false;
+        }
+        if (pool.isEmpty() || poolFetchedAt == null
+            || Duration.between(poolFetchedAt, now).compareTo(poolTtl) > 0) {
+            try {
+                List<AsmClient.XOutboundCandidate> fresh = asmClient.listXOutboundCandidates(
+                    settings.hotMinReplies(), settings.hotMaxAgeHours());
+                pool = fresh == null ? new ArrayList<>() : new ArrayList<>(fresh);
+                poolFetchedAt = now;
+                poolTtl = Duration.ofMinutes(20 + ThreadLocalRandom.current().nextInt(0, 21));
+                log.info("[x-outbound] pool refreshed: {} candidates (ttl {}m)",
+                    pool.size(), poolTtl.toMinutes());
+                recordSeen(pool, now);
+            } catch (Exception e) {
+                log.warn("[x-outbound] candidate fetch failed: {}", e.getMessage());
+                return false;
+            }
+        }
+        if (pool.isEmpty()) {
+            return false;
+        }
+        List<AsmClient.XOutboundCandidate> ordered = diversify(pool, now);
+        List<AsmClient.XOutboundCandidate> consumed = new ArrayList<>();
+        int posted = processCandidates(ordered, settings, now, 1, cap - inboundToday, consumed);
+        pool.removeAll(consumed);
+        return posted > 0;
+    }
+
+    private int processCandidates(List<AsmClient.XOutboundCandidate> candidates,
+        MarketingXOpsSettingsService.XOpsSettings settings, Instant now, int perTick, int dailyCap) {
+        return processCandidates(diversify(candidates, now), settings, now, perTick, dailyCap,
+            new ArrayList<>());
+    }
+
+    private int processCandidates(List<AsmClient.XOutboundCandidate> ordered,
+        MarketingXOpsSettingsService.XOpsSettings settings, Instant now, int perTick, int dailyCap,
+        List<AsmClient.XOutboundCandidate> consumed) {
+        List<AsmClient.XOutboundCandidate> candidates = ordered;
         int accountCap = Math.max(1, settings.outboundPerAccountDailyCap());
-        List<AsmClient.XOutboundCandidate> ordered = diversify(candidates, now);
         Map<String, XOpsActionLedger.AuthorPosted> today = ledger.postedByAuthorSince(
             handlesOf(candidates), XOpsActionLedger.startOfKstDay(now));
         Set<String> pickedThisTick = new HashSet<>();
 
-        int perTick = Math.max(1, settings.outboundPerTick());
+        perTick = Math.max(1, perTick);
         int postedThisTick = 0;
         int accountCapSkipped = 0;
         for (AsmClient.XOutboundCandidate c : ordered) {
             if (postedThisTick >= perTick) {
                 break;
             }
-            if (ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now) >= settings.outboundDailyCap()) {
+            if (ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now) >= dailyCap) {
                 break;
             }
+            consumed.add(c);
             if (c == null || c.tweetId() == null || c.tweetId().isBlank()) {
                 continue;
             }
@@ -163,6 +233,7 @@ public class XOutboundService {
         }
         log.info("[x-outbound] posted={} accountCapSkipped={} accountCap={}",
             postedThisTick, accountCapSkipped, accountCap);
+        return postedThisTick;
     }
 
     private void recordSeen(List<AsmClient.XOutboundCandidate> candidates, Instant now) {

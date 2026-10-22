@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +43,8 @@ class XInboundServiceTest {
     private XCommentTraceRecorder commentTrace;
     @Mock
     private TelegramNotifier telegramNotifier;
+    @Mock
+    private XDailyQuota dailyQuota;
 
     @InjectMocks
     private XInboundService service;
@@ -52,6 +55,7 @@ class XInboundServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         when(settingsService.get()).thenReturn(inboundOn(40, 12));
+        when(dailyQuota.targetFor(any(Instant.class))).thenReturn(300);
         when(ledger.alreadyHandled(anyString())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.INBOUND), any())).thenReturn(0);
         when(ledger.countPostedTodayForOurPost(anyString(), any())).thenReturn(0);
@@ -213,5 +217,34 @@ class XInboundServiceTest {
         return new MarketingXOpsSettingsService.XOpsSettings(
             "07:30", "22:00", 2, 20, 40, 12, 3, 6,
             false, false, false, true, "04:30");
+    }
+
+    @Test
+    void sharedDailyBudget_outboundPlusInboundAtTargetBlocksReply() {
+        when(dailyQuota.targetFor(any(Instant.class))).thenReturn(210);
+        when(ledger.countPostedToday(eq(XOpsAction.Kind.INBOUND), any())).thenReturn(10);
+        when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(200);
+        String id = "c-shared";
+        Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
+        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+
+        service.run(now);
+
+        verify(asmClient, never()).listXInbox(90);
+        verify(asmClient, never()).publishX(any(), any(), any(), any());
+    }
+
+    @Test
+    void oneReplyPerCall_thenPausesBeforeTheNext() {
+        String a = "c-a";
+        String b = "c-b";
+        Instant ca = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(a)));
+        Instant cb = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(b)));
+        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(a, ca), inbox(b, cb)));
+
+        service.run(now);
+        service.run(now.plusSeconds(5));
+
+        verify(asmClient, times(1)).publishX(any(), any(), any(), any());
     }
 }

@@ -21,9 +21,7 @@ public class XGrowthLoopScheduler {
 
     private final XRitualPublisher ritualPublisher;
     private final XInboundService inboundService;
-    private final XOutboundService outboundService;
     private final XOriginalPostService originalPostService;
-    private final XFollowBackService followBackService;
 
     @Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
     public void tick() {
@@ -42,27 +40,6 @@ public class XGrowthLoopScheduler {
             originalPostService.runIfDue(now);
         } catch (Exception e) {
             log.warn("[x-growth] original tick failed: {}", e.getMessage());
-        }
-    }
-
-    /** 08:00, 08:30, … 23:00, 23:30 KST. */
-    @Scheduled(cron = "0 0,30 8-23 * * *", zone = "Asia/Seoul")
-    public void outboundTick() {
-        Instant now = Instant.now();
-        try {
-            outboundService.run(now);
-        } catch (Exception e) {
-            log.warn("[x-growth] outbound tick failed: {}", e.getMessage());
-        }
-    }
-
-    /** 08:10, 08:40, … 23:10, 23:40 KST — ten minutes after each outbound tick. */
-    @Scheduled(cron = "0 10,40 8-23 * * *", zone = "Asia/Seoul")
-    public void followBackTick() {
-        try {
-            followBackService.run(Instant.now());
-        } catch (Exception e) {
-            log.warn("[x-growth] follow-back tick failed: {}", e.getMessage());
         }
     }
 }

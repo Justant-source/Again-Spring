@@ -11,7 +11,6 @@ import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,8 +20,6 @@ class XGrowthLoopSchedulerTest {
     private XRitualPublisher ritualPublisher;
     @Mock
     private XInboundService inboundService;
-    @Mock
-    private XOutboundService outboundService;
     @Mock
     private XOriginalPostService originalPostService;
 
@@ -41,7 +38,6 @@ class XGrowthLoopSchedulerTest {
         verify(ritualPublisher).runIfDue(any(Instant.class));
         verify(inboundService).run(any(Instant.class));
         verify(originalPostService).runIfDue(any(Instant.class));
-        verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
@@ -52,7 +48,6 @@ class XGrowthLoopSchedulerTest {
 
         verify(inboundService).run(any(Instant.class));
         verify(originalPostService).runIfDue(any(Instant.class));
-        verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
@@ -63,7 +58,6 @@ class XGrowthLoopSchedulerTest {
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
         verify(originalPostService).runIfDue(any(Instant.class));
-        verify(outboundService, never()).run(any(Instant.class));
     }
 
     @Test
@@ -74,25 +68,5 @@ class XGrowthLoopSchedulerTest {
 
         verify(ritualPublisher).runIfDue(any(Instant.class));
         verify(inboundService).run(any(Instant.class));
-        verify(outboundService, never()).run(any(Instant.class));
-    }
-
-    @Test
-    void outboundTick_runsOutboundOnly() {
-        scheduler.outboundTick();
-
-        verify(outboundService).run(any(Instant.class));
-        verify(ritualPublisher, never()).runIfDue(any());
-        verify(inboundService, never()).run(any());
-        verify(originalPostService, never()).runIfDue(any());
-    }
-
-    @Test
-    void outboundTick_failure_isIsolated() {
-        doThrow(new RuntimeException("outbound boom")).when(outboundService).run(any());
-
-        scheduler.outboundTick();
-
-        verify(outboundService).run(any(Instant.class));
     }
 }
