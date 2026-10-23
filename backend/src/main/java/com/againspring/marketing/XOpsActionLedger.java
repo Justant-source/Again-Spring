@@ -96,6 +96,24 @@ public class XOpsActionLedger {
             XOpsAction.Status.FAILED, skipReason, now, null, normHandle(authorHandle));
     }
 
+    /** 같은 대상에 실패(FAILED)가 이 횟수 이상 쌓이면 더 시도하지 않는다. */
+    static final int MAX_FAILED_ATTEMPTS = 2;
+
+    /**
+     * 선댓글용: 게시·건너뜀 기록이 있으면 처리 끝. FAILED뿐이면 X 부팅 실패 같은 일시 장애일 수 있어
+     * {@link #MAX_FAILED_ATTEMPTS}회까지는 다음 틱에 다시 시도한다.
+     */
+    public boolean handledOrExhausted(String targetTweetId) {
+        if (targetTweetId == null || targetTweetId.isBlank()) {
+            return false;
+        }
+        if (repository.existsByTargetTweetIdAndStatusNot(targetTweetId, XOpsAction.Status.FAILED)) {
+            return true;
+        }
+        return repository.countByTargetTweetIdAndStatus(targetTweetId, XOpsAction.Status.FAILED)
+            >= MAX_FAILED_ATTEMPTS;
+    }
+
     public boolean alreadyHandled(String targetTweetId) {
         if (targetTweetId == null || targetTweetId.isBlank()) {
             return false;

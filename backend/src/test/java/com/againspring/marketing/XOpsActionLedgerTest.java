@@ -51,6 +51,30 @@ class XOpsActionLedgerTest {
     }
 
     @Test
+    void handledOrExhausted_retriesFailedTwiceThenStops() {
+        Instant now = Instant.parse("2026-08-31T00:00:00Z");
+        when(repository.existsByTargetTweetIdAndStatusNot(any(), any())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            XOpsAction.Status st = inv.getArgument(1);
+            return store.stream().anyMatch(a -> id.equals(a.getTargetTweetId()) && a.getStatus() != st);
+        });
+        when(repository.countByTargetTweetIdAndStatus(any(), any())).thenAnswer(inv -> {
+            String id = inv.getArgument(0);
+            XOpsAction.Status st = inv.getArgument(1);
+            return store.stream().filter(a -> id.equals(a.getTargetTweetId()) && a.getStatus() == st).count();
+        });
+
+        assertThat(ledger.handledOrExhausted("tw-1")).isFalse();
+        ledger.recordOutboundFailed("tw-1", "ASM_ERROR", now, "bob");
+        assertThat(ledger.handledOrExhausted("tw-1")).isFalse();
+        ledger.recordOutboundFailed("tw-1", "ASM_ERROR", now, "bob");
+        assertThat(ledger.handledOrExhausted("tw-1")).isTrue();
+
+        ledger.recordOutboundSkipped("tw-2", "VIDEO", now, "bob");
+        assertThat(ledger.handledOrExhausted("tw-2")).isTrue();
+    }
+
+    @Test
     void alreadyHandled_trueAfterRecordPostedOrSkipped() {
         Instant now = Instant.parse("2026-08-31T00:00:00Z");
         assertThat(ledger.alreadyHandled("tw-1")).isFalse();

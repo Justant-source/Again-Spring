@@ -167,7 +167,7 @@ public class XOutboundService {
             if (replyTo == null) {
                 continue;
             }
-            if (ledger.alreadyHandled(replyTo)) {
+            if (ledger.handledOrExhausted(replyTo)) {
                 continue;
             }
 
@@ -305,8 +305,8 @@ public class XOutboundService {
         return null;
     }
 
-    /** Pause before the single publish retry (X sometimes refuses the first compose). */
-    long retryPauseMillis = 25_000L;
+    /** Pause before the single publish retry (X sometimes refuses the first compose: splash stuck under 429 rate limits, so wait long enough to cool down). */
+    long retryPauseMillis = 90_000L;
 
     private AsmClient.XPublishResult publishWithRetry(String body, String replyTo) {
         RuntimeException last = null;

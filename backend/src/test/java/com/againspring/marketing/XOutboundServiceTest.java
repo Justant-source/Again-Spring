@@ -58,7 +58,7 @@ class XOutboundServiceTest {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
         when(settingsService.get()).thenReturn(outboundOn(20));
-        when(ledger.alreadyHandled(anyString())).thenReturn(false);
+        when(ledger.handledOrExhausted(anyString())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(0);
         when(composer.composeOutbound(any(), any(), any())).thenReturn(XCommentComposer.Draft.of("너무귀여움"));
         when(outboundDraftGuard.firstViolation(any(), any(), any())).thenReturn(Optional.empty());
@@ -155,7 +155,7 @@ class XOutboundServiceTest {
     void alreadyHandled_preventsDouble() {
         when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
             cand("root-1", "mutual", "글", 5, 1.0, false, null)));
-        when(ledger.alreadyHandled("root-1")).thenReturn(true);
+        when(ledger.handledOrExhausted("root-1")).thenReturn(true);
 
         service.run(now);
 

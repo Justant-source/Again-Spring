@@ -142,7 +142,7 @@ flowchart TD
 코드: `XInboundService`. ASM `GET /api/v1/x/inbox?sinceMinutes=90`.
 
 - 수신 후 **3–25분** 지터(`tweetId` 해시)부터 **20시간** 창까지(알림함·프로필 스크랩은 24시간 범위). 예전 30분 창은 KST 0–7시 수면과 겹치면 밤 댓글이 전부 만료돼 대댓글이 거의 안 나갔다. UI에 없음.
-- 게시(선댓글·대댓글)는 실패하면 25초 뒤 **같은 내용으로 1회 재시도**한다. 재시도도 실패하면 `FAILED` 기록 후 그 틱을 끝낸다.
+- 게시(선댓글·대댓글)는 실패하면 90초 뒤 **같은 내용으로 1회 재시도**한다(X가 429로 속도 제한을 걸면 부팅 로고에서 멈추는 일이 몰려 나서 쿨다운이 필요하다). 재시도도 실패하면 `FAILED` 기록 후 그 틱을 끝낸다. 선댓글은 `FAILED`뿐인 대상을 다음 틱에 다시 시도하되 실패가 2회 쌓이면 포기한다(`handledOrExhausted`).
 - 틱당 처리 상한 = `marketing.x.inbound_per_tick`. 일일/글당 cap도 `system_setting`.
 - 스킵: URL만, 맞팔 미끼, 욕설 패턴 → `SAFETY`.
 - 작문: `composeReply` — **인라인 프롬프트 + persona**. outbound JSON 프롬프트·few-shot·`OutboundDraftGuard`를 타지 않는다.
