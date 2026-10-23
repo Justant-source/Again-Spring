@@ -79,6 +79,8 @@ last_updated: 2026-10-08
 
 장부는 `x_ops_action` `kind=FOLLOW`, `target_tweet_id=follow:<handle>`(한 계정 두 번 팔로우 안 함). 팔로우 확인(`-unfollow` 버튼 전환)이 안 되거나 클릭이 실패하면 그 회차는 즉시 중단한다.
 
+**일일 리포트 (매일 23:00 KST, 2026-10-23)** — `XDailyReportService`가 Telegram으로 오늘의 선댓글·대댓글 합계, 게시 실패 수, 맞팔로우 수, 팔로워/팔로잉 수와 전회 대비 증감을 보낸다. 증감 기준은 전날 리포트가 `system_setting`(`marketing.x.report.last_counts` = `yyyy-MM-dd|followers|following`)에 남긴 스냅샷이다. 팔로워 수는 ASM `GET /api/v1/x/profile-counts`(social-poster `x-profile-counts.js`가 `x.com/<own>`의 팔로워·팔로잉 링크 숫자를 읽음)로 얻고, 조회에 실패해도 건수 리포트는 나간다.
+
 **선댓글 처리량 상한** — 후보는 Following 타임라인에서 회당 최대 24건을 긁고(스크롤 6회), 계정당 하루 `outbound_per_account_daily_cap`건이다. 목표를 300으로 잡아도 **후보가 되는 팔로잉 계정 수가 실제 병목**이다.
 
 코드 기본값이 꺼져 있어도 **prod DB의 `system_setting`이 켜져 있으면 실제로 게시한다.** 문서가 “prod는 꺼져 있다”고 가정하지 말 것. 현재 on/off는 어드민 GET 또는 DB를 본다.

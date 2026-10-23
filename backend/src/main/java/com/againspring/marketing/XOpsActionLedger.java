@@ -110,6 +110,13 @@ public class XOpsActionLedger {
             kind, XOpsAction.Status.POSTED, window[0], window[1]);
     }
 
+    /** KST calendar day of {@code now}, any status. */
+    public int countTodayByStatus(XOpsAction.Kind kind, XOpsAction.Status status, Instant now) {
+        Instant[] window = kstDayWindow(now);
+        return (int) repository.countByKindAndStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            kind, status, window[0], window[1]);
+    }
+
     public int countPostedTodayForOurPost(String ourPostTweetId, Instant now) {
         Instant[] window = kstDayWindow(now);
         return (int) repository.countByOurPostTweetIdAndStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(

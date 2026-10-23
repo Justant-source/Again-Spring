@@ -540,6 +540,27 @@ public class AsmClient {
         }
     }
 
+    public record XProfileCounts(int followers, int following) {}
+
+    /** Own profile follower/following counts (Playwright pass → long-read client). */
+    public XProfileCounts getXProfileCounts() {
+        try {
+            XProfileCounts body = statsRestClient
+                .get()
+                .uri("/api/v1/x/profile-counts")
+                .retrieve()
+                .body(XProfileCounts.class);
+            if (body == null) {
+                throw new AsmUnavailableException("empty profile-counts response");
+            }
+            return body;
+        } catch (AsmUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to read X profile counts: " + e.getMessage(), e);
+        }
+    }
+
     private static XPublishResult toPublishResult(XPublishResponse body) {
         if (body == null) {
             return new XPublishResult(false, null, null, null);
