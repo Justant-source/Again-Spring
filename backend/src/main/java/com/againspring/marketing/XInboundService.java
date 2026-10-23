@@ -54,7 +54,7 @@ public class XInboundService {
         if (!settings.inboundEnabled()) {
             return;
         }
-        if (!llmEnabled) {
+        if (!llmEnabled || XPublishCooldown.active(now)) {
             return;
         }
 
@@ -144,8 +144,13 @@ public class XInboundService {
                 }
             } catch (Exception e) {
                 log.warn("[x-inbound] publish failed tweetId={}: {}", item.tweetId(), e.getMessage());
+                boolean rateLimited = XPublishCooldown.isRateLimited(e);
+                if (rateLimited) {
+                    XPublishCooldown.trip(now);
+                }
                 remember(ledger.recordFailed(
-                    XOpsAction.Kind.INBOUND, item.tweetId(), "ASM_ERROR", now),
+                    XOpsAction.Kind.INBOUND, item.tweetId(),
+                    rateLimited ? "X_RATE_LIMITED" : "ASM_ERROR", now),
                     draft, item, context);
             }
             // One reply per call, then a human-ish pause (1–7 min) before the next one.
@@ -226,7 +231,7 @@ public class XInboundService {
                 }
             } catch (RuntimeException e) {
                 last = e;
-                if (attempt == 2) {
+                if (attempt == 2 || XPublishCooldown.isRateLimited(e)) {
                     throw e;
                 }
             }

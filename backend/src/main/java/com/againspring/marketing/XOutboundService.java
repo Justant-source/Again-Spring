@@ -57,7 +57,7 @@ public class XOutboundService {
 
     public void run(Instant now) {
         MarketingXOpsSettingsService.XOpsSettings settings = settingsService.get();
-        if (!settings.outboundEnabled() || !llmEnabled) {
+        if (!settings.outboundEnabled() || !llmEnabled || XPublishCooldown.active(now)) {
             return;
         }
         if (ledger.countPostedToday(XOpsAction.Kind.OUTBOUND, now) >= settings.outboundDailyCap()) {
@@ -96,7 +96,7 @@ public class XOutboundService {
      */
     public synchronized boolean runOne(Instant now, int effectiveCap) {
         MarketingXOpsSettingsService.XOpsSettings settings = settingsService.get();
-        if (!settings.outboundEnabled() || !llmEnabled) {
+        if (!settings.outboundEnabled() || !llmEnabled || XPublishCooldown.active(now)) {
             return false;
         }
         int cap = Math.min(effectiveCap, settings.outboundDailyCap());
@@ -229,7 +229,14 @@ public class XOutboundService {
                 break;
             } catch (Exception e) {
                 log.warn("[x-outbound] publish failed tweetId={}: {}", replyTo, e.getMessage());
-                remember(ledger.recordOutboundFailed(replyTo, "ASM_ERROR", now, author), draft, c);
+                boolean rateLimited = XPublishCooldown.isRateLimited(e);
+                if (rateLimited) {
+                    XPublishCooldown.trip(now);
+                    log.warn("[x-outbound] X rejected publish — pausing publishing for {} min",
+                        XPublishCooldown.PAUSE.toMinutes());
+                }
+                remember(ledger.recordOutboundFailed(replyTo,
+                    rateLimited ? "X_RATE_LIMITED" : "ASM_ERROR", now, author), draft, c);
                 // Publish path is shared with x_thread posting; hammering it with the next
                 // candidates only burns candidates. Stop this tick and let the pacer retry later.
                 break;
@@ -322,7 +329,8 @@ public class XOutboundService {
                 }
             } catch (RuntimeException e) {
                 last = e;
-                if (attempt == 2) {
+                // X가 이미 거부했다면 90초 뒤 재시도도 같은 제한에 걸린다 — 바로 올려 보내 쿨다운에 맡긴다.
+                if (attempt == 2 || XPublishCooldown.isRateLimited(e)) {
                     throw e;
                 }
             }

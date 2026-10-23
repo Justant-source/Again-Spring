@@ -57,6 +57,7 @@ class XOutboundServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
+        XPublishCooldown.reset();
         when(settingsService.get()).thenReturn(outboundOn(20));
         when(ledger.handledOrExhausted(anyString())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(0);
@@ -98,6 +99,24 @@ class XOutboundServiceTest {
         verify(ledger).recordOutboundPosted(
             eq("root-r"), eq("root-r"), eq("out-posted"), eq("너무귀여움"), eq(now), eq("mutual"));
         verify(ledger, never()).recordOutboundFailed(any(), any(), any(), any());
+    }
+
+    @Test
+    void xRejected_noRetry_recordsRateLimited_andPausesLaterTicks() {
+        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+            cand("root-r", "mutual", "글", 5, 1.0, false, null),
+            cand("root-s", "mutual", "글", 5, 1.0, false, null)));
+        when(asmClient.publishX(anyString(), anyString(), any(), any()))
+            .thenThrow(new RuntimeException("502 {\"detail\":\"X_REJECTED: Something went wrong\"}"));
+
+        service.run(now);
+
+        verify(asmClient, times(1)).publishX(any(), any(), any(), any());
+        verify(ledger).recordOutboundFailed(eq("root-r"), eq("X_RATE_LIMITED"), eq(now), eq("mutual"));
+
+        service.run(now.plusSeconds(60));
+        verify(asmClient, times(1)).publishX(any(), any(), any(), any());
+        verify(asmClient, times(1)).listXOutboundCandidates(3, 6);
     }
 
     @Test

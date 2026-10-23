@@ -54,6 +54,7 @@ class XInboundServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
+        XPublishCooldown.reset();
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         when(settingsService.get()).thenReturn(inboundOn(40, 12));
         when(dailyQuota.targetFor(any(Instant.class))).thenReturn(300);
