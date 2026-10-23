@@ -56,6 +56,7 @@ class XOutboundServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
+        ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
         when(settingsService.get()).thenReturn(outboundOn(20));
         when(ledger.alreadyHandled(anyString())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(0);
@@ -81,6 +82,22 @@ class XOutboundServiceTest {
         service.run(now);
 
         verifyNoInteractions(asmClient);
+    }
+
+    @Test
+    void publishFailsOnce_retriesAndPosts() {
+        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+            cand("root-r", "mutual", "오늘 저녁 뭐먹지", 5, 1.0, false, null)));
+        when(asmClient.publishX(anyString(), anyString(), any(), any()))
+            .thenThrow(new AsmUnavailableException("compose failed"))
+            .thenReturn(new AsmClient.XPublishResult(true, "out-posted", "https://x.com/i/out", null));
+
+        service.run(now);
+
+        verify(asmClient, times(2)).publishX(eq("너무귀여움"), eq("root-r"), isNull(), isNull());
+        verify(ledger).recordOutboundPosted(
+            eq("root-r"), eq("root-r"), eq("out-posted"), eq("너무귀여움"), eq(now), eq("mutual"));
+        verify(ledger, never()).recordOutboundFailed(any(), any(), any(), any());
     }
 
     @Test

@@ -53,6 +53,7 @@ class XInboundServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         when(settingsService.get()).thenReturn(inboundOn(40, 12));
         when(dailyQuota.targetFor(any(Instant.class))).thenReturn(300);
@@ -88,7 +89,7 @@ class XInboundServiceTest {
     @Test
     void tooNew_skipped() {
         String id = "c-new";
-        when(asmClient.listXInbox(90)).thenReturn(List.of(
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(
             inbox(id, now.minus(Duration.ofMinutes(1)))));
 
         service.run(now);
@@ -100,8 +101,8 @@ class XInboundServiceTest {
     @Test
     void tooOld_skipped() {
         String id = "c-old";
-        when(asmClient.listXInbox(90)).thenReturn(List.of(
-            inbox(id, now.minus(Duration.ofMinutes(31)))));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(
+            inbox(id, now.minus(Duration.ofMinutes(XInboundService.REPLY_WINDOW_MINUTES + 1)))));
 
         service.run(now);
 
@@ -113,7 +114,7 @@ class XInboundServiceTest {
     void inWindow_postsOnce() {
         String id = "c-ok";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(id, created)));
 
         service.run(now);
 
@@ -133,7 +134,7 @@ class XInboundServiceTest {
         when(ledger.countPostedToday(eq(XOpsAction.Kind.INBOUND), any())).thenReturn(40);
         String id = "c-cap";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(id, created)));
 
         service.run(now);
 
@@ -148,7 +149,7 @@ class XInboundServiceTest {
         String b = "c-post-b";
         Instant createdA = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(a)));
         Instant createdB = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(b)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(
             new AsmClient.XInboxItem(a, "p", "our-full", "alice", "좋은 글", createdA),
             new AsmClient.XInboxItem(b, "p", "our-open", "bob", "공감요", createdB)));
         when(ledger.countPostedTodayForOurPost(eq("our-full"), any())).thenReturn(12);
@@ -165,7 +166,7 @@ class XInboundServiceTest {
     void alreadyHandled_preventsDouble() {
         String id = "c-dup";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(id, created)));
         when(ledger.alreadyHandled(id)).thenReturn(true);
 
         service.run(now);
@@ -178,7 +179,7 @@ class XInboundServiceTest {
     void followForFollow_skippedAsSafetyWithoutPublish() {
         String id = "c-spam";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(
             new AsmClient.XInboxItem(id, "p", "our-1", "spammer", "맞팔해요!", created)));
 
         service.run(now);
@@ -192,7 +193,7 @@ class XInboundServiceTest {
     void publishFailure_recordsFailed() {
         String id = "c-fail";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(id, created)));
         when(asmClient.publishX(anyString(), anyString(), any(), any()))
             .thenThrow(new AsmUnavailableException("400 from ASM"));
 
@@ -226,11 +227,11 @@ class XInboundServiceTest {
         when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(200);
         String id = "c-shared";
         Instant created = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(id)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(id, created)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(id, created)));
 
         service.run(now);
 
-        verify(asmClient, never()).listXInbox(90);
+        verify(asmClient, never()).listXInbox(XInboundService.INBOX_SINCE_MINUTES);
         verify(asmClient, never()).publishX(any(), any(), any(), any());
     }
 
@@ -240,7 +241,7 @@ class XInboundServiceTest {
         String b = "c-b";
         Instant ca = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(a)));
         Instant cb = now.minus(Duration.ofMinutes(XInboundService.jitterMinutes(b)));
-        when(asmClient.listXInbox(90)).thenReturn(List.of(inbox(a, ca), inbox(b, cb)));
+        when(asmClient.listXInbox(XInboundService.INBOX_SINCE_MINUTES)).thenReturn(List.of(inbox(a, ca), inbox(b, cb)));
 
         service.run(now);
         service.run(now.plusSeconds(5));

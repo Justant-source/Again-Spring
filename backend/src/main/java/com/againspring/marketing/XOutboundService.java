@@ -207,8 +207,8 @@ public class XOutboundService {
             }
 
             try {
-                AsmClient.XPublishResult result = asmClient.publishX(
-                    draft.body(), replyTo, null, null);
+                AsmClient.XPublishResult result = publishWithRetry(
+                    draft.body(), replyTo);
                 if (result != null && result.ok()) {
                     remember(ledger.recordOutboundPosted(
                         replyTo,
@@ -301,6 +301,41 @@ public class XOutboundService {
         }
         if (c.ourReplyTweetId() != null && !c.ourReplyTweetId().isBlank()) {
             return c.ourReplyTweetId();
+        }
+        return null;
+    }
+
+    /** Pause before the single publish retry (X sometimes refuses the first compose). */
+    long retryPauseMillis = 25_000L;
+
+    private AsmClient.XPublishResult publishWithRetry(String body, String replyTo) {
+        RuntimeException last = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                AsmClient.XPublishResult r = asmClient.publishX(body, replyTo, null, null);
+                if (r != null && r.ok()) {
+                    return r;
+                }
+                last = null;
+                if (attempt == 2) {
+                    return r;
+                }
+            } catch (RuntimeException e) {
+                last = e;
+                if (attempt == 2) {
+                    throw e;
+                }
+            }
+            log.warn("[x-publish] attempt {} failed for {}, retrying once", attempt, replyTo);
+            try {
+                Thread.sleep(retryPauseMillis);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                if (last != null) {
+                    throw last;
+                }
+                return null;
+            }
         }
         return null;
     }

@@ -64,7 +64,7 @@ last_updated: 2026-10-08
 
 **사람 같은 게시 패턴 (2026-10-22)** — 선댓글·맞팔로우는 cron이 아니라 `XHumanPacer`(1분 폴링)가 불규칙 간격으로 실행한다.
 - **하루 목표(`XDailyQuota`)**: KST 평일 200–250, 토·일·공휴일 230–300. 날짜 시드 추첨이라 재시작해도 같은 값. 키 `marketing.x.outbound_weekday_range`·`outbound_offday_range`(`"200-250"` 형식), 공휴일 추가 `marketing.x.holidays_extra`(CSV `yyyy-MM-dd`; 내장 목록은 2026-10~2027-05만). 실제 상한 = `min(오늘 목표, outbound_daily_cap)` — `outbound_daily_cap`(≤300)은 비상 천장이다.
-- **하루 목표는 선댓글(OUTBOUND)+우리 글 대댓글(INBOUND) 합산**이다. 대댓글(`XInboundService`)은 이미 구현돼 있고 `marketing.x.inbound_enabled`(prod 기본 false)로 켠다. 대댓글은 받은 시각 기준 3–25분 지터·30분 창이라 시간 민감하므로 목표 안에서 먼저 처리하고, 선댓글이 남는 몫을 채운다. 대댓글도 1건씩(다음까지 1–7분), 알림함 스크랩은 4–9분마다, 수면 시간(KST 0–7시)엔 안 한다. `inbound_daily_cap`·`inbound_per_post_cap`은 그대로 별도 천장이고 `inbound_per_tick`은 폐지(항상 1).
+- **하루 목표는 선댓글(OUTBOUND)+우리 글 대댓글(INBOUND) 합산**이다. 대댓글(`XInboundService`)은 이미 구현돼 있고 `marketing.x.inbound_enabled`(prod 기본 false)로 켠다. 대댓글은 받은 시각 기준 3–25분 지터 뒤 **20시간 창**(2026-10-23 확대, 수면 시간·배포 공백에 댓글을 놓치지 않게)이라 목표 안에서 먼저 처리하고, 선댓글이 남는 몫을 채운다. 대댓글도 1건씩(다음까지 1–7분), 알림함 스크랩은 4–9분마다, 수면 시간(KST 0–7시)엔 안 한다. `inbound_daily_cap`·`inbound_per_post_cap`은 그대로 별도 천장이고 `inbound_per_tick`은 폐지(항상 1).
 - **간격**: 1건씩. 남은 목표를 시간대 가중치(0시~6시 0, 12시·18–22시 높음)로 나눈 평균에 로그정규 지터(0.4–2.2×)를 곱하고, 8% 확률로 15–45분 휴식. 최소 60초·최대 90분. 못 채우면 남은 시간에 더 빠르게(따라잡기).
 - **후보 풀**: Following 스크랩은 20–40분마다만(풀 소진 시 포함) 하고 한 번에 여러 건을 소비한다. `outbound_per_tick`은 어드민 수동 "지금 실행"(`POST /x-ops/outbound`)에만 쓰인다(수동 실행은 오늘 목표가 아닌 `outbound_daily_cap` 기준).
 - **맞팔로우**: 20–55분마다 1–3명(간격 12–40초). 하루 목표는 `follow_back_daily_cap`의 60–100% 날짜 시드 추첨.
@@ -139,7 +139,8 @@ flowchart TD
 
 코드: `XInboundService`. ASM `GET /api/v1/x/inbox?sinceMinutes=90`.
 
-- 수신 후 **3–25분** 지터(`tweetId` 해시)부터 **30분** 창까지. UI에 없음.
+- 수신 후 **3–25분** 지터(`tweetId` 해시)부터 **20시간** 창까지(알림함·프로필 스크랩은 24시간 범위). 예전 30분 창은 KST 0–7시 수면과 겹치면 밤 댓글이 전부 만료돼 대댓글이 거의 안 나갔다. UI에 없음.
+- 게시(선댓글·대댓글)는 실패하면 25초 뒤 **같은 내용으로 1회 재시도**한다. 재시도도 실패하면 `FAILED` 기록 후 그 틱을 끝낸다.
 - 틱당 처리 상한 = `marketing.x.inbound_per_tick`. 일일/글당 cap도 `system_setting`.
 - 스킵: URL만, 맞팔 미끼, 욕설 패턴 → `SAFETY`.
 - 작문: `composeReply` — **인라인 프롬프트 + persona**. outbound JSON 프롬프트·few-shot·`OutboundDraftGuard`를 타지 않는다.
