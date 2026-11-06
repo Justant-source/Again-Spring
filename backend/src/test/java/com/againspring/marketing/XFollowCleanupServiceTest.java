@@ -131,6 +131,20 @@ class XFollowCleanupServiceTest {
     }
 
     @Test
+    void megaAccounts_atOrAboveMax_areKept() {
+        Instant fresh = now.minus(Duration.ofHours(1));
+        candidates(acc("big", 10, 999_999, fresh), acc("mega", 10, 1_000_000, fresh),
+            acc("elon", 10, 241_000_000, fresh));
+        when(asm.getXProfileFollowers(anyList())).thenReturn(new AsmClient.XProfileFollowersResult(List.of()));
+
+        service.run(now);
+
+        ArgumentCaptor<List<String>> cap = ArgumentCaptor.forClass(List.class);
+        verify(asm, times(1)).unfollowX(cap.capture());
+        assertThat(cap.getAllValues().stream().flatMap(List::stream).toList()).containsExactly("big");
+    }
+
+    @Test
     void dryRun_noAsmUnfollowNoDbChange() {
         cfg.put(XFollowCleanupService.KEY_DRY_RUN, "true");
         candidates(acc("big", 10, 50_000, now.minus(Duration.ofHours(1))));

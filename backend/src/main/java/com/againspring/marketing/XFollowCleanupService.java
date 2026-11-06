@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 /**
  * Early-morning cleanup of big accounts we followed that never reacted: not mutual, followed
  * at least {@code unfollow_after_days} ago, no like/repost/reply from them since the follow, and
- * follower count >= {@code unfollow_min_followers}. Runs only on a complete, fresh tracker snapshot.
+ * follower count in [{@code unfollow_min_followers}, {@code unfollow_max_followers}). Runs only on a complete, fresh tracker snapshot.
  *
  * <p>Gates (system_setting): {@code unfollow_cleanup_enabled} (default false),
  * {@code unfollow_dry_run} (default true: report only, no X / DB change).
@@ -38,10 +38,13 @@ public class XFollowCleanupService {
     public static final String KEY_ENABLED = "marketing.x.unfollow_cleanup_enabled";
     public static final String KEY_DRY_RUN = "marketing.x.unfollow_dry_run";
     public static final String KEY_MIN_FOLLOWERS = "marketing.x.unfollow_min_followers";
+    public static final String KEY_MAX_FOLLOWERS = "marketing.x.unfollow_max_followers";
     public static final String KEY_AFTER_DAYS = "marketing.x.unfollow_after_days";
     public static final String KEY_DAILY_CAP = "marketing.x.unfollow_daily_cap";
 
     static final int DEFAULT_MIN_FOLLOWERS = 10_000;
+    /** Mega/official accounts (celebrities, brands) are kept: they never follow back by design. */
+    static final int DEFAULT_MAX_FOLLOWERS = 1_000_000;
     static final int DEFAULT_AFTER_DAYS = 7;
     static final int DEFAULT_DAILY_CAP = 30;
     static final String REASON = "NO_ACTION_7D";
@@ -78,6 +81,7 @@ public class XFollowCleanupService {
         }
         boolean dryRun = readBool(KEY_DRY_RUN, true);
         int minFollowers = readInt(KEY_MIN_FOLLOWERS, DEFAULT_MIN_FOLLOWERS, 100, 10_000_000);
+        int maxFollowers = readInt(KEY_MAX_FOLLOWERS, DEFAULT_MAX_FOLLOWERS, 1_000, Integer.MAX_VALUE);
         int afterDays = readInt(KEY_AFTER_DAYS, DEFAULT_AFTER_DAYS, 1, 60);
         int dailyCap = readInt(KEY_DAILY_CAP, DEFAULT_DAILY_CAP, 0, 100);
 
@@ -114,7 +118,8 @@ public class XFollowCleanupService {
         long doneToday = todayUnfollowCount(now);
         int remaining = (int) Math.max(0, dailyCap - doneToday);
         List<XFollowAccount> targets = candidates.stream()
-            .filter(a -> a.getFollowerCount() != null && a.getFollowerCount() >= minFollowers)
+            .filter(a -> a.getFollowerCount() != null && a.getFollowerCount() >= minFollowers
+                && a.getFollowerCount() < maxFollowers)
             .limit(remaining)
             .toList();
         log.info("[x-unfollow] candidates={} targets={} remainingCap={} dryRun={}",
