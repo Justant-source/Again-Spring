@@ -2,6 +2,8 @@ package com.againspring.marketing;
 
 import com.againspring.domain.marketing.XOpsAction;
 import com.againspring.notification.TelegramNotifier;
+import com.againspring.domain.marketing.XFollowAccount;
+import com.againspring.repository.marketing.XFollowAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +43,7 @@ public class XOutboundService {
     private final XOpsActionLedger ledger;
     private final XCommentTraceRecorder commentTrace;
     private final TelegramNotifier telegramNotifier;
+    private final XFollowAccountRepository followAccountRepository;
 
     private List<AsmClient.XOutboundCandidate> pool = new ArrayList<>();
     private Instant poolFetchedAt;
@@ -48,6 +51,27 @@ public class XOutboundService {
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
+
+    /** Handles unfollowed in the last 90 days — kept out of the follow candidate set. Never throws. */
+    private List<String> recentlyUnfollowed(Instant now) {
+        try {
+            List<XFollowAccount> rows = followAccountRepository.findByStatusAndUnfollowedAtGreaterThanEqual(
+                XFollowAccount.Status.UNFOLLOWED, now.minus(Duration.ofDays(90)));
+            if (rows == null) {
+                return List.of();
+            }
+            return rows.stream()
+                .sorted(Comparator.comparing(XFollowAccount::getUnfollowedAt,
+                    Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(XFollowAccount::getHandle)
+                .filter(h -> h != null && !h.isBlank())
+                .limit(300)
+                .toList();
+        } catch (Exception e) {
+            log.warn("[x-outbound] no-follow lookup failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
 
     /** Replies posted today across outbound + inbound — both draw on one daily budget. */
     public int countPostedToday(Instant now) {
@@ -68,7 +92,7 @@ public class XOutboundService {
         long fetchStarted = System.nanoTime();
         try {
             candidates = asmClient.listXOutboundCandidates(
-                settings.hotMinReplies(), settings.hotMaxAgeHours());
+                settings.hotMinReplies(), settings.hotMaxAgeHours(), recentlyUnfollowed(now));
         } catch (Exception e) {
             log.warn("[x-outbound] candidate fetch failed: {}", e.getMessage());
             return;

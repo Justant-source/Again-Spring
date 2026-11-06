@@ -490,6 +490,16 @@ public class AsmClient {
      * the default 30s ASM timeout (measured ~49s) — use the long-read client.
      */
     public List<XOutboundCandidate> listXOutboundCandidates(int minReplies, int maxAgeHours) {
+        return listXOutboundCandidates(minReplies, maxAgeHours, List.of());
+    }
+
+    /**
+     * @param noFollow handles that must not be auto-followed (recently unfollowed by the cleanup);
+     *                 sent as a comma-joined {@code noFollow} query param.
+     */
+    public List<XOutboundCandidate> listXOutboundCandidates(
+        int minReplies, int maxAgeHours, java.util.Collection<String> noFollow) {
+        String noFollowParam = noFollow == null ? "" : String.join(",", noFollow);
         try {
             XOutboundCandidatesResponse body = statsRestClient
                 .get()
@@ -497,6 +507,8 @@ public class AsmClient {
                     .path("/api/v1/x/outbound-candidates")
                     .queryParam("minReplies", minReplies)
                     .queryParam("maxAgeHours", maxAgeHours)
+                    .queryParamIfPresent("noFollow",
+                        noFollowParam.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(noFollowParam))
                     .build())
                 .retrieve()
                 .body(XOutboundCandidatesResponse.class);
@@ -558,6 +570,120 @@ public class AsmClient {
             throw e;
         } catch (Exception e) {
             throw new AsmUnavailableException("Failed to read X profile counts: " + e.getMessage(), e);
+        }
+    }
+
+    // ---- follow tracking (ASM /api/v1/x/{following-snapshot,engagers,profile-followers,unfollow}) ----
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XFollowingEntry(String handle, boolean followsYou, boolean verified, int order) {}
+
+    /** {@code complete=false} means the scroll stopped early (time budget); callers must not treat absence as unfollowed. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XFollowingSnapshot(String ownHandle, boolean complete, List<XFollowingEntry> following) {
+        public XFollowingSnapshot {
+            if (following == null) {
+                following = List.of();
+            }
+        }
+    }
+
+    /** {@code kind} = LIKE / REPOST / REPLY; {@code at} may be null (notification without timestamp). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XEngagerEvent(String handle, String kind, Instant at) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XEngagers(String ownHandle, boolean complete, List<XEngagerEvent> events) {
+        public XEngagers {
+            if (events == null) {
+                events = List.of();
+            }
+        }
+    }
+
+    /** {@code followers} is null when the profile could not be read ({@code error} says why). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XProfileFollowers(String handle, Integer followers, String error) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XProfileFollowersResult(List<XProfileFollowers> results) {
+        public XProfileFollowersResult {
+            if (results == null) {
+                results = List.of();
+            }
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XUnfollowFailure(String handle, String error) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record XUnfollowResult(List<String> unfollowed, List<XUnfollowFailure> failed) {
+        public XUnfollowResult {
+            if (unfollowed == null) {
+                unfollowed = List.of();
+            }
+            if (failed == null) {
+                failed = List.of();
+            }
+        }
+    }
+
+    /** Playwright scroll of x.com/&lt;own&gt;/following with the "follows you" badge (long-read client). */
+    public XFollowingSnapshot getXFollowingSnapshot() {
+        try {
+            XFollowingSnapshot body = statsRestClient.post().uri("/api/v1/x/following-snapshot")
+                .contentType(MediaType.APPLICATION_JSON).body(java.util.Map.of())
+                .retrieve().body(XFollowingSnapshot.class);
+            if (body == null) {
+                throw new AsmUnavailableException("empty following-snapshot response");
+            }
+            return body;
+        } catch (AsmUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to read X following snapshot: " + e.getMessage(), e);
+        }
+    }
+
+    /** Likes / reposts / replies on our posts from the notifications + mentions tabs (long-read client). */
+    public XEngagers getXEngagers() {
+        try {
+            XEngagers body = statsRestClient.post().uri("/api/v1/x/engagers")
+                .contentType(MediaType.APPLICATION_JSON).body(java.util.Map.of())
+                .retrieve().body(XEngagers.class);
+            if (body == null) {
+                throw new AsmUnavailableException("empty engagers response");
+            }
+            return body;
+        } catch (AsmUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to read X engagers: " + e.getMessage(), e);
+        }
+    }
+
+    /** Follower counts for up to 8 handles per call (profile visits). */
+    public XProfileFollowersResult getXProfileFollowers(List<String> handles) {
+        try {
+            XProfileFollowersResult body = statsRestClient.post().uri("/api/v1/x/profile-followers")
+                .contentType(MediaType.APPLICATION_JSON).body(java.util.Map.of("handles", handles))
+                .retrieve().body(XProfileFollowersResult.class);
+            return body == null ? new XProfileFollowersResult(List.of()) : body;
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to read X profile followers: " + e.getMessage(), e);
+        }
+    }
+
+    /** Unfollow up to 5 handles per call; ASM stops at the first rate-limit sign. */
+    public XUnfollowResult unfollowX(List<String> handles) {
+        try {
+            XUnfollowResult body = statsRestClient.post().uri("/api/v1/x/unfollow")
+                .contentType(MediaType.APPLICATION_JSON).body(java.util.Map.of("handles", handles))
+                .retrieve().body(XUnfollowResult.class);
+            return body == null ? new XUnfollowResult(List.of(), List.of()) : body;
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to unfollow on X: " + e.getMessage(), e);
         }
     }
 

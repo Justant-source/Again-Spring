@@ -79,6 +79,19 @@ last_updated: 2026-10-08
 
 장부는 `x_ops_action` `kind=FOLLOW`, `target_tweet_id=follow:<handle>`(한 계정 두 번 팔로우 안 함). 팔로우 확인(`-unfollow` 버튼 전환)이 안 되거나 클릭이 실패하면 그 회차는 즉시 중단한다.
 
+**팔로잉 추적 + 무반응 대형 계정 새벽 정리 (2026-11-06)** — 우리가 팔로우한 계정을 DB로 관리한다: `x_follow_account`(계정별 팔로우 시각·맞팔 여부·팔로워 수·상대의 마지막 반응) + `x_follow_event`(IN/OUT 좋아요·리포스트·답글·팔로우·언팔 교환 로그).
+- **추적** `XFollowTrackerService.sync` — 6시간마다(매 6시간 30분 KST, `XFollowTrackerScheduler`) ASM `POST /x/following-snapshot`(팔로잉 목록 + "나를 팔로우함" 표시)과 `POST /x/engagers`(알림·멘션 탭의 좋아요·리포스트·답글)로 갱신. `followed_at`은 ① 맞팔로우 장부 시각(LEDGER) ② 장부에 없으면 목록 순서(최신 팔로우 순, 장부 337건과 역전 0으로 검증)를 앵커 사이 **더 늦은 쪽 시각**으로 보간(ESTIMATED, 보수적) ③ 최신 구간은 첫 관측 시각(FIRST_SEEN). 스냅샷이 `complete=false`면 상태를 바꾸지 않는다. 키 `marketing.x.follow_tracking_enabled`(기본 true).
+- **정리** `XFollowCleanupService` — 매일 04:00 KST. 먼저 sync가 성공·완전해야 진행. 대상 = FOLLOWING + 맞팔 아님 + 팔로우 후 `unfollow_after_days`(7)일 경과 + 팔로우 이후 상대의 좋아요·리포스트·답글 없음 + 팔로워 수 ≥ `unfollow_min_followers`(1만). 팔로워 수는 프로필 방문(`POST /x/profile-followers`, 8개/회, 실행당 60개, 3일 캐시)으로 조회하며 **모르면 언팔하지 않는다**. 3개씩 `POST /x/unfollow`(ASM이 핸들 사이 20–40초 대기), 배치 사이 30–60초. 실패·rate limit 징후가 한 번이라도 나오면 전체 중단. 결과는 Telegram. 언팔한 계정은 `unfollowed_at`·`NO_ACTION_7D` 기록.
+- **재팔로우 방지** — 최근 90일 내 언팔한 계정(최대 300)을 선댓글 후보 호출에 `noFollow`로 넘겨 social-poster 자동팔로우가 제외한다.
+
+| 키 | 기본 | 비고 |
+|---|---|---|
+| `marketing.x.unfollow_cleanup_enabled` | **false** | 켜기 (DB 직접 편집) |
+| `marketing.x.unfollow_dry_run` | **true** | true면 후보만 로그·Telegram 보고, X·DB 변경 없음. 첫 가동은 dry-run으로 후보 확인 후 false |
+| `marketing.x.unfollow_min_followers` | 10000 | 100–10,000,000, 이상 |
+| `marketing.x.unfollow_after_days` | 7 | 1–60 |
+| `marketing.x.unfollow_daily_cap` | 30 | 0–100 (KST 하루) |
+
 **일일 리포트 (매일 23:00 KST, 2026-10-23)** — `XDailyReportService`가 Telegram으로 오늘의 선댓글·대댓글 합계, 게시 실패 수, 맞팔로우 수, 팔로워/팔로잉 수와 전회 대비 증감을 보낸다. 증감 기준은 전날 리포트가 `system_setting`(`marketing.x.report.last_counts` = `yyyy-MM-dd|followers|following`)에 남긴 스냅샷이다. 팔로워 수는 ASM `GET /api/v1/x/profile-counts`(social-poster `x-profile-counts.js`가 `x.com/<own>`의 팔로워·팔로잉 링크 숫자를 읽음)로 얻고, 조회에 실패해도 건수 리포트는 나간다.
 
 **선댓글 처리량 상한** — 후보는 Following 타임라인에서 회당 최대 24건을 긁고(스크롤 6회), 계정당 하루 `outbound_per_account_daily_cap`건이다. 목표를 300으로 잡아도 **후보가 되는 팔로잉 계정 수가 실제 병목**이다.

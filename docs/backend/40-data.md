@@ -5,7 +5,7 @@ last_updated: 2026-09-01
 
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V130.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V131.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -555,6 +555,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V117** | `marketing_job.scheduled_publish_at` **NOT NULL** 승격(2026-08-15) — 슬롯 조회 실패 시 폴백 로직으로 항상 값을 채우도록 코드가 먼저 바뀐 뒤 승격. 잔여 NULL 행은 `created_at`으로 백필 |
 | **V119** | `marketing_generation_trace` — 영상 변형 단계에서 LLM 호출·시봄이 선택 이력 저장(프롬프트·응답·가드 로그 포함). **사연 본문은 30일 후 NULL이지만 trace에 영구 보관** |
 | **V130** | `visit_events.visitor_class`·`class_reason` 추가 + 과거 행 멱등 백필(`visitor_class IS NULL`만). UA 규칙은 `VisitorClassifier`와 동일한 SQL 사본, SUSPECT_SCANNER_PROXY는 자기조인. 백필 구간은 `VisitorClassBackfillIT`가 그대로 실행 |
+| **V131** | `x_follow_account`(팔로우한 계정별 팔로우 시각·출처·맞팔·팔로워 수·상대의 마지막 반응·언팔 기록, handle unique) + `x_follow_event`(IN/OUT 교환 로그, unique `(handle,direction,kind,occurred_at)`). 7일 무반응 대형 계정 새벽 정리용 — 정책: `justant-bot-x-ops.md` |
 | **V129** | `marketing_job.hook_rule` VARCHAR(16) NULL — 훅 프롬프트 규칙 버전 태그(NULL=v1). 테스트 탭 배지·필터, `scripts/marketing_ab_report.py` 코호트 분리용 |
 
 ### `marketing_generation_trace` (**V119**)
@@ -621,6 +622,20 @@ ritual / inbound / outbound / original 작문·게시 결과. 어드민 REST 없
 | `created_at` | TIMESTAMP | 일일 cap·글당 cap 집계 |
 
 인덱스: `idx_xoa_kind_created(kind, created_at)` (일일 cap), `idx_xoa_target(target_tweet_id)` (중복 스킵), `idx_xoa_our_post_created(our_post_tweet_id, created_at)` (글당 inbound), `idx_xoa_ref_post(ref_post_id)` (**V126**, 기스쿱 제외), `idx_xoa_author_created(target_author_handle, created_at)` (**V128**, 계정별 분포·계정당 일일 상한).
+
+### `x_follow_account` / `x_follow_event` (팔로잉 추적) **V131**
+
+| 컬럼 | 설명 |
+|---|---|
+| `x_follow_account.handle` | lower, no @ — unique |
+| `status` | FOLLOWING / UNFOLLOWED |
+| `followed_at` · `followed_at_source` | 팔로우 시각 · LEDGER / ESTIMATED / FIRST_SEEN |
+| `first_seen_at` · `last_seen_following_at` | 스냅샷 최초 관측 / 마지막 관측 |
+| `follows_us` · `follows_us_since` · `verified` | 맞팔 여부 · 파란 딱지 |
+| `follower_count` · `follower_count_checked_at` | 프로필 조회값(3일 캐시) |
+| `last_inbound_interaction_at` | 상대가 우리에게 한 마지막 좋아요·리포스트·답글 |
+| `unfollowed_at` · `unfollow_reason` | 언팔 기록(`NO_ACTION_7D`) |
+| `x_follow_event` | `handle`·`direction`(IN/OUT)·`kind`(FOLLOW/UNFOLLOW/FOLLOW_BACK/LIKE/REPOST/REPLY)·`tweet_id`·`occurred_at` |
 
 ### `x_target_account` (선댓글 대상 계정 집계) **V128**
 

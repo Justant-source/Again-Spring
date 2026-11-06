@@ -47,6 +47,8 @@ class XOutboundServiceTest {
     private XCommentTraceRecorder commentTrace;
     @Mock
     private TelegramNotifier telegramNotifier;
+    @Mock
+    private com.againspring.repository.marketing.XFollowAccountRepository followAccountRepository;
 
     @InjectMocks
     private XOutboundService service;
@@ -87,7 +89,7 @@ class XOutboundServiceTest {
 
     @Test
     void publishFailsOnce_retriesAndPosts() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-r", "mutual", "오늘 저녁 뭐먹지", 5, 1.0, false, null)));
         when(asmClient.publishX(anyString(), anyString(), any(), any()))
             .thenThrow(new AsmUnavailableException("compose failed"))
@@ -103,7 +105,7 @@ class XOutboundServiceTest {
 
     @Test
     void xRejected_noRetry_recordsRateLimited_andPausesLaterTicks() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-r", "mutual", "글", 5, 1.0, false, null),
             cand("root-s", "mutual", "글", 5, 1.0, false, null)));
         when(asmClient.publishX(anyString(), anyString(), any(), any()))
@@ -116,12 +118,12 @@ class XOutboundServiceTest {
 
         service.run(now.plusSeconds(60));
         verify(asmClient, times(1)).publishX(any(), any(), any(), any());
-        verify(asmClient, times(1)).listXOutboundCandidates(3, 6);
+        verify(asmClient, times(1)).listXOutboundCandidates(eq(3), eq(6), any());
     }
 
     @Test
     void firstReply_usesRootTweetId() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "mutual", "오늘 저녁 뭐먹지", 5, 1.0, false, null)));
 
         service.run(now);
@@ -138,7 +140,7 @@ class XOutboundServiceTest {
 
     @Test
     void secondReply_usesOurReplyTweetId() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "mutual", "오늘 저녁 뭐먹지", 5, 1.0, true, "our-reply-9")));
 
         service.run(now);
@@ -150,7 +152,7 @@ class XOutboundServiceTest {
 
     @Test
     void alreadyRepliedWithoutOurReplyId_skips() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "mutual", "글", 5, 1.0, true, null)));
 
         service.run(now);
@@ -166,13 +168,13 @@ class XOutboundServiceTest {
 
         service.run(now);
 
-        verify(asmClient, never()).listXOutboundCandidates(anyInt(), anyInt());
+        verify(asmClient, never()).listXOutboundCandidates(anyInt(), anyInt(), any());
         verify(asmClient, never()).publishX(any(), any(), any(), any());
     }
 
     @Test
     void alreadyHandled_preventsDouble() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "mutual", "글", 5, 1.0, false, null)));
         when(ledger.handledOrExhausted("root-1")).thenReturn(true);
 
@@ -183,7 +185,7 @@ class XOutboundServiceTest {
 
     @Test
     void noVoice_doesNotPublish_andDoesNotConsumeCap() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "mutual", "글", 5, 1.0, false, null)));
         when(composer.composeOutbound(any(), any(), any())).thenReturn(XCommentComposer.Draft.skipped("NO_VOICE"));
 
@@ -203,7 +205,7 @@ class XOutboundServiceTest {
         when(settingsService.get()).thenReturn(new MarketingXOpsSettingsService.XOpsSettings(
             "07:30", "22:00", 2, 20, 40, 12, 0, 24,
             false, false, true, true, "04:30"));
-        when(asmClient.listXOutboundCandidates(0, 24)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(0), eq(24), any())).thenReturn(List.of(
             cand("root-new", "followed", "오늘 저녁 뭐먹지", 0, 0.5, false, null)));
 
         service.run(now);
@@ -214,7 +216,7 @@ class XOutboundServiceTest {
     @Test
     void maxPublishesPerTick_fromSettings() {
         when(settingsService.get()).thenReturn(outboundOn(20, 2));
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "a", "글1", 5, 1.0, false, null),
             cand("root-2", "b", "글2", 8, 2.0, false, null),
             cand("root-3", "c", "글3", 9, 1.5, false, null)));
@@ -229,7 +231,7 @@ class XOutboundServiceTest {
 
     @Test
     void videoSkip_continuesToNextAndPublishesOnce() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             video("vid-1", "a", "영상글", 5, 1.0),
             cand("root-2", "b", "글2", 8, 2.0, false, null)));
 
@@ -245,7 +247,7 @@ class XOutboundServiceTest {
 
     @Test
     void photoWithoutBytes_visionFail_continuesToNext() {
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             photoNoJpeg("pic-1", "a", "사진글", 5, 1.0),
             cand("root-2", "b", "글2", 8, 2.0, false, null)));
 
@@ -262,7 +264,7 @@ class XOutboundServiceTest {
         when(settingsService.get()).thenReturn(outboundOn(20, 1));
         when(ledger.postedByAuthorSince(any(), any())).thenReturn(java.util.Map.of(
             "hot", new XOpsActionLedger.AuthorPosted(2, now.minusSeconds(60))));
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "Hot", "글1", 5, 1.0, false, null),
             cand("root-2", "cold", "글2", 8, 2.0, false, null)));
 
@@ -275,7 +277,7 @@ class XOutboundServiceTest {
     @Test
     void sameAuthorTwiceInOneTick_onlyFirstPublishes() {
         when(settingsService.get()).thenReturn(outboundOn(20, 3));
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "@Same", "글1", 5, 1.0, false, null),
             cand("root-2", "same", "글2", 8, 2.0, false, null),
             cand("root-3", "other", "글3", 9, 1.5, false, null)));
@@ -292,7 +294,7 @@ class XOutboundServiceTest {
         when(settingsService.get()).thenReturn(outboundOn(20, 1));
         when(ledger.postedByAuthorSince(any(), any())).thenReturn(java.util.Map.of(
             "busy", new XOpsActionLedger.AuthorPosted(5, now.minusSeconds(3600))));
-        when(asmClient.listXOutboundCandidates(3, 6)).thenReturn(List.of(
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
             cand("root-1", "busy", "글1", 5, 1.0, false, null),
             cand("root-2", "fresh", "글2", 8, 2.0, false, null)));
 
