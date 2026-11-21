@@ -9,9 +9,16 @@ from functools import lru_cache
 from pathlib import Path
 
 ENV_PATH = "LLM_ERROR_SIGNATURES_PATH"
+def _repo_candidate() -> Path:
+    # 컨테이너(/app/app/services/…)에는 parents[4]가 없다 — 임포트 자체가 IndexError로 죽지 않게 한다.
+    parents = Path(__file__).resolve().parents
+    root = parents[4] if len(parents) > 4 else parents[-1]
+    return root / "docs" / "shared" / "policies" / "llm-error-signatures.json"
+
+
 _CANDIDATES = (
     Path("/app/shared/docs/policies/llm-error-signatures.json"),
-    Path(__file__).resolve().parents[4] / "docs" / "shared" / "policies" / "llm-error-signatures.json",
+    _repo_candidate(),
 )
 
 
