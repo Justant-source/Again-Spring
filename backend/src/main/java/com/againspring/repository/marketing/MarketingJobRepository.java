@@ -57,6 +57,9 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * PUBLISHING, STALE. Delayed remote rendering stays active until ASM gives a real terminal result.
      *
      * {@code recencyCutoff}: Jobs whose {@code updated_at} is older than this instant are excluded.
+     * SLA_BREACHED / WAITING_EXTERNAL 잡은 폴링이 updated_at을 계속 갱신해 위 조건만으로는 좀비가 영영 빠지지 않으므로
+     * (2026-11-21 prod: WaggleBot에 접수되지 못한 잡 4개가 2시간 넘게 같은 사연의 새 잡을 막았다),
+     * 이 두 상태는 created_at 기준으로도 cutoff를 넘기면 제외한다.
      * This prevents zombie jobs (e.g., SLA_BREACHED for 90+ minutes) from permanently blocking
      * new job creation for the same post+platform. Intended callers pass
      * {@code Instant.now().minus(marketingConfig.activeJobRecencyMinutes, ChronoUnit.MINUTES)}.
@@ -72,6 +75,7 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         AND status IN ('REQUESTED', 'QUEUED', 'RUNNING', 'SLA_BREACHED', 'WAITING_EXTERNAL', 'PUBLISHING', 'STALE')
         AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
         AND updated_at > :recencyCutoff
+        AND (status NOT IN ('SLA_BREACHED', 'WAITING_EXTERNAL') OR created_at > :recencyCutoff)
         """)
     long countActivePlatformJobs(
         @Param("postId") String postId,
