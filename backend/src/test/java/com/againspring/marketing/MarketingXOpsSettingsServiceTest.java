@@ -181,4 +181,15 @@ class MarketingXOpsSettingsServiceTest {
             false, false, false, true, "04:30", true, false, 1, 1, 3, 11), "admin"))
             .isInstanceOf(ResponseStatusException.class);
     }
+
+    @Test
+    void originalPostTimes_defaultsAndParsing() {
+        when(systemSettingRepository.findById(any())).thenReturn(Optional.empty());
+        assertThat(service.originalPostTimes())
+            .containsExactly(java.time.LocalTime.of(12, 30), java.time.LocalTime.of(19, 30));
+
+        assertThat(MarketingXOpsSettingsService.parseTimesCsv("21:00, bad,08:15,21:00"))
+            .containsExactly(java.time.LocalTime.of(8, 15), java.time.LocalTime.of(21, 0));
+        assertThat(MarketingXOpsSettingsService.parseTimesCsv("zzz")).isEmpty();
+    }
 }

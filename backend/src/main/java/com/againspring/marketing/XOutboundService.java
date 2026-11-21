@@ -1,6 +1,8 @@
 package com.againspring.marketing;
 
+import com.againspring.domain.ai.SystemSetting;
 import com.againspring.domain.marketing.XOpsAction;
+import com.againspring.repository.ai.SystemSettingRepository;
 import com.againspring.notification.TelegramNotifier;
 import com.againspring.domain.marketing.XFollowAccount;
 import com.againspring.repository.marketing.XFollowAccountRepository;
@@ -36,6 +38,9 @@ public class XOutboundService {
 
     private static final Duration RECENT_WINDOW = Duration.ofDays(7);
 
+    /** DB-only switch (no admin UI): skip non-Korean candidate posts before the LLM. Fallback true. */
+    public static final String KEY_KOREAN_ONLY = "marketing.x.outbound_korean_only";
+
     private final MarketingXOpsSettingsService settingsService;
     private final AsmClient asmClient;
     private final XCommentComposer composer;
@@ -44,6 +49,7 @@ public class XOutboundService {
     private final XCommentTraceRecorder commentTrace;
     private final TelegramNotifier telegramNotifier;
     private final XFollowAccountRepository followAccountRepository;
+    private final SystemSettingRepository systemSettingRepository;
 
     private List<AsmClient.XOutboundCandidate> pool = new ArrayList<>();
     private Instant poolFetchedAt;
@@ -51,6 +57,19 @@ public class XOutboundService {
 
     @Value("${llm.enabled:true}")
     private boolean llmEnabled;
+
+    private boolean koreanOnly() {
+        try {
+            return systemSettingRepository.findById(KEY_KOREAN_ONLY)
+                .map(SystemSetting::getSettingValue)
+                .map(v -> v == null || v.isBlank()
+                    || "true".equalsIgnoreCase(v.trim()) || "1".equals(v.trim()))
+                .orElse(true);
+        } catch (Exception e) {
+            log.warn("[x-outbound] {} read failed, using true: {}", KEY_KOREAN_ONLY, e.getMessage());
+            return true;
+        }
+    }
 
     /** Handles unfollowed in the last 90 days — kept out of the follow candidate set. Never throws. */
     private List<String> recentlyUnfollowed(Instant now) {
@@ -168,6 +187,8 @@ public class XOutboundService {
         Map<String, XOpsActionLedger.AuthorPosted> today = ledger.postedByAuthorSince(
             handlesOf(candidates), XOpsActionLedger.startOfKstDay(now));
         Set<String> pickedThisTick = new HashSet<>();
+        boolean koreanOnly = koreanOnly();
+        int notKoreanSkipped = 0;
 
         perTick = Math.max(1, perTick);
         int postedThisTick = 0;
@@ -203,6 +224,13 @@ public class XOutboundService {
                     accountCapSkipped++;
                     continue;
                 }
+            }
+
+            // LLM 호출 전 차단. SKIPPED는 게시 수(postedThisTick)에 세지 않아 회차 처리량이 줄지 않는다.
+            if (koreanOnly && !OutboundDraftGuard.isKoreanPost(c.text())) {
+                ledger.recordOutboundSkipped(replyTo, "NOT_KOREAN", now, author);
+                notKoreanSkipped++;
+                continue;
             }
 
             if (c.hasVideo()) {
@@ -266,8 +294,8 @@ public class XOutboundService {
                 break;
             }
         }
-        log.info("[x-outbound] posted={} accountCapSkipped={} accountCap={}",
-            postedThisTick, accountCapSkipped, accountCap);
+        log.info("[x-outbound] posted={} accountCapSkipped={} accountCap={} notKoreanSkipped={}",
+            postedThisTick, accountCapSkipped, accountCap, notKoreanSkipped);
         return postedThisTick;
     }
 

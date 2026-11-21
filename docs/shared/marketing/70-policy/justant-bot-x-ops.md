@@ -61,6 +61,7 @@ last_updated: 2026-10-08
 | 페르소나 학습 | **true** · 04:30 KST | `marketing.x.persona_learning_enabled` · `persona_learn_at` |
 | 페르소나 채점 | **true** (게시 아님) | `marketing.x.persona_eval_enabled` |
 | 원글 자동 작성 | **false** · 한도 1 (0–5) | `marketing.x.original_post_enabled` · `original_post_daily_cap` |
+| 원글 게시 시각 | `12:30,19:30` KST (CSV `HH:mm`, **어드민 UI 없이 DB 직접 편집**) | `marketing.x.original_post_times` |
 
 **사람 같은 게시 패턴 (2026-10-22)** — 선댓글·맞팔로우는 cron이 아니라 `XHumanPacer`(1분 폴링)가 불규칙 간격으로 실행한다.
 - **하루 목표(`XDailyQuota`)**: KST 평일 200–250, 토·일·공휴일 230–300. 날짜 시드 추첨이라 재시작해도 같은 값. 키 `marketing.x.outbound_weekday_range`·`outbound_offday_range`(`"200-250"` 형식), 공휴일 추가 `marketing.x.holidays_extra`(CSV `yyyy-MM-dd`; 내장 목록은 2026-10~2027-05만). 실제 상한 = `min(오늘 목표, outbound_daily_cap)` — `outbound_daily_cap`(≤300)은 비상 천장이다.
@@ -142,6 +143,7 @@ flowchart TD
 - 선댓글 게시가 한 번 실패(`PUBLISH_FAILED`/`ASM_ERROR`)하면 그 틱은 즉시 중단한다(같은 틱에서 후보를 연달아 태우던 문제 수정). 실패 원인 후보는 x_thread 영상 게시와 social-poster 브라우저를 공유하는 시간대에 몰렸다.
 - 작문 프롬프트는 일상·가벼운 글은 스킵하지 않고 한 줄을 쓰게 하고, 슬픈 소식·정치·광고·내용 불명만 `UNSURE`로 거른다.
 - 그 글에 우리 댓글이 없으면 **원글(root)** 에 달고, 있으면 `ourReplyTweetId` 아래로 스레드.
+- **한국어 글만 (2026-11-21)** — LLM 호출 **전에** 후보 본문이 한국어가 아니면 `NOT_KOREAN`으로 SKIPPED 기록하고 다음 후보로 넘어간다(게시 수에 세지 않아 회차 처리량 유지; 이미 기록된 후보는 `handledOrExhausted`로 다시 안 잡힌다). 판정 `OutboundDraftGuard.isKoreanPost`: URL·멘션 제거 후 글자(letter) 중 한글 음절 **5자 이상** 그리고 한글 비율 **30% 이상**. 본문이 비었거나 사진만 있는 글은 한국어가 아님. 스위치 `marketing.x.outbound_korean_only`(폴백 **true**, `false`/`0`이 아니면 켜짐, 어드민 UI 없이 `system_setting` 직접 편집). 배경: 10월 22일 인증 팔로워 맞팔 이후 외국어 계정이 Following에 몰려 11월 선댓글 45%가 비한국어였다. `LANG_MISMATCH`(작문 결과와 글의 언어 불일치)는 별개로 그대로 동작한다. 대댓글(`XInboundService`)에는 적용하지 않는다.
 - `hasVideo` (네이티브 영상) → `VIDEO` 스킵 후 다음. GIF 배지는 영상이 아님.
 - `hasPhoto`인데 `photoJpegBase64` 없음 → `VISION_FAIL`. AS는 x.com CDN을 직접 받지 않음(ASM Playwright JPEG, 첫 장·긴 변 ~768).
 - 작문: `composeOutbound` — 프롬프트 + persona JSON + TIMELINE few-shot + DELETED_AUTO avoid + 선택 JPEG(`LlmImage`) + `peerReplies` 최대 10.
@@ -196,7 +198,10 @@ flowchart TD
 - 슬롯 **12:30 · 19:30 KST** (리추얼 07:30/22:00과 격리).
 - 한도: `countPostedToday(ORIGINAL) < min(original_post_daily_cap, storyScoopsPerDay)`. `story_scoops_per_day`를 여기서 소비한다.
 - 소재 = **광장 공개 인기 사연만**. 개인 경험 날조 금지(일상 원글은 리추얼이 커버). `x_thread` 기발행(`marketing_job`) 제외 ∧ 기스쿱(`ref_post_id`) 제외. 표현 denylist는 없다(§3.1 원칙과 동일).
-- 작문: `composeOriginal(storySummary, link)` — persona `post_style` + `fewShotPostBlock()`(`TIMELINE_POST`) + donts + 원글 전용 길이 가드(140자/3줄). 프롬프트 `x-original-post.md`: 공감 한 줄 + UTM 링크(어조는 공감이지 판결이 아니다 — 필터로 차단하지 않는다).
+- 시각: `marketing.x.original_post_times`(CSV, 폴백 `12:30,19:30`, KST). 슬롯 id = `HHmm`, 센티넬 `original:<HHmm>:<날짜>`. 한 슬롯에서 LLM 작문은 **최대 3개 후보**까지만 시도하고 모두 실패하면 `NO_MATERIAL`로 끝난다(`MAX_COMPOSE_ATTEMPTS`).
+- 작문: `composeOriginal(storySummary, kind)` — persona `post_style` + `fewShotPostBlock()`(`TIMELINE_POST`) + donts. **본문에 링크를 넣지 않는다**(링크 글은 노출이 깎인다). 본문 = 사연을 모르는 사람도 이해되는 "상황 한 줄 + 운영자 한마디", 유형은 슬롯·날짜 패리티로 **의견형(OPINION)/질문형(QUESTION)** 교대. 판결 금지(어조 지침일 뿐 필터로 차단하지 않는다). 길이 가드는 `XCommentComposer.originalTooLong` **한 곳**(URL 제외 140자 · 3줄). 모델이 URL을 붙여도 제거한다. 투표(poll)는 없다.
+- 링크: 원글 게시 성공 후 `AsmClient.publishX(text, replyTo=원글 tweetId)`로 UTM 링크(`story_scoop`)를 **자기 답글 1개**로 단다. 답글이 실패해도 원글은 `POSTED`로 남는다(원장에 별도 행 없음, 경고 로그만).
+- 과거 버그(2026-11-21): 프롬프트가 "공감+링크"를 출력시켰고 UTM 링크 자체가 161자라 가드(URL 포함 140자)가 거의 항상 `TOO_LONG`으로 떨어졌다.
 - 게시: `AsmClient.publishX` → `ledger.recordPosted(Kind.ORIGINAL, …, refPostId)` → Telegram 알림(알림 전용).
 - `ALL_KINDS`에 ORIGINAL 포함 → gold 오염 차단, 지운 원글은 avoid 학습.
 

@@ -194,11 +194,14 @@ public class XCommentComposer {
         return invokeDraft(prompt);
     }
 
+    /** Original-post shape: opinion (situation + short take) or question (situation + reply bait). */
+    public enum OriginalKind { OPINION, QUESTION }
+
     /**
-     * Original post from a plaza story scoop. Length guard is 140 chars / 3 lines
-     * (not the 40-char outbound comment guard).
+     * Original post from a plaza story scoop. The body carries no link (a link self-reply is posted
+     * separately). Length guard is 140 chars (URLs excluded) / 3 lines, see {@link #originalTooLong}.
      */
-    public Draft composeOriginal(String storySummary, String link) {
+    public Draft composeOriginal(String storySummary, OriginalKind kind) {
         if (!llmEnabled) {
             return Draft.skipped("DEV_LLM_OFF");
         }
@@ -217,7 +220,9 @@ public class XCommentComposer {
         }
         String safeProfile = promptSanitizer.sanitize(readProfile());
         String safeStory = promptSanitizer.sanitize(storySummary);
-        String safeLink = promptSanitizer.sanitize(link);
+        String safeKind = kind == OriginalKind.QUESTION
+            ? "질문형 — 상황 한 줄 + 답글을 부르는 질문 한 줄"
+            : "의견형 — 상황 한 줄 + 짧은 감상 한 줄";
         String safeDonts = promptSanitizer.sanitize(donts);
         String safeShots = promptSanitizer.sanitize(fewShotPostBlock());
         String prompt = instructions + """
@@ -232,10 +237,8 @@ public class XCommentComposer {
             %s
             </user_input>
 
-            링크:
-            <user_input>
+            이번 유형:
             %s
-            </user_input>
 
             하지 말 것:
             <user_input>
@@ -246,7 +249,7 @@ public class XCommentComposer {
             <user_input>
             %s
             </user_input>
-            """.formatted(safeProfile, safeStory, safeLink, safeDonts, safeShots);
+            """.formatted(safeProfile, safeStory, safeKind, safeDonts, safeShots);
         try {
             String raw = llmProvider.invoke(prompt, model);
             return toOriginalDraft(raw);
@@ -512,18 +515,29 @@ public class XCommentComposer {
         if (draft.skip()) {
             return draft;
         }
+        // The body never carries a link; if the model adds one anyway, drop it (link goes in a self-reply).
+        String stripped = stripUrls(draft.body());
+        if (stripped.isBlank()) {
+            return Draft.skipped("UNSURE");
+        }
+        draft = Draft.of(stripped);
         if (originalTooLong(draft.body())) {
             return Draft.skipped("TOO_LONG");
         }
         return draft;
     }
 
+    static String stripUrls(String body) {
+        return body == null ? "" : body.replaceAll("https?://\\S+", "").replaceAll("[ \\t]+\\n", "\n").strip();
+    }
+
+    /** Single source of truth for original-post length: URLs are excluded from the 140-char count. */
     static boolean originalTooLong(String body) {
         if (body == null) {
             return true;
         }
         String t = body.trim();
-        if (t.length() > ORIGINAL_MAX_CHARS) {
+        if (stripUrls(t).length() > ORIGINAL_MAX_CHARS) {
             return true;
         }
         int lines = 1;

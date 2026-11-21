@@ -166,6 +166,39 @@ public class OutboundDraftGuard {
         return null;
     }
 
+    /** Minimum Hangul syllables for a post to count as Korean. */
+    public static final int KOREAN_MIN_SYLLABLES = 5;
+    /** Minimum Hangul share of the post's letters (URLs, mentions, digits, emoji, whitespace excluded). */
+    public static final double KOREAN_MIN_RATIO = 0.3;
+
+    private static final Pattern URL_OR_MENTION = Pattern.compile("https?://\\S+|www\\.\\S+|@\\w+");
+
+    /**
+     * Is the candidate post written in Korean? At least {@value #KOREAN_MIN_SYLLABLES} Hangul
+     * syllables and Hangul &gt;= {@value #KOREAN_MIN_RATIO} of all letters. Blank / photo-only
+     * (no text) posts are not Korean.
+     */
+    public static boolean isKoreanPost(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String s = URL_OR_MENTION.matcher(text).replaceAll(" ");
+        int letters = 0;
+        int syllables = 0;
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            i += Character.charCount(cp);
+            if (!Character.isLetter(cp)) {
+                continue;
+            }
+            letters++;
+            if (cp >= 0xAC00 && cp <= 0xD7A3) {
+                syllables++;
+            }
+        }
+        return syllables >= KOREAN_MIN_SYLLABLES && syllables >= letters * KOREAN_MIN_RATIO;
+    }
+
     enum Script { LATIN, HANGUL, MIXED }
 
     static Script scriptOf(String s) {

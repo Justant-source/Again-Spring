@@ -39,6 +39,9 @@ public class MarketingXOpsSettingsService {
     public static final String KEY_PERSONA_EVAL_ENABLED = "marketing.x.persona_eval_enabled";
     public static final String KEY_ORIGINAL_POST_ENABLED = "marketing.x.original_post_enabled";
     public static final String KEY_ORIGINAL_POST_DAILY_CAP = "marketing.x.original_post_daily_cap";
+    /** CSV "HH:mm" (KST). DB-only key: not part of {@link XOpsSettings}, no admin UI. */
+    public static final String KEY_ORIGINAL_POST_TIMES = "marketing.x.original_post_times";
+    public static final String DEFAULT_ORIGINAL_POST_TIMES = "12:30,19:30";
     public static final String KEY_OUTBOUND_PER_TICK = "marketing.x.outbound_per_tick";
     public static final String KEY_OUTBOUND_PER_ACCOUNT_DAILY_CAP = "marketing.x.outbound_per_account_daily_cap";
     public static final String KEY_INBOUND_PER_TICK = "marketing.x.inbound_per_tick";
@@ -190,6 +193,38 @@ public class MarketingXOpsSettingsService {
             readInt(KEY_INBOUND_PER_TICK, DEFAULT_INBOUND_PER_TICK, 1, 10),
             readInt(KEY_OUTBOUND_PER_ACCOUNT_DAILY_CAP, DEFAULT_OUTBOUND_PER_ACCOUNT_DAILY_CAP, 1, 10)
         );
+    }
+
+    /**
+     * Original-post slots (KST), sorted and de-duplicated. Invalid tokens are dropped;
+     * an empty/invalid value falls back to {@link #DEFAULT_ORIGINAL_POST_TIMES}.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<LocalTime> originalPostTimes() {
+        java.util.List<LocalTime> parsed = parseTimesCsv(systemSettingRepository
+            .findById(KEY_ORIGINAL_POST_TIMES)
+            .map(SystemSetting::getSettingValue)
+            .orElse(null));
+        return parsed.isEmpty() ? parseTimesCsv(DEFAULT_ORIGINAL_POST_TIMES) : parsed;
+    }
+
+    static java.util.List<LocalTime> parseTimesCsv(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return java.util.List.of();
+        }
+        java.util.TreeSet<LocalTime> out = new java.util.TreeSet<>();
+        for (String tok : csv.split(",")) {
+            String t = tok.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            try {
+                out.add(LocalTime.parse(normalizeHhMm(t), HH_MM));
+            } catch (RuntimeException e) {
+                // drop invalid token
+            }
+        }
+        return java.util.List.copyOf(out);
     }
 
     @Transactional

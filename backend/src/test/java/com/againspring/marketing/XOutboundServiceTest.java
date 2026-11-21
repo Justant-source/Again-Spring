@@ -50,6 +50,9 @@ class XOutboundServiceTest {
     @Mock
     private com.againspring.repository.marketing.XFollowAccountRepository followAccountRepository;
 
+    @Mock
+    private com.againspring.repository.ai.SystemSettingRepository systemSettingRepository;
+
     @InjectMocks
     private XOutboundService service;
 
@@ -60,6 +63,8 @@ class XOutboundServiceTest {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         ReflectionTestUtils.setField(service, "retryPauseMillis", 0L);
         XPublishCooldown.reset();
+        // 기존 테스트는 짧은 더미 본문("글")을 쓰므로 한국어 전용 스위치는 끄고 시작한다.
+        koreanOnly("false");
         when(settingsService.get()).thenReturn(outboundOn(20));
         when(ledger.handledOrExhausted(anyString())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.OUTBOUND), any())).thenReturn(0);
@@ -67,6 +72,52 @@ class XOutboundServiceTest {
         when(outboundDraftGuard.firstViolation(any(), any(), any())).thenReturn(Optional.empty());
         when(asmClient.publishX(anyString(), anyString(), any(), any()))
             .thenReturn(new AsmClient.XPublishResult(true, "out-posted", "https://x.com/i/out", null));
+    }
+
+    private void koreanOnly(String value) {
+        when(systemSettingRepository.findById(XOutboundService.KEY_KOREAN_ONLY)).thenReturn(Optional.of(
+            com.againspring.domain.ai.SystemSetting.builder()
+                .settingKey(XOutboundService.KEY_KOREAN_ONLY).settingValue(value).build()));
+    }
+
+    @Test
+    void koreanOnly_skipsForeignPostBeforeLlm_andDoesNotUseUpTheTickBudget() {
+        when(systemSettingRepository.findById(XOutboundService.KEY_KOREAN_ONLY)).thenReturn(Optional.empty());
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
+            cand("en-1", "foreign", "Good morning everyone, have a great day", 5, 1.0, false, null),
+            cand("ko-1", "korean", "오늘 저녁 뭐먹지 고민이다", 5, 1.0, false, null)));
+
+        service.run(now);
+
+        verify(ledger).recordOutboundSkipped(eq("en-1"), eq("NOT_KOREAN"), eq(now), eq("foreign"));
+        verify(composer, times(1)).composeOutbound(any(), any(), any());
+        verify(composer, never()).composeOutbound(eq("Good morning everyone, have a great day"), any(), any());
+        verify(asmClient).publishX(anyString(), eq("ko-1"), any(), any());
+        verify(asmClient, never()).publishX(anyString(), eq("en-1"), any(), any());
+    }
+
+    @Test
+    void koreanOnly_emptyOrPhotoOnlyTextIsSkipped() {
+        when(systemSettingRepository.findById(XOutboundService.KEY_KOREAN_ONLY)).thenReturn(Optional.empty());
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
+            cand("e-1", "blank", "", 5, 1.0, false, null)));
+
+        service.run(now);
+
+        verify(ledger).recordOutboundSkipped(eq("e-1"), eq("NOT_KOREAN"), eq(now), eq("blank"));
+        verifyNoInteractions(composer);
+    }
+
+    @Test
+    void koreanOnly_switchOff_letsForeignPostThrough() {
+        koreanOnly("false");
+        when(asmClient.listXOutboundCandidates(eq(3), eq(6), any())).thenReturn(List.of(
+            cand("en-1", "foreign", "Good morning everyone, have a great day", 5, 1.0, false, null)));
+
+        service.run(now);
+
+        verify(asmClient).publishX(anyString(), eq("en-1"), any(), any());
+        verify(ledger, never()).recordOutboundSkipped(any(), eq("NOT_KOREAN"), any(), any());
     }
 
     @Test

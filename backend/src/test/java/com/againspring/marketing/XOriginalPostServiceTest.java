@@ -60,12 +60,14 @@ class XOriginalPostServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "llmEnabled", true);
         when(settingsService.get()).thenReturn(originalOn(2, 1));
+        when(settingsService.originalPostTimes())
+            .thenReturn(List.of(java.time.LocalTime.of(12, 30), java.time.LocalTime.of(19, 30)));
         when(ledger.alreadyHandled(anyString())).thenReturn(false);
         when(ledger.alreadyScooped(anyLong())).thenReturn(false);
         when(ledger.countPostedToday(eq(XOpsAction.Kind.ORIGINAL), any())).thenReturn(0);
         when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(composer.composeOriginal(any(), any())).thenReturn(XCommentComposer.Draft.of("그 마음 알겠음"));
+        when(composer.composeOriginal(any(), any(XCommentComposer.OriginalKind.class))).thenReturn(XCommentComposer.Draft.of("그 마음 알겠음"));
         when(asmClient.publishX(anyString(), any(), any(), any()))
             .thenReturn(new AsmClient.XPublishResult(true, "orig-1", "https://x.com/i/orig", null));
         when(postRepository.findPublicRankedForMarketing(anyInt(), anyInt()))
@@ -131,7 +133,7 @@ class XOriginalPostServiceTest {
 
         service.runIfDue(noon);
 
-        verify(composer).composeOriginal(any(), any());
+        verify(composer).composeOriginal(any(), any(XCommentComposer.OriginalKind.class));
         ArgumentCaptor<Long> ref = ArgumentCaptor.forClass(Long.class);
         verify(ledger).recordPosted(
             eq(XOpsAction.Kind.ORIGINAL),
@@ -144,6 +146,66 @@ class XOriginalPostServiceTest {
             ref.capture());
         assertThat(ref.getValue()).isEqualTo(1002L);
         verify(asmClient).publishX(anyString(), isNull(), isNull(), isNull());
+    }
+
+    @Test
+    void postedBody_hasNoLink_andLinkGoesInSelfReply() {
+        service.runIfDue(noon);
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(asmClient).publishX(body.capture(), isNull(), isNull(), isNull());
+        assertThat(body.getValue()).doesNotContain("http");
+        ArgumentCaptor<String> reply = ArgumentCaptor.forClass(String.class);
+        verify(asmClient).publishX(reply.capture(), eq("orig-1"), isNull(), isNull());
+        assertThat(reply.getValue()).contains("utm_campaign=story_scoop");
+    }
+
+    @Test
+    void linkReplyFailure_doesNotAffectPostedOriginal() {
+        when(asmClient.publishX(anyString(), eq("orig-1"), any(), any()))
+            .thenThrow(new RuntimeException("boom"));
+
+        service.runIfDue(noon);
+
+        verify(ledger).recordPosted(any(), any(), any(), any(), eq("orig-1"), any(), any(), any());
+        verify(ledger, never()).recordFailed(any(), any(), any(), any());
+    }
+
+    @Test
+    void composeAttempts_cappedAtThree_thenNoMaterial() {
+        when(postRepository.findPublicRankedForMarketing(anyInt(), anyInt()))
+            .thenReturn(List.of(story("1"), story("2"), story("3"), story("4"), story("5")));
+        when(composer.composeOriginal(any(), any(XCommentComposer.OriginalKind.class)))
+            .thenReturn(XCommentComposer.Draft.skipped("NO_VOICE"));
+
+        service.runIfDue(noon);
+
+        verify(composer, org.mockito.Mockito.times(3))
+            .composeOriginal(any(), any(XCommentComposer.OriginalKind.class));
+        verify(asmClient, never()).publishX(any(), any(), any(), any());
+        verify(ledger).recordSkipped(
+            eq(XOpsAction.Kind.ORIGINAL), eq("original:1230:2026-09-01"), eq("NO_MATERIAL"), eq(noon));
+    }
+
+    @Test
+    void customTimes_triggerAtConfiguredSlot_only() {
+        when(settingsService.originalPostTimes()).thenReturn(List.of(java.time.LocalTime.of(9, 5)));
+
+        service.runIfDue(noon);
+        verifyNoInteractions(asmClient);
+
+        service.runIfDue(Instant.parse("2026-09-01T00:05:00Z")); // 09:05 KST
+        verify(ledger).recordPosted(any(), eq("original:0905:2026-09-01"), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void kindAlternatesAcrossSlotsAndDays() {
+        var times = List.of(java.time.LocalTime.of(12, 30), java.time.LocalTime.of(19, 30));
+        var a = XOriginalPostService.kindFor(noon, times, "1230");
+        var b = XOriginalPostService.kindFor(noon, times, "1930");
+        var c = XOriginalPostService.kindFor(noon.plus(java.time.Duration.ofDays(1)), times, "1230");
+        assertThat(a).isNotEqualTo(b);
+        assertThat(a).isNotEqualTo(c);
     }
 
     @Test
@@ -160,7 +222,7 @@ class XOriginalPostServiceTest {
             eq(noon),
             eq(1001L));
         verify(telegramNotifier).send(anyString());
-        verify(composer).composeOriginal(anyString(), anyString());
+        verify(composer).composeOriginal(anyString(), any(XCommentComposer.OriginalKind.class));
     }
 
     @Test

@@ -274,7 +274,7 @@ class XCommentComposerTest {
     void composeOriginal_llmDisabled_skipsDevLlmOffWithoutInvoking() throws Exception {
         ReflectionTestUtils.setField(composer, "llmEnabled", false);
 
-        XCommentComposer.Draft draft = composer.composeOriginal("사연 요약", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("사연 요약", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isTrue();
         assertThat(draft.skipReason()).isEqualTo("DEV_LLM_OFF");
@@ -286,7 +286,7 @@ class XCommentComposerTest {
         when(promptLoader.get("marketing/x-original-post.md"))
             .thenThrow(new java.nio.file.NoSuchFileException("marketing/x-original-post.md"));
 
-        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isTrue();
         assertThat(draft.skipReason()).isEqualTo("UNSURE");
@@ -298,7 +298,7 @@ class XCommentComposerTest {
         stubOriginalPrompts();
         when(llmProvider.invoke(anyString(), anyString())).thenReturn("Credit balance is too low");
 
-        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isTrue();
         assertThat(draft.skipReason()).isEqualTo("LLM_ERROR");
@@ -311,7 +311,7 @@ class XCommentComposerTest {
         when(llmProvider.invoke(anyString(), anyString()))
             .thenReturn("가".repeat(141));
 
-        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isTrue();
         assertThat(draft.skipReason()).isEqualTo("TOO_LONG");
@@ -323,7 +323,7 @@ class XCommentComposerTest {
         when(llmProvider.invoke(anyString(), anyString()))
             .thenReturn("한줄\n두줄\n세줄\n네줄");
 
-        XCommentComposer.Draft draft = composer.composeOriginal("사연", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("사연", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isTrue();
         assertThat(draft.skipReason()).isEqualTo("TOO_LONG");
@@ -339,9 +339,9 @@ class XCommentComposerTest {
                 .operatorBody("오늘 광장 글 하나 올렸다")
                 .build()));
         when(llmProvider.invoke(anyString(), anyString()))
-            .thenReturn("이런 마음 이해됨 https://againspring.net/p/1");
+            .thenReturn("이런 마음 이해됨");
 
-        XCommentComposer.Draft draft = composer.composeOriginal("퇴근 갈등", "https://againspring.net/p/1");
+        XCommentComposer.Draft draft = composer.composeOriginal("퇴근 갈등", XCommentComposer.OriginalKind.OPINION);
 
         assertThat(draft.skip()).isFalse();
         assertThat(draft.body()).contains("이런 마음 이해됨");
@@ -355,6 +355,41 @@ class XCommentComposerTest {
         assertThat(prompt).contains("퇴근 갈등");
         assertThat(prompt).contains("오늘 광장 글 하나 올렸다");
         assertThat(prompt).contains("- no spam");
+    }
+
+    @Test
+    void composeOriginal_shortTextPlusUtmLink_isNotTooLong_andLinkIsStripped() throws Exception {
+        // Regression: UTM link alone is 161 chars; the old guard counted it and skipped nearly everything.
+        stubOriginalPrompts();
+        String link = MarketingUtmUrls.buildUrl("post_c51dda6a0c3d40338484", "x", "story_scoop");
+        assertThat(link.length()).isGreaterThan(140);
+        when(llmProvider.invoke(anyString(), anyString()))
+            .thenReturn("이런 마음 이해됨\n" + link);
+
+        XCommentComposer.Draft draft =
+            composer.composeOriginal("퇴근 갈등", XCommentComposer.OriginalKind.OPINION);
+
+        assertThat(draft.skip()).isFalse();
+        assertThat(draft.body()).isEqualTo("이런 마음 이해됨");
+    }
+
+    @Test
+    void originalTooLong_excludesUrls() {
+        assertThat(XCommentComposer.originalTooLong("가".repeat(140) + "\nhttps://x.example/" + "a".repeat(200)))
+            .isFalse();
+        assertThat(XCommentComposer.originalTooLong("가".repeat(141))).isTrue();
+    }
+
+    @Test
+    void composeOriginal_kindIsInjectedIntoPrompt_withoutLink() throws Exception {
+        stubOriginalPrompts();
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn("상황 한 줄\n여러분이라면?");
+
+        composer.composeOriginal("사연", XCommentComposer.OriginalKind.QUESTION);
+
+        ArgumentCaptor<String> pc = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(pc.capture(), anyString());
+        assertThat(pc.getValue()).contains("질문형").doesNotContain("링크:");
     }
 
     private void stubComment(String raw) throws Exception {
