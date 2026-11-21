@@ -38,6 +38,12 @@ public class ThreadPlanRequest {
     private String styleReference;
     /** 크롤 원문 본문 글자 수. 있으면 본문 목표 길이를 원문에 맞춘다. null이면 길이 지시 없음. */
     private Integer sourceLength;
+    /**
+     * 크롤 원문 댓글(최대 12개). 댓글 문체·길이·온도 참고 전용 — 내용 복사 금지. null/빈 목록이면 기존 동작.
+     */
+    private List<String> commentStyleReference;
+    /** 크롤 원문 제목(게시판 접두어 "썸·연애: " 포함 가능). 제목 길이·말투 참고 전용. null/blank면 기존 동작. */
+    private String sourceTitle;
     /** Style-only few-shot anchors (not the reconstruct primary). */
     private String dynamicExamples;
     /** Recent post bodies for anti-self-copy (list of short strings). */

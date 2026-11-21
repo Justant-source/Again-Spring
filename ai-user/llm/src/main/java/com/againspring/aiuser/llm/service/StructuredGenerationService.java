@@ -57,10 +57,12 @@ public class StructuredGenerationService {
     static final String RECONSTRUCT_RULE = """
             RECONSTRUCT_RULE=
             - SKELETON은 뼈대다. 등장인물·직장·동네·금액·기간·순서의 세부는 AUTHOR/PARTNER의 personaCard 삶에 맞게 전부 새로 정한다.
+            - SKELETON에서 "몇백만 원대"처럼 뭉갠 금액·기간·나이·횟수는 표절 방지용이다. 글에서는 구체적인 숫자로 새로 정해 써라(예: "몇백만 원대" → "320만원", "몇 달" → "4개월"). 실제 사람 글처럼 금액·기간·횟수를 구체적으로 적는다.
             - 반드시 "누가 무엇을 했다" 형태의 구체 사건 1개를 중심에 둔다. 감정 나열만 하는 글은 실격.
             - 작성자 시점(A)이면 author_claim을 자기 편에서 유리하게 말한다. 스스로 잘잘못을 저울질하거나 "나도 잘못은 있다"고 정리하지 않는다.
               gray_zone은 작성자가 대수롭지 않게 흘리는 사실 한 줄로만 넣는다(본인은 그게 문제인 줄 모른다) — 독자가 찾아내 댓글로 다투게 한다.
-              "내가 예민한 건가" 류의 자문으로 글을 열거나 닫는 걸 기본값으로 삼지 않는다.
+              "내가 예민한 건가" 류의 자문으로 글을 열거나 닫는 걸 기본값으로 삼지 않는다. 독자에게 묻는 질문형 맺음은 STYLE_REFERENCE 원문이 그렇게 끝날 때만 쓴다.
+            - 한 글 안에서는 종결 어미 체계를 하나로 통일한다(음슴체면 끝까지 음슴체, 요체면 끝까지 요체). 인용한 대사는 예외.
             - SKELETON.tone이 있으면(고민 상담/분노 토로/웃긴 썰/단순 질문 등) 그 글의 성격과 원문 화자의 태도를 지킨다. 웃긴 글을 반성문으로 바꾸지 마라.
             - 상대방 시점(B) 글이면 counterpart_claim으로 같은 사건을 다시 말한다(B도 자기 편에서 유리하게).
             - 뼈대 문장을 그대로 옮기지 마라. 카드의 말버릇·시그니처 표현은 평소 습관일 뿐이니 자연스러울 때만 쓴다.
@@ -68,6 +70,37 @@ public class StructuredGenerationService {
               직장 경력 ≤ (나이−22)년, 결혼 년차·자녀 나이는 카드에 적힌 값을 따른다.
               23세가 "6년째 만나는 남친"을 말하는 식의 조합을 쓰지 마라.""";
     static final int STYLE_REFERENCE_MAX_CHARS = 1500;
+    static final int COMMENT_STYLE_REFERENCE_MAX = 12;
+    static final int COMMENT_STYLE_REFERENCE_ITEM_MAX_CHARS = 160;
+    /** 작성자/상대방 계정이 한 응답에서 쓸 수 있는 대댓글 상한. */
+    static final int MAX_AUTHOR_REPLIES = 2;
+    static final int MAX_PARTNER_REPLIES = 1;
+    private static final Pattern BOARD_PREFIX = Pattern.compile("^[^:]{1,12}:\\s");
+
+    /** 제목 규칙(solo·paired 공통). {{TITLE_RULE}} 자리표시자로 프롬프트에 치환된다. */
+    static final String TITLE_RULE = "title is a short Korean plaza headline, like a real community post title: roughly 8~30 characters including spaces (hard max 40). "
+            + "It throws out ONE thing (one moment, one grievance, or one question) — do NOT summarize the whole plot or pack cause, result and feeling into the title. "
+            + "Typed by the author in the same voice and speech level as the body (banmal body → banmal title; do not default to a polite '~습니다/~인가요/~걸까요' question), not an SNS clickbait rewrite. "
+            + "If TITLE_STYLE_REFERENCE is present, match only its length and manner of speaking — never copy its words.";
+
+    /**
+     * 댓글 공통 규칙(형태·분포 지시 — 특정 표현 금지 목록이 아니다). {{COMMENT_RULES}} 자리표시자로 치환된다.
+     * 실제 커뮤니티 댓글 분포: 절반은 30자 이하, 대부분 60자 이하.
+     */
+    static final String COMMENT_RULES = """
+            COMMENT_RULES (hard):
+            - LENGTH follows real community comments, which are tiny: about half of the comments in this response are 30 characters or fewer, most are 60 or fewer, and AT MOST 1~2 comments in the whole response may pass 100 characters. Replies (parentRef not null) are even shorter. Default shape = ONE line with no line break inside a comment.
+            - KINDS must be mixed. Not every comment weighs both sides or ends with advice. Include comments that take only one side, comments that merely react (a laugh, a gasp, a short sympathy), comments that only ask a question, and now and then an off-topic aside or a joke about the situation.
+            - No metaphors or jokes built on the commenter's own job or trade.
+            - A comment that opens by introducing the commenter (e.g. marriage years, student status) appears in AT MOST 1 comment per response.
+            - No two comments in this response start with the same first word. A persona's speech habit (입버릇) is never placed at the very start of a comment.
+            - Call the poster the way that community does (see COMMENT_STYLE_REFERENCE when present: 쓰니, 글쓴이, 님 …), and refer to the other person naturally (그 사람, 남친, 상사 …). Do not write the product labels 작성자/상대방 inside comment bodies.
+            - Each commenter reacts to what actually happened in THIS story; numbers, jobs and habits from a persona card are not a reason to mention them.""";
+
+    /** 댓글 스타일 참고 규칙 — COMMENT_STYLE_REFERENCE가 있을 때만 붙는다. */
+    static final String COMMENT_STYLE_REFERENCE_RULE = "COMMENT_STYLE_REFERENCE_RULE (hard): COMMENT_STYLE_REFERENCE holds real comments from the source community, given for STYLE ONLY — "
+            + "length, temperature, how they address the poster, how blunt or lazy they are, punctuation, ㅋㅋ/ㅠㅠ habits. "
+            + "Never copy a sentence or phrase from it; the CONTENT of every comment must be about THIS story. Match its length distribution rather than writing longer than it.";
 
     /** 솔로 PLAN 경로에는 voice/post.md 가이드가 주입되지 않으므로 핵심 문체 규칙을 본문에 직접 둔다(토큰 최소화). */
     static final String AUTHOR_VOICE_RULE = """
@@ -191,33 +224,6 @@ public class StructuredGenerationService {
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
         int max = safe(req.getMaxTopLevel(), 14, 1, 20) + safe(req.getMaxReplies(), 10, 0, 20);
         if (comments.size() > max) throw new StructuredGenerationException("comment candidate limit exceeded");
-        Set<String> personaIds = new HashSet<>();
-        for (var p : req.getPersonas()) personaIds.add(p.getPersonaId());
-        Set<String> storyPersonas = storySidePersonaIds(req.getAuthor(), null);
-        Set<String> refs = new HashSet<>(); Set<String> topLevel = new HashSet<>();
-        Set<String> droppedRefs = new HashSet<>();
-        List<ThreadPlanResponse.Item> items = new ArrayList<>();
-        for (JsonNode n : comments) {
-            String ref = text(n, "ref"); String parent = nullableText(n, "parentRef");
-            String persona = text(n, "personaId"); String body = text(n, "body");
-            validRef(ref); validText(body, "comment.body", 2, 1000);
-            if (!refs.add(ref)) throw new StructuredGenerationException("duplicate comment ref");
-            if (!personaIds.contains(persona)) throw new StructuredGenerationException("unknown personaId: " + persona);
-            if (storyPersonas.contains(persona)) {
-                droppedRefs.add(ref);
-                continue;
-            }
-            if (parent == null) topLevel.add(ref);
-            else if (!topLevel.contains(parent)) {
-                if (droppedRefs.contains(parent)) {
-                    droppedRefs.add(ref);
-                    continue;
-                }
-                throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
-            }
-            items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
-                    .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
-        }
         int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
         // null → legacy floors (6 top / 12 items); explicit values (incl. 1) honored for quality-droppable plans
         int minTop = req.getMinTopLevel() != null
@@ -226,8 +232,8 @@ public class StructuredGenerationService {
         int minItems = req.getMinItems() != null
                 ? Math.max(1, Math.min(req.getMinItems(), max))
                 : Math.min(12, max);
-        if (topLevel.size() < minTop || items.size() < minItems)
-            throw new StructuredGenerationException("thread plan does not meet minimum candidate count");
+        List<ThreadPlanResponse.Item> items = parseCommentItems(comments, req.getPersonas(), max, minTop, minItems,
+                storySidePersonaIds(req.getAuthor()), Set.of());
         return ThreadPlanResponse.builder().provider(provider.name()).model(model).correlationId(correlationId)
                 .post(post).items(items).elapsedMs(System.currentTimeMillis() - started).build();
     }
@@ -353,10 +359,11 @@ public class StructuredGenerationService {
         return """
                 아래 %s만 다시 써라. JSON·스키마·페르소나 목록·원본 생성 프롬프트를 출력하지 마라.
                 의미·사실·전체 분량은 유지하고 아래 문제만 고쳐라:
-                %s
+                %s%s
                 [원문]
                 %s
-                """.formatted(kind, fixes, draft == null ? "" : draft);
+                """.formatted(kind, fixes, "post".equalsIgnoreCase(contentType) ? ""
+                        : "- 댓글이므로 분량을 늘리지 말고 줄바꿈 없는 짧은 한 줄로 유지하라\n", draft == null ? "" : draft);
     }
 
     /**
@@ -373,6 +380,8 @@ public class StructuredGenerationService {
         Map<String, String> axes = parseStyleAxesFromCard(persona.getPersonaCard());
         if (axes.isEmpty()) return body;
         List<String> violations = axisViolations(body, axes);
+        // 댓글은 실제 분포(대부분 한 줄·30자 안팎)를 따른다 — 줄바꿈 축으로 되돌리지 않는다.
+        if ("comment".equalsIgnoreCase(contentType)) violations.removeIf(v -> v.startsWith("linebreak_"));
         if (violations.isEmpty()) return body;
 
         log.info("[AXIS_COMPLIANCE] violations={} corr={} persona={}", violations, correlationId, persona.getPersonaId());
@@ -427,7 +436,7 @@ public class StructuredGenerationService {
     private static ThreadPlanResponse.Item replaceCommentBodyIfValid(ThreadPlanResponse.Item item, String refined) {
         if (refined == null || refined.equals(item.getBody())) return item;
         try {
-            validText(refined, "comment.body", 2, 1000);
+            validText(refined, "comment.body", 1, 1000);
             return ThreadPlanResponse.Item.builder()
                     .ref(item.getRef()).parentRef(item.getParentRef()).personaId(item.getPersonaId())
                     .body(refined).stance(item.getStance()).priority(item.getPriority()).build();
@@ -550,7 +559,7 @@ public class StructuredGenerationService {
                 : minTop;
         List<ThreadPlanResponse.Item> items = parseCommentItems(
                 root.path("comments"), req.getPersonas(), max, minTop, minItems,
-                storySidePersonaIds(req.getAuthor(), null));
+                storySidePersonaIds(req.getAuthor()), Set.of());
         return PairedPhase1Response.builder()
                 .provider(provider.name()).model(model).correlationId(correlationId)
                 .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE1)
@@ -590,7 +599,7 @@ public class StructuredGenerationService {
                 : Math.min(6, max);
         List<ThreadPlanResponse.Item> items = parseCommentItems(
                 root.path("comments"), req.getPersonas(), max, minTop, minItems,
-                storySidePersonaIdsForPhase2(req));
+                authorPersonaIdsForPhase2(req), partnerPersonaIdsForPhase2(req));
         return PairedPhase2Response.builder()
                 .provider(provider.name()).model(model).correlationId(correlationId)
                 .workload(StructuredOutputSchema.WORKLOAD_PAIRED_PHASE2)
@@ -599,31 +608,45 @@ public class StructuredGenerationService {
 
     private List<ThreadPlanResponse.Item> parseCommentItems(JsonNode comments, List<ThreadPlanRequest.Persona> personas,
                                                             int max, int minTop, int minItems) {
-        return parseCommentItems(comments, personas, max, minTop, minItems, Set.of());
+        return parseCommentItems(comments, personas, max, minTop, minItems, Set.of(), Set.of());
     }
 
+    /**
+     * 댓글 후보 파싱. 작성자/상대방 personaId는 대댓글(parentRef != null)에만 허용한다:
+     * 최상위 댓글이면 그 항목(과 딸린 대댓글)을 버리고, 작성자 대댓글은 {@link #MAX_AUTHOR_REPLIES}개·
+     * 상대방 대댓글은 {@link #MAX_PARTNER_REPLIES}개를 넘는 항목을 버린다(응답 전체를 실패시키지 않는다).
+     */
     private List<ThreadPlanResponse.Item> parseCommentItems(JsonNode comments, List<ThreadPlanRequest.Persona> personas,
                                                             int max, int minTop, int minItems,
-                                                            Set<String> excludedStoryPersonas) {
+                                                            Set<String> authorIds, Set<String> partnerIds) {
         if (!comments.isArray()) throw new StructuredGenerationException("comments must be an array");
         if (comments.size() > max) throw new StructuredGenerationException("comment candidate limit exceeded");
         Set<String> personaIds = new HashSet<>();
         for (var p : personas) personaIds.add(p.getPersonaId());
-        Set<String> excluded = excludedStoryPersonas == null ? Set.of() : excludedStoryPersonas;
+        Set<String> authors = authorIds == null ? Set.of() : authorIds;
+        Set<String> partners = partnerIds == null ? Set.of() : partnerIds;
         Set<String> refs = new HashSet<>();
         Set<String> topLevel = new HashSet<>();
         Set<String> droppedRefs = new HashSet<>();
         List<ThreadPlanResponse.Item> items = new ArrayList<>();
+        int authorReplies = 0;
+        int partnerReplies = 0;
         for (JsonNode n : comments) {
             String ref = text(n, "ref");
             String parent = nullableText(n, "parentRef");
             String persona = text(n, "personaId");
             String body = text(n, "body");
             validRef(ref);
-            validText(body, "comment.body", 2, 1000);
+            validText(body, "comment.body", 1, 1000);
             if (!refs.add(ref)) throw new StructuredGenerationException("duplicate comment ref");
-            if (!personaIds.contains(persona)) throw new StructuredGenerationException("unknown personaId: " + persona);
-            if (excluded.contains(persona)) {
+            boolean isAuthor = authors.contains(persona);
+            boolean isPartner = !isAuthor && partners.contains(persona);
+            // 작성자/상대방은 PERSONAS(구경꾼 cast)에 없어도 된다 — 오케스트레이터는 AUTHOR/partner로 따로 보낸다.
+            if (!isAuthor && !isPartner && !personaIds.contains(persona)) {
+                throw new StructuredGenerationException("unknown personaId: " + persona);
+            }
+            if ((isAuthor || isPartner) && parent == null) {
+                // 작성자/상대방은 최상위 댓글 금지 — 항목과 그 대댓글을 버린다.
                 droppedRefs.add(ref);
                 continue;
             }
@@ -635,6 +658,14 @@ public class StructuredGenerationService {
                 }
                 throw new StructuredGenerationException("reply parent must be an earlier top-level ref");
             }
+            if (isAuthor && ++authorReplies > MAX_AUTHOR_REPLIES) {
+                droppedRefs.add(ref);
+                continue;
+            }
+            if (isPartner && ++partnerReplies > MAX_PARTNER_REPLIES) {
+                droppedRefs.add(ref);
+                continue;
+            }
             items.add(ThreadPlanResponse.Item.builder().ref(ref).parentRef(parent).personaId(persona).body(body)
                     .stance(nullableText(n, "stance")).priority(n.path("priority").asInt(0)).build());
         }
@@ -644,22 +675,26 @@ public class StructuredGenerationService {
         return items;
     }
 
-    /** Author / partner ids that must never own bystander comments. */
-    static Set<String> storySidePersonaIds(Map<String, Object> author, Map<String, Object> partner) {
+    /** 작성자 personaId 집합 — 최상위 댓글 금지, 대댓글만 허용(최대 {@link #MAX_AUTHOR_REPLIES}). */
+    static Set<String> storySidePersonaIds(Map<String, Object> author) {
         Set<String> out = new LinkedHashSet<>();
         addPersonaId(out, author);
-        addPersonaId(out, partner);
         return out;
     }
 
-    static Set<String> storySidePersonaIdsForPhase2(PairedPhase2Request req) {
+    /** 양면 phase2의 작성자 personaId(= 게시된 작성자 글의 계정). */
+    static Set<String> authorPersonaIdsForPhase2(PairedPhase2Request req) {
         Set<String> out = new LinkedHashSet<>();
-        if (req != null) {
-            if (req.getAuthorPost() != null && !blank(req.getAuthorPost().getPersonaId())) {
-                out.add(req.getAuthorPost().getPersonaId().trim());
-            }
-            addPersonaId(out, req.getPartner());
+        if (req != null && req.getAuthorPost() != null && !blank(req.getAuthorPost().getPersonaId())) {
+            out.add(req.getAuthorPost().getPersonaId().trim());
         }
+        return out;
+    }
+
+    /** 양면 phase2의 상대방 personaId — 대댓글만 허용(최대 {@link #MAX_PARTNER_REPLIES}). */
+    static Set<String> partnerPersonaIdsForPhase2(PairedPhase2Request req) {
+        Set<String> out = new LinkedHashSet<>();
+        if (req != null) addPersonaId(out, req.getPartner());
         return out;
     }
 
@@ -769,6 +804,9 @@ public class StructuredGenerationService {
             }
         }
         grounding.append(styleReferenceBlock(req.getStyleReference(), req.getSourceLength()));
+        grounding.append(titleStyleReferenceBlock(req.getSourceTitle()));
+        grounding.append(commentStyleReferenceBlock(req.getCommentStyleReference()));
+        grounding.append(verdictLeanBlock(req.getSourceContext()));
         if (!blank(req.getDynamicExamples())) {
             grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
         }
@@ -778,14 +816,15 @@ public class StructuredGenerationService {
         }
         int maxTop = safe(req.getMaxTopLevel(), 4, 1, 6);
         int maxReplies = safe(req.getMaxReplies(), 2, 0, 6);
-        return """
+        return expandRules("""
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE1 (logical Call1).
                 Schema: {"post":{"title":"...","body":"...","promo_title":"...\\n...","hook_emotion":"tension","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 This is a 양면 사연: write the 작성자(A) post now. The 상대방(B) has NOT written yet — phase1 comments must NOT assume a partner reply exists, quote a partner body, or say both sides already posted.
-                Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방. Product framing = plaza empathy votes (공감).
-                STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId to any comment or reply. Phase1 comments are community bystanders only.
+                Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use personal data, internal notes, or claims of being an AI. Product framing = plaza empathy votes (공감).
+                STORY_PERSONA_RULE (hard): AUTHOR.personaId must NEVER write a top-level comment (parentRef null). The author MAY appear only as a REPLY (parentRef not null) to a commenter, at most 2 author replies in the whole response — 0 is fine, do not force it. An author reply is short, in the same voice and speech level as the author's own post body: clarifying a fact, adding a detail, pushing back, or answering like a poster who comes back to the thread. The 상대방 has not written yet and must not appear. Every other comment is a community bystander.
+                {{COMMENT_RULES}}
                 When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed.
-                AI_POST title/body rules (hard): title is a short Korean plaza headline of 12~40 characters including spaces (max 40), typed by the author in the same voice and speech level as the body (banmal body → banmal title; do not default to a polite '~습니다/~인가요/~걸까요' question) — it names what happened, like a real community post title, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
+                AI_POST title/body rules (hard): {{TITLE_RULE}} body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
                 AI_POST body format rules (hard): break lines the way this person usually types (follow STYLE_REFERENCE habits when present). Several sentences may share one line, and sentence lengths must be uneven — do NOT write one sentence per line, do NOT make every line the same length. Avoid one solid block: use at least 2 lines/paragraphs (2~4 chunky paragraphs is fine). A single line/paragraph must not exceed about 300 characters (a capture card cannot be cut inside a block). Always set capture_split_after_lines to null — the server computes it.
@@ -798,7 +837,7 @@ public class StructuredGenerationService {
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 overusedMetaphorsHint(req.getOverusedMetaphorIds()) +
                 "\nPERSONAS=" + json(personaCardList(req.getPersonas())) +
-                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
+                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies)));
     }
 
     private String pairedPhase2Prompt(PairedPhase2Request req) {
@@ -832,16 +871,20 @@ public class StructuredGenerationService {
                 grounding.append("\n").append(RECONSTRUCT_RULE);
             }
         }
-        return """
+        grounding.append(commentStyleReferenceBlock(req.getCommentStyleReference()));
+        grounding.append(verdictLeanBlock(req.getSourceContext()));
+        return expandRules("""
                 Return ONLY a JSON object, with no Markdown or explanation. Workload=PAIRED_PHASE2 (logical Call2).
                 Schema: {"partner_post":{"body":"...","capture_split_after_lines":null}|null,"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 """ + partnerBlock + "\n" + """
                 Phase2 comments are the bulk reactions after both 작성자 and 상대방 bodies are visible.
+                Comment bodies refer to the two sides the way commenters naturally would, not with the labels 작성자/상대방 (see COMMENT_RULES).
                 Ground comments on AUTHOR_POST + partner body (when being written or already known via partner voice) + PUBLISHED_TOP_LEVEL_COMMENTS.
                 If PUBLISHED_TOP_LEVEL_COMMENTS is empty, use author (+ partner) bodies only — do not invent prior comments.
                 Do not use published comment ids as parentRef; replies may only parent earlier top-level refs from this response.
-                Use only supplied personaIds. No personal data, internal notes, or AI identity claims. Use 작성자/상대방.
-                STORY_PERSONA_RULE (hard): never assign the 작성자 or 상대방 personaId to any comment or reply. Those accounts already wrote the story sides; comments are other community members only.
+                Use only supplied personaIds. No personal data, internal notes, or AI identity claims.
+                STORY_PERSONA_RULE (hard): the 작성자 and 상대방 personaIds must NEVER write a top-level comment (parentRef null). They MAY appear only as REPLIES (parentRef not null) to a commenter: the 작성자 at most 2 replies and the 상대방 at most 1 reply in the whole response — 0 is fine, do not force it. A 작성자 reply is short and in the voice/speech level of the 작성자 body; a 상대방 reply is short and in the voice of the 상대방 body (clarify, add a detail, push back). All other comments are other community members only.
+                {{COMMENT_RULES}}
                 Partner body format rules: break lines the way this person usually types; several sentences may share a line and sentence lengths must be uneven (no one-sentence-per-line pattern); avoid one solid block (at least 2 lines/paragraphs). Keep each line/paragraph under about 300 characters. Always set capture_split_after_lines to null — the server computes it. The partner also writes in favor of themselves (no weighing own fault) and summarizes rather than staging scenes.
                 When SKELETON is present, partner_post must restate the SAME incident as AUTHOR_POST from the 상대방 side via SKELETON's counterpart_claim — never invent a different conflict.
                 """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase2", req.getPromptOverrides())) +
@@ -855,7 +898,7 @@ public class StructuredGenerationService {
                 "\nPUBLISHED_TOP_LEVEL_COMMENTS=" + json(publishedRows) +
                 "\nINCLUDE_PARTNER_POST=" + wantPartner +
                 "\nPERSONAS=" + json(personaCardList(req.getPersonas())) +
-                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies));
+                "\nLIMITS=" + json(Map.of("topLevel", maxTop, "replies", maxReplies)));
     }
 
     private String planPrompt(ThreadPlanRequest req) {
@@ -879,7 +922,10 @@ public class StructuredGenerationService {
         if (req.getKind() == ThreadPlanRequest.Kind.AI_POST) {
             grounding.append("\n").append(AUTHOR_VOICE_RULE);
             grounding.append(styleReferenceBlock(req.getStyleReference(), req.getSourceLength()));
+            grounding.append(titleStyleReferenceBlock(req.getSourceTitle()));
         }
+        grounding.append(commentStyleReferenceBlock(req.getCommentStyleReference()));
+        grounding.append(verdictLeanBlock(req.getSourceContext()));
         if (!blank(req.getDynamicExamples())) {
             grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
         }
@@ -887,13 +933,14 @@ public class StructuredGenerationService {
             grounding.append("\nRECENT_OUTPUTS=").append(json(req.getRecentOutputs()));
             grounding.append("\nANTI_COPY_RULE=Do not reuse the same incident type, punchline, or closing advice pattern as RECENT_OUTPUTS.");
         }
-        return """
+        return expandRules("""
                 Return ONLY a JSON object, with no Markdown or explanation. Create Korean community conversation candidates.
                 The JSON schema is {"post":{"title":"...","body":"...","promo_title":"...\\n...","hook_emotion":"tension","capture_split_after_lines":null,"metaphor_ids":["empty-chair","tangled-thread","cracked-window"]},"comments":[{"ref":"c1","parentRef":null,"personaId":"...","body":"...","stance":"...","priority":1}]}.
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use personal data, internal notes, or claims of being an AI. Product framing = plaza empathy votes (공감).
-                STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId (or the AI_POST author) to any comment or reply. Comments are bystanders only — the story author must not appear as a community commenter.
+                STORY_PERSONA_RULE (hard): for AI_POST, AUTHOR.personaId (the post author) must NEVER write a top-level comment (parentRef null). The author MAY appear only as a REPLY (parentRef not null) to a commenter, at most 2 author replies in the whole response — 0 is fine, do not force it. An author reply is short, in the same voice and speech level as the author's own post body (clarify a fact, add a detail, push back). All other comments are bystanders.
+                {{COMMENT_RULES}}
                 When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed, not the whole story.
-                AI_POST title/body rules (hard): title is a short Korean plaza headline of 12~40 characters including spaces (max 40), typed by the author in the same voice and speech level as the body (banmal body → banmal title; do not default to a polite '~습니다/~인가요/~걸까요' question) — it names what happened, like a real community post title, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
+                AI_POST title/body rules (hard): {{TITLE_RULE}} body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required for AI_POST.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
                 AI_POST body format rules (hard): break lines the way this person usually types (follow STYLE_REFERENCE habits when present). Several sentences may share one line, and sentence lengths must be uneven — do NOT write one sentence per line, do NOT make every line the same length. Avoid one solid block: use at least 2 lines/paragraphs (2~4 chunky paragraphs is fine). A single line/paragraph must not exceed about 300 characters (a capture card cannot be cut inside a block). Always set capture_split_after_lines to null — the server computes it.
@@ -902,7 +949,66 @@ public class StructuredGenerationService {
                 grounding +
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 overusedMetaphorsHint(req.getOverusedMetaphorIds()) +
-                "\nPERSONAS=" + json(personaCardList(req.getPersonas())) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
+                "\nPERSONAS=" + json(personaCardList(req.getPersonas())) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20))));
+    }
+
+    /** {{TITLE_RULE}}·{{COMMENT_RULES}} 자리표시자를 공통 규칙 문자열로 치환한다. */
+    static String expandRules(String prompt) {
+        return prompt.replace("{{TITLE_RULE}}", TITLE_RULE).replace("{{COMMENT_RULES}}", COMMENT_RULES);
+    }
+
+    /** "썸·연애: " 같은 게시판 접두어(`^[^:]{1,12}:\\s`)를 떼고 다듬는다. 결과가 비면 null. */
+    static String stripBoardPrefix(String title) {
+        if (blank(title)) return null;
+        String t = BOARD_PREFIX.matcher(title.strip()).replaceFirst("").strip();
+        return t.isEmpty() ? null : t;
+    }
+
+    /** 원문 제목 참고 블록(길이·말투 전용). 제목이 없으면 빈 문자열. */
+    static String titleStyleReferenceBlock(String sourceTitle) {
+        String t = stripBoardPrefix(sourceTitle);
+        if (t == null) return "";
+        t = clean(t);
+        if (t.length() > 80) t = t.substring(0, 80);
+        return "\nTITLE_STYLE_REFERENCE=" + t
+                + "\nTITLE_STYLE_REFERENCE_RULE (hard): TITLE_STYLE_REFERENCE is the real title of the source post, given for LENGTH and MANNER OF SPEAKING only. Never reuse its words; the incident comes from SKELETON.";
+    }
+
+    /** 실제 댓글 참고 블록. 비었으면 빈 문자열(하위 호환). */
+    static String commentStyleReferenceBlock(List<String> refs) {
+        if (refs == null || refs.isEmpty()) return "";
+        List<String> out = new ArrayList<>();
+        for (String r : refs) {
+            if (blank(r)) continue;
+            String c = clean(r).replace("\n", " ").strip();
+            if (c.isEmpty()) continue;
+            if (c.length() > COMMENT_STYLE_REFERENCE_ITEM_MAX_CHARS) c = c.substring(0, COMMENT_STYLE_REFERENCE_ITEM_MAX_CHARS);
+            out.add(c);
+            if (out.size() >= COMMENT_STYLE_REFERENCE_MAX) break;
+        }
+        if (out.isEmpty()) return "";
+        return "\nCOMMENT_STYLE_REFERENCE=" + json(out) + "\n" + COMMENT_STYLE_REFERENCE_RULE;
+    }
+
+    /** SKELETON의 verdict_lean(AUTHOR|PARTNER|SPLIT, 누락·이상값은 SPLIT) → 본문 사실 배치·댓글 stance 분포 지시. 골격이 없으면 빈 문자열. */
+    static String verdictLeanBlock(Map<String, Object> sourceContext) {
+        if (sourceContext == null || sourceContext.isEmpty()) return "";
+        Object raw = sourceContext.get("verdict_lean");
+        String lean = raw == null ? "" : String.valueOf(raw).trim().toUpperCase(Locale.ROOT);
+        if (!"AUTHOR".equals(lean) && !"PARTNER".equals(lean)) lean = "SPLIT";
+        String post = switch (lean) {
+            case "PARTNER" -> "the writer sincerely believes they are in the right and never admits fault, but arrange the facts (what they did, what they said, how the other person reacted, small matter-of-fact details) so a reader can plainly see the writer's side is the bigger problem";
+            case "AUTHOR" -> "the writer is plainly wronged; lay the facts out so most readers side with the writer";
+            default -> "lay the facts out so readers genuinely split: some details favor the writer, some favor the other person";
+        };
+        String dist = switch (lean) {
+            case "PARTNER" -> "most top-level comments (roughly 60~70%) have stance \"상대방 이해\" (they point at the poster's own fault or side with the other person); the rest are \"작성자 공감\" or \"중립\"";
+            case "AUTHOR" -> "most top-level comments (roughly 60~70%) have stance \"작성자 공감\" (they side with the poster); the rest are \"상대방 이해\" or \"중립\"";
+            default -> "top-level comments split roughly evenly between stance \"작성자 공감\" and \"상대방 이해\", with a few \"중립\"";
+        };
+        return "\nVERDICT_LEAN=" + lean
+                + "\nVERDICT_LEAN_RULE (hard): VERDICT_LEAN is how most readers should come away. Posts stay in the writer's own voice and side (never a self-confession): " + post + "."
+                + " Comments: the stance field is exactly one of \"작성자 공감\" | \"상대방 이해\" | \"중립\" (reaction, question or aside), and " + dist + ". Follow the lean even if it feels unbalanced — do not force balance.";
     }
 
     /** 본문 목표 길이 [하한, 상한]. 하한 = max(120, round(0.7L)), 상한 = min(900, max(220, round(1.3L))). 하한은 상한을 넘지 않게 100 이상 여유를 둔다. */
@@ -932,7 +1038,7 @@ public class StructuredGenerationService {
             int[] r = targetLengthRange(sourceLength);
             sb.append("\nBODY_LENGTH_TARGET (hard): body should be about ").append(r[0]).append("~").append(r[1])
                     .append(" characters (the original is ").append(sourceLength)
-                    .append(" characters). Do not pad or stretch it longer than the original; do not invent scenes to fill length.");
+                    .append(" characters). Stay inside this range on both ends: do not go under the lower bound — when the original is long, keep the same number of episodes and exchanges that SKELETON.sequence lists instead of compressing them into a summary — and do not pad or stretch it longer than the original or invent scenes to fill length.");
         }
         return sb.toString();
     }
@@ -953,6 +1059,7 @@ public class StructuredGenerationService {
                 For each INPUT human comment, emit 0 to 3 replies. Multiple replies for the same humanCommentId must use different personaIds drawn only from that item's candidateResponders.
                 Omitting an interaction (zero rows) is allowed and means no response. Never emit more than 3 rows for one humanCommentId.
                 Write short natural Korean. Do not use internal notes, personal data, or claims of being an AI.
+                Replies are tiny like real community replies: about half 30 characters or fewer, almost all 60 or fewer, one line with no line break. A reply may just react, agree with one side, ask a back-question, or go off on a tangent — it need not weigh both sides or end with advice. No metaphors or jokes built on the replier's job; do not open with a self-introduction; do not start two replies with the same word; do not write the labels 작성자/상대방 in a reply.
                 INPUT=""" + json(req.getItems().stream().map(i -> {
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("humanCommentId", i.getHumanCommentId());
@@ -1451,7 +1558,13 @@ public class StructuredGenerationService {
     private static String collapseWs(String s) {
         return s == null ? "" : s.replaceAll("\\s+", " ").trim();
     }
-    private static double koreanRatio(String v) { long k=v.chars().filter(c -> c >= 0xAC00 && c <= 0xD7A3).count(); long letters=v.chars().filter(Character::isLetter).count(); return letters == 0 ? 1 : (double) k / letters; }
+    /** 한글 비율. 자모(ㅋㅋ·ㅠㅠ·ㅇㅈ)도 한글로 세고, SSOT의 korean_check_min_chars 미만 글자 수면 검사하지 않는다(짧은 반응 댓글). */
+    static double koreanRatio(String v) {
+        long k = v.chars().filter(c -> (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x3131 && c <= 0x318E)).count();
+        long letters = v.chars().filter(Character::isLetter).count();
+        if (letters < LlmErrorSignatures.get().koreanCheckMinChars()) return 1;
+        return (double) k / letters;
+    }
     private static boolean blank(String s) { return s == null || s.isBlank(); }
     private static String clean(String s) {
         if (s == null) return "";

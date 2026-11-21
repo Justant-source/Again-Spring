@@ -190,6 +190,58 @@ public class EngagementSnapshotReader {
     }
 
     /**
+     * 투표 방향 신호 — AUTHOR | PARTNER | SPLIT, 신호가 없으면 null.
+     * 1순위: 예약 게시 행 {@code candidates_json._sourceProvenance.verdictLean}(원문 뼈대의 verdict_lean).
+     * 2순위: {@code post_analysis.author_sympathy}(≥0.65 AUTHOR, ≤0.35 PARTNER, 그 외 SPLIT).
+     */
+    public String verdictLean(String postId) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT candidates_json FROM ai_scheduled_posts WHERE published_post_id = ? LIMIT 1",
+                    String.class, postId);
+            if (!rows.isEmpty() && rows.get(0) != null) {
+                String lean = leanFromCandidatesJson(rows.get(0));
+                if (lean != null) return lean;
+            }
+        } catch (Exception e) {
+            log.debug("verdictLean provenance lookup failed postId={}: {}", postId, e.getMessage());
+        }
+        try {
+            List<java.math.BigDecimal> rows = jdbc.queryForList(
+                    "SELECT author_sympathy FROM post_analysis WHERE post_id = ?",
+                    java.math.BigDecimal.class, postId);
+            if (!rows.isEmpty() && rows.get(0) != null) {
+                return leanFromSympathy(rows.get(0).doubleValue());
+            }
+        } catch (Exception e) {
+            log.debug("verdictLean analysis lookup failed postId={}: {}", postId, e.getMessage());
+        }
+        return null;
+    }
+
+    static String leanFromSympathy(double authorSympathy) {
+        if (authorSympathy >= 0.65) return "AUTHOR";
+        if (authorSympathy <= 0.35) return "PARTNER";
+        return "SPLIT";
+    }
+
+    @SuppressWarnings("unchecked")
+    static String leanFromCandidatesJson(String candidatesJson) {
+        try {
+            Map<String, Object> root = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(candidatesJson, Map.class);
+            Object prov = root.get("_sourceProvenance");
+            if (!(prov instanceof Map<?, ?> m)) return null;
+            Object v = m.get("verdictLean");
+            if (v == null) return null;
+            String s = String.valueOf(v).trim().toUpperCase(java.util.Locale.ROOT);
+            return switch (s) { case "AUTHOR", "PARTNER", "SPLIT" -> s; default -> null; };
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Snapshot of a single post with its metadata and comments/replies.
      */
     public record PostSnapshot(String postId, String authorId, long viewCount, List<CommentRow> comments) { }

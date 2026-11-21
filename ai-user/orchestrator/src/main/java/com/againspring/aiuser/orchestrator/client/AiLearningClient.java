@@ -391,6 +391,48 @@ public class AiLearningClient {
     }
 
     /**
+     * 원문 글에 실제로 달렸던 댓글(부족하면 같은 커뮤니티 댓글로 보충) — 문체 참고용.
+     * Disabled / failure / empty → 빈 목록(생성을 막지 않는다).
+     */
+    public List<String> sourceComments(long exampleId, int limit) {
+        if (!enabled) return List.of();
+        try {
+            ResponseEntity<String> resp = postJson("/examples/source-comments",
+                    Map.of("example_id", exampleId, "limit", limit));
+            String body = resp == null ? null : resp.getBody();
+            if (body == null || body.isBlank()) return List.of();
+            var node = objectMapper.readTree(body).get("comments");
+            if (node == null || !node.isArray()) return List.of();
+            List<String> out = new java.util.ArrayList<>();
+            for (var n : node) {
+                String t = n.asText("");
+                if (!t.isBlank()) out.add(t);
+                if (out.size() >= limit) break;
+            }
+            return out;
+        } catch (Exception e) {
+            log.debug("AiLearning sourceComments failed (non-critical) exampleId={}: {}", exampleId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 원문을 다시는 claim되지 않게 표시(예: 갈등 없음). Failure / disabled → false. */
+    public boolean rejectSource(long exampleId, String reservationKey, String reason) {
+        if (!enabled) return false;
+        try {
+            Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("example_id", exampleId);
+            body.put("reservation_key", reservationKey == null ? "" : reservationKey);
+            body.put("reason", reason);
+            postJson("/examples/reject-source", body);
+            return true;
+        } catch (Exception e) {
+            log.debug("AiLearning rejectSource failed (non-critical) exampleId={}: {}", exampleId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Re-fetch a single example_bank row by id ({@code GET /examples/{id}}) — used by
      * {@code PartnerAnswerPublisher} to re-check B측 재구성 결과 against the same original the
      * A측 claim used, since Call2 runs as a separate lease/row that never held the claim-time

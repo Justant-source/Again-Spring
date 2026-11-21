@@ -143,8 +143,11 @@ public class PlanEngagementDispatcher {
                         if (dryRun) {
                             deficits.add(new PostDeficit(postId, null, "VOTE", voteDeficit));
                         } else if (voteCallsUsed < cfg.getMaxVoteCallsPerRun()) {
-                            double targetAShare = EngagementTargetCalculator.voteAShare(
-                                    postId, cfg.getVoteAShareMin(), cfg.getVoteAShareMax());
+                            // 2026-11: 원문 뼈대 verdict_lean(없으면 post_analysis)을 따라간다 — 글마다
+                            // 해시 균등(44~80%)이라 상대방 우세 글이 한 건도 없던 쏠림 수정.
+                            double targetAShare = EngagementTargetCalculator.voteAShareForLean(
+                                    postId, reader.verdictLean(postId),
+                                    cfg.getVoteAShareMin(), cfg.getVoteAShareMax());
                             // votes.UNIQUE(post_id, voter_user_id) — backend returns 409 on a second
                             // vote from the same user, so this pre-filter is mandatory, not just an
                             // optimization (see VoteService.java:61-66).

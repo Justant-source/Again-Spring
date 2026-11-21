@@ -61,7 +61,7 @@ public final class PersonaCard {
 
     /**
      * 시그니처 문구 선택을 호출마다 달리하고 싶은 호출자용 오버로드. {@code seed}가 같으면 출력도
-     * 같다(순수 함수 유지). seed=0이면 앞 2개 고정. PlanPersonaMapper는 날짜(epochDay) seed로 호출한다.
+     * 같다(순수 함수 유지). 카드당 1개만 고르며 seed=0이면 첫 항목. PlanPersonaMapper는 날짜(epochDay) seed로 호출한다.
      */
     public static String render(Persona p, String nickname, int seed) {
         if (p == null) return "";
@@ -262,13 +262,12 @@ public final class PersonaCard {
         List<String> segments = new java.util.ArrayList<>();
         Object phrasesObj = lexicon.get("signature_phrases");
         if (phrasesObj instanceof List<?> list && !list.isEmpty()) {
-            // 최대 2개. seed=0이면 앞 2개 고정, 아니면 seed로 시작 위치만 돌린다(순수 함수).
+            // 카드당 최대 1개. seed=0이면 첫 항목 고정, 아니면 seed로 고른다(순수 함수).
+            // 입버릇이 글·댓글 첫머리에 반복되던 문제(prod 6.9%) — 열 번에 한 번쯤 쓰는 말로 약하게 서술한다.
             int n = list.size();
-            int start = n <= 2 ? 0 : Math.floorMod(seed, n);
-            List<String> picked = new java.util.ArrayList<>();
-            for (int k = 0; k < Math.min(2, n); k++) picked.add("\"" + list.get((start + k) % n) + "\"");
-            segments.add("가끔 쓰는 표현 — 안 써도 되고, 쓰더라도 그대로 붙이지 않는다: "
-                    + String.join(", ", picked));
+            int idx = n <= 1 ? 0 : Math.floorMod(seed, n);
+            segments.add("입버릇(열 번에 한 번쯤 나오는 말, 글 첫머리에는 두지 않는다. 안 써도 된다): \""
+                    + list.get(idx) + "\"");
         }
         Object habit = lexicon.get("typing_habit");
         if (habit != null && !String.valueOf(habit).isBlank()) {

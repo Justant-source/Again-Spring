@@ -90,6 +90,38 @@ public class SkeletonExtractionService {
         List<String> sequence = textArray(node, "sequence");
         Boolean bSideViable = node.path("b_side_viable").isBoolean() ? node.path("b_side_viable").asBoolean() : null;
 
+        boolean hasConflict = !node.path("has_conflict").isBoolean() || node.path("has_conflict").asBoolean();
+        String verdictLean = normalizeVerdictLean(text(node, "verdict_lean"));
+
+        if (!hasConflict) {
+            // 갈등 없는 원문: 필수 필드 검증을 건너뛴다. 있는 텍스트만 오류 시그니처 검사.
+            String loose = String.join("\n", category, authorRole, counterpartRole, relationship, incident,
+                    stakes, authorClaim, counterpartClaim, emotion, grayZone, String.join("\n", sequence));
+            LlmErrorSignatures s0 = LlmErrorSignatures.get();
+            if (s0.containsSignature(loose.toLowerCase(Locale.ROOT)) || s0.hasPromptLeak(loose)) {
+                return SkeletonExtractResponse.failure("skeleton response matches error/refusal signature");
+            }
+            return SkeletonExtractResponse.builder()
+                    .ok(true)
+                    .hasConflict(false)
+                    .verdictLean(verdictLean)
+                    .category(blank(category) ? null : category)
+                    .authorRole(blank(authorRole) ? null : authorRole)
+                    .counterpartRole(blank(counterpartRole) ? null : counterpartRole)
+                    .relationship(blank(relationship) ? null : relationship)
+                    .incident(blank(incident) ? null : incident)
+                    .sequence(sequence.isEmpty() ? null : sequence)
+                    .stakes(blank(stakes) ? null : stakes)
+                    .authorClaim(blank(authorClaim) ? null : authorClaim)
+                    .counterpartClaim(blank(counterpartClaim) ? null : counterpartClaim)
+                    .emotion(blank(emotion) ? null : emotion)
+                    .grayZone(blank(grayZone) ? null : grayZone)
+                    .tone(blank(tone) ? null : tone)
+                    .bSideViable(bSideViable)
+                    .sourceExampleId(req.getSourceExampleId())
+                    .build();
+        }
+
         List<String> missing = new ArrayList<>();
         if (blank(category)) missing.add("category");
         if (blank(authorRole)) missing.add("author_role");
@@ -125,6 +157,8 @@ public class SkeletonExtractionService {
 
         return SkeletonExtractResponse.builder()
                 .ok(true)
+                .hasConflict(true)
+                .verdictLean(verdictLean)
                 .category(category)
                 .authorRole(authorRole)
                 .counterpartRole(counterpartRole)
@@ -140,6 +174,13 @@ public class SkeletonExtractionService {
                 .bSideViable(bSideViable)
                 .sourceExampleId(req.getSourceExampleId())
                 .build();
+    }
+
+    /** AUTHOR|PARTNER|SPLIT 외 값(누락 포함)은 SPLIT. */
+    static String normalizeVerdictLean(String raw) {
+        if (raw == null) return "SPLIT";
+        String u = raw.trim().toUpperCase(Locale.ROOT);
+        return ("AUTHOR".equals(u) || "PARTNER".equals(u)) ? u : "SPLIT";
     }
 
     private static String text(JsonNode node, String field) {

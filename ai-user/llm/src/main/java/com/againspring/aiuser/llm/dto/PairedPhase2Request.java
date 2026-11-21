@@ -35,6 +35,10 @@ public class PairedPhase2Request {
     private Map<String, Object> sourceContext;
     private Boolean reconstructMode;
     private Long sourceExampleId;
+    /**
+     * 크롤 원문 댓글(최대 12개). 댓글 문체·길이·온도 참고 전용 — 내용 복사 금지. null/빈 목록이면 기존 동작.
+     */
+    private List<String> commentStyleReference;
     private List<ThreadPlanRequest.Persona> personas;
     /**
      * Up to 5–8 latest published top-level comments (may be empty).

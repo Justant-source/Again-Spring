@@ -80,7 +80,8 @@ public class ContentSafetyGuard {
             log.error("ContentSafetyGuard: internal prompt/correction note leaked into content — BLOCKED.");
             return GuardResult.blocked("PROMPT_LEAK_META");
         }
-        if (text.length() < MIN_LENGTH) {
+        // 댓글은 실제 커뮤니티처럼 "헐"·"ㅋㅋㅋ" 한두 글자 반응이 정상이다 — 글(POST)에만 최소 길이를 건다.
+        if (type == ContentType.POST && text.length() < MIN_LENGTH) {
             return GuardResult.blocked("TOO_SHORT");
         }
         int maxLen = (type == ContentType.POST) ? maxLenPost : maxLenComment;

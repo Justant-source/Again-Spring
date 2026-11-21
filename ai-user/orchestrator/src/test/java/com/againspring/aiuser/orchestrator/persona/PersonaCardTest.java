@@ -216,15 +216,15 @@ class PersonaCardTest {
     }
 
     @Test
-    void render_signatureAtMostTwoAndSoftened_seedRotates() {
+    void render_signatureOnlyOneAndSoftened_seedRotates() {
         Persona p = fullPersona();
         Map<String, Object> vp = new java.util.HashMap<>();
         vp.put("lexicon", Map.of("signature_phrases", List.of("가", "나", "다", "라", "마")));
         p.setVoiceProfile(vp);
         String card = PersonaCard.render(p, "닉");
-        assertThat(card).contains("가끔 쓰는 표현 — 안 써도 되고").contains("\"가\", \"나\"")
-                .doesNotContain("\"다\"");
-        assertThat(PersonaCard.render(p, "닉", 2)).contains("\"다\", \"라\"");
+        assertThat(card).contains("열 번에 한 번쯤").contains("글 첫머리에는 두지 않는다").contains("\"가\"")
+                .doesNotContain("\"나\"");
+        assertThat(PersonaCard.render(p, "닉", 2)).contains("\"다\"").doesNotContain("\"가\"");
         assertThat(PersonaCard.render(p, "닉", 2)).isEqualTo(PersonaCard.render(p, "닉", 2));
     }
 

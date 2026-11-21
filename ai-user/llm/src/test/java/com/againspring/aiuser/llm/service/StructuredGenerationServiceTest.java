@@ -280,7 +280,7 @@ class StructuredGenerationServiceTest {
         verify(pool).executeProviderTask(promptCaptor.capture(), anyString(), anyLong(), anyString(),
                 eq(LlmProvider.CODEX), eq(StructuredOutputSchema.THREAD_PLAN));
         String prompt = promptCaptor.getValue();
-        assertTrue(prompt.contains("12~40 characters"), "title length rule");
+        assertTrue(prompt.contains("8~30 characters"), "title length rule");
         assertTrue(prompt.contains("never set title equal to body"), "title≠body rule");
         assertTrue(prompt.contains("promo_title"), "promo_title in schema");
         assertTrue(prompt.contains("hook_emotion"), "hook_emotion in schema");

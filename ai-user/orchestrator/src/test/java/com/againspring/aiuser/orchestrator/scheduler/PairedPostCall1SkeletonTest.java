@@ -101,7 +101,8 @@ class PairedPostCall1SkeletonTest {
                 "https://example.invalid/1",
                 "원문 제목",
                 "",
-                List.of());
+                List.of(),
+                List.of("실제 댓글 하나", "실제 댓글 둘"));
 
         scheduler.generateCall1(author(), "WORK", "corr-skeleton", Instant.now(), "natepan",
                 "partner-1", resolvedSource);
@@ -119,6 +120,8 @@ class PairedPostCall1SkeletonTest {
         assertThat(request.get("styleReference")).isEqualTo("원문 전문 (프롬프트로 나가면 안 됨)");
         assertThat(request.get("sourceLength")).isEqualTo("원문 전문 (프롬프트로 나가면 안 됨)".length());
         assertThat(request).doesNotContainKey("sourceBody");
+        assertThat(request.get("sourceTitle")).isEqualTo("원문 제목");
+        assertThat(request.get("commentStyleReference")).isEqualTo(List.of("실제 댓글 하나", "실제 댓글 둘"));
     }
 
     @Test
@@ -133,6 +136,7 @@ class PairedPostCall1SkeletonTest {
 
         assertThat(request).doesNotContainKey("sourceContext");
         assertThat(request).doesNotContainKey("reconstructMode");
-        assertThat(request).doesNotContainKeys("styleReference", "sourceLength");
+        assertThat(request).doesNotContainKeys("styleReference", "sourceLength",
+                "commentStyleReference", "sourceTitle");
     }
 }

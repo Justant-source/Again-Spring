@@ -126,4 +126,12 @@ class ContentSafetyGuardTest {
         assertThat(g.check("가".repeat(1001), ContentSafetyGuard.ContentType.POST).passed()).isFalse();
     }
 
+
+    @org.junit.jupiter.api.Test
+    void shortReactionCommentsPass_butShortPostsAreBlocked() {
+        ContentSafetyGuard g = new ContentSafetyGuard();
+        org.junit.jupiter.api.Assertions.assertTrue(g.check("헐", ContentSafetyGuard.ContentType.COMMENT).passed());
+        org.junit.jupiter.api.Assertions.assertTrue(g.check("ㅋㅋㅋ", ContentSafetyGuard.ContentType.COMMENT).passed());
+        org.junit.jupiter.api.Assertions.assertFalse(g.check("헐", ContentSafetyGuard.ContentType.POST).passed());
+    }
 }

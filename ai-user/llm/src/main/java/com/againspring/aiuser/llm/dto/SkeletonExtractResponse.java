@@ -42,6 +42,14 @@ public class SkeletonExtractResponse {
     @Getter(onMethod_ = @__(@JsonProperty("b_side_viable")))
     private final Boolean bSideViable;
     @JsonProperty("source_example_id") private final Long sourceExampleId;
+    /**
+     * 원문에 작성자와 특정 상대 사이의 실제 사건·충돌이 있는가. 누락 시 true(구 골격 호환).
+     * false면 나머지 필드는 비어 있을 수 있다(ok=true 유효 응답).
+     */
+    @Getter(onMethod_ = @__(@JsonProperty("has_conflict")))
+    private final Boolean hasConflict;
+    /** 읽는 사람 다수가 공감할 쪽: AUTHOR | PARTNER | SPLIT. 누락·이상값이면 SPLIT. */
+    @JsonProperty("verdict_lean") private final String verdictLean;
 
     public static SkeletonExtractResponse failure(String reason) {
         return SkeletonExtractResponse.builder().ok(false).reason(reason).build();

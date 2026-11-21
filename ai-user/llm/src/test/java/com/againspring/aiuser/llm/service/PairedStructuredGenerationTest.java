@@ -94,7 +94,7 @@ class PairedStructuredGenerationTest {
         String prompt = promptCaptor.getValue();
         assertTrue(prompt.contains("PAIRED_PHASE1"));
         assertTrue(prompt.contains("has NOT written yet") || prompt.contains("상대방(B) has NOT"));
-        assertTrue(prompt.contains("12~40 characters"));
+        assertTrue(prompt.contains("8~30 characters"));
         assertTrue(prompt.contains("hook_emotion"));
         assertTrue(prompt.contains("MASTER SNS") || prompt.contains("scroll-stop"));
         assertTrue(prompt.contains("작성자"));

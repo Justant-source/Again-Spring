@@ -191,6 +191,16 @@ learning container가 뜨면 아래가 항상 실행된다.
   natepan 75.9%(1035/1363).
 - 반영에는 learning 컨테이너 `--build` 재빌드가 필요하다(crawl budget은 불변).
 
+### 원문 실제 댓글 표본 (2026-11-21, 미배포)
+
+`POST /examples/source-comments` `{"example_id","limit"}` → `{"comments":[…],"matched":bool}` (`app/services/source_comments.py`).
+댓글 문체·길이 참고용이며 예외·미존재 시에도 `{"comments":[],"matched":false}`로 응답한다.
+
+- **글↔댓글 대응**: 댓글 `source_url`의 fragment를 제거한 값이 글 URL과 같으면 그 글의 댓글(blind `#comment-<id>`, natepan `#cmt<N>`).
+- **필터**: 2~200자, 삭제/숨김 자리표시 제외, 전역 3회 이상 중복(광고) 제외, 개인정보 패턴 제외, LLM 오류 시그니처 제외.
+- **표본**: 길이 분포를 유지하는 무작위 추출. 6개 미만이면 같은 source의 실제 댓글로 보충한다(natepan은 글당 저장 댓글이 적어 보충이 기본).
+- `reject-source`는 위 예약 생명주기 표 참고(뼈대 `has_conflict=false` 원문 영구 제외).
+
 ## Popular source claim (2026-08-05)
 
 AI 예약 글의 **primary reconstruct source**는 topic RAG(`findSimilar`)가 아니라
@@ -221,6 +231,7 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 | claim | `/examples/claim-popular-source` | `example_source_reservations`에 SOFT 행 |
 | commit | `/examples/commit-source` `{exampleId, reservationKey}` | SOFT→COMMITTED (영구) |
 | release | `/examples/release-source` | SOFT 행 삭제 (COMMITTED/missing은 no-op) |
+| reject | `/examples/reject-source` `{example_id, reservation_key, reason}` | status `REJECTED`(2026-11-21 신설, 영구). expire·release가 건드리지 않고 claim·available-count에서 제외. 스키마 변경 없음 |
 
 크롤 `SOURCES` budget(natepan 1500 · blind 500)은 **변경하지 않는다**.
 

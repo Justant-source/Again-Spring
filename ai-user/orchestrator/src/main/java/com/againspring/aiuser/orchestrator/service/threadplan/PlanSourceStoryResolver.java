@@ -36,6 +36,9 @@ public class PlanSourceStoryResolver {
     /** 계약3 §3 — 골격 추출 실패 시 release 후 재시도하는 최대 횟수. */
     static final int MAX_SKELETON_ATTEMPTS = 3;
 
+    /** 실제 댓글 참고 최대 개수(llm 계약). */
+    public static final int COMMENT_STYLE_LIMIT = 12;
+
     private final AiLearningClient aiLearningClient;
     private final PersonaHistoryStore personaHistoryStore;
     private final LlmAiUserClient llmAiUserClient;
@@ -50,8 +53,18 @@ public class PlanSourceStoryResolver {
             String sourceUrl,
             String sourceTitle,
             String dynamicExamples,
-            List<String> recentBodies
+            List<String> recentBodies,
+            List<String> commentStyleReference
     ) {
+        /** 실제 댓글 참고가 없는 호출자용 호환 생성자. */
+        public ResolvedSource(
+                String topicSeed, Map<String, Object> sourceContext, boolean reconstructMode,
+                Long sourceExampleId, String sourceBody, String sourceCommunity, String sourceUrl,
+                String sourceTitle, String dynamicExamples, List<String> recentBodies) {
+            this(topicSeed, sourceContext, reconstructMode, sourceExampleId, sourceBody, sourceCommunity,
+                    sourceUrl, sourceTitle, dynamicExamples, recentBodies, List.of());
+        }
+
         public Map<String, Object> provenanceForTrace() {
             Map<String, Object> m = new LinkedHashMap<>();
             if (sourceExampleId != null) m.put("sourceExampleId", sourceExampleId);
@@ -60,6 +73,10 @@ public class PlanSourceStoryResolver {
             if (sourceTitle != null) m.put("sourceOriginalTitle", sourceTitle);
             if (sourceBody != null) m.put("sourceOriginalBody", truncate(sourceBody, 2000));
             m.put("reconstructMode", reconstructMode);
+            // 투표 시점(PlanEngagementDispatcher)에 원문이 정한 쏠림 방향을 알 수 있게 기록한다.
+            if (sourceContext != null && sourceContext.get("verdict_lean") != null) {
+                m.put("verdictLean", String.valueOf(sourceContext.get("verdict_lean")).trim().toUpperCase());
+            }
             return m;
         }
     }
@@ -117,11 +134,18 @@ public class PlanSourceStoryResolver {
                 excluded.add(primary.getId());
                 continue;
             }
+            if (!hasConflict(skeleton.get())) {
+                log.warn("claimAndResolve: no conflict in source exampleId={} attempt={}/{} — rejecting and retrying",
+                        primary.getId(), attempt, MAX_SKELETON_ATTEMPTS);
+                aiLearningClient.rejectSource(primary.getId(), reservationKey, "no_conflict");
+                excluded.add(primary.getId());
+                continue;
+            }
 
             return Optional.of(buildResolvedSource(author, source, primary, skeleton.get()));
         }
 
-        log.warn("claimAndResolve: skeleton extraction failed {} times, giving up preferredSource={} plaza={} reservationKey={}",
+        log.warn("claimAndResolve: skeleton extraction/conflict check failed {} times, giving up preferredSource={} plaza={} reservationKey={}",
                 MAX_SKELETON_ATTEMPTS, source, plaza, reservationKey);
         return Optional.empty();
     }
@@ -152,8 +176,30 @@ public class PlanSourceStoryResolver {
                 primary.getSourceUrl(),
                 primary.getTitle(),
                 dynamicExamples,
-                recent
+                recent,
+                fetchSourceComments(primary.getId())
         );
+    }
+
+    /** 뼈대의 {@code has_conflict}. 키 없음·파싱 불가는 true(기존 동작 유지). */
+    static boolean hasConflict(Map<String, Object> skeleton) {
+        if (skeleton == null) return true;
+        Object v = skeleton.get("has_conflict");
+        if (v == null) return true;
+        if (v instanceof Boolean b) return b;
+        return !"false".equalsIgnoreCase(String.valueOf(v).trim());
+    }
+
+    /** 원문에 달린 실제 댓글(문체 참고). 실패·빈 응답이면 빈 목록 — 생성을 막지 않는다. */
+    private List<String> fetchSourceComments(Long exampleId) {
+        if (exampleId == null) return List.of();
+        try {
+            List<String> c = aiLearningClient.sourceComments(exampleId, COMMENT_STYLE_LIMIT);
+            return c == null ? List.of() : c;
+        } catch (Exception e) {
+            log.debug("sourceComments failed exampleId={}: {}", exampleId, e.getMessage());
+            return List.of();
+        }
     }
 
     /** 원문 대신 골격에서 뽑은 짧은 일반화 문자열(200자 이내) — LLM 요청 {@code topicHint}로 나간다. */
@@ -292,6 +338,23 @@ public class PlanSourceStoryResolver {
                 : t.substring(0, t.offsetByCodePoints(0, STYLE_REFERENCE_MAX_CODEPOINTS));
         request.put("styleReference", ref);
         request.put("sourceLength", total);
+    }
+
+    /**
+     * 원문이 claim된 사연의 생성 요청에 {@code commentStyleReference}(≤12)·{@code sourceTitle}을 넣는다.
+     * 둘 다 비어 있으면 아무것도 넣지 않는다.
+     */
+    public static void putCommentReference(Map<String, Object> request, List<String> comments, String sourceTitle) {
+        if (request == null) return;
+        if (comments != null && !comments.isEmpty()) {
+            List<String> cleaned = new ArrayList<>();
+            for (String c : comments) {
+                if (c != null && !c.isBlank()) cleaned.add(c.trim());
+                if (cleaned.size() >= COMMENT_STYLE_LIMIT) break;
+            }
+            if (!cleaned.isEmpty()) request.put("commentStyleReference", cleaned);
+        }
+        if (sourceTitle != null && !sourceTitle.isBlank()) request.put("sourceTitle", sourceTitle.trim());
     }
 
     static String truncate(String s, int max) {

@@ -652,6 +652,10 @@ public class AiPostBundleService {
         // (styleReference ≤1500자 + sourceLength). 사실관계는 여전히 sourceContext 골격 기준이며,
         // 복사는 SourceOverlapGuard가 사후 차단한다. follow-up(HUMAN_POST) 호출은 이 맵을 쓰지 않는다.
         PlanSourceStoryResolver.putStyleReference(request, source.sourceBody());
+        if (source.sourceExampleId() != null) {
+            PlanSourceStoryResolver.putCommentReference(
+                    request, source.commentStyleReference(), source.sourceTitle());
+        }
         if (source.dynamicExamples() != null && !source.dynamicExamples().isBlank()) {
             request.put("dynamicExamples", source.dynamicExamples());
         }

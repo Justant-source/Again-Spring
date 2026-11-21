@@ -196,4 +196,19 @@ class EngagementTargetCalculatorTest {
             }
         }
     }
+
+    @Test
+    void voteAShareForLeanFollowsVerdictLeanBands() {
+        for (int i = 0; i < 300; i++) {
+            String id = "post_" + i;
+            assertThat(EngagementTargetCalculator.voteAShareForLean(id, "PARTNER", 0.44, 0.80))
+                    .isBetween(0.25, 0.45);
+            assertThat(EngagementTargetCalculator.voteAShareForLean(id, "split", 0.44, 0.80))
+                    .isBetween(0.45, 0.60);
+            assertThat(EngagementTargetCalculator.voteAShareForLean(id, "AUTHOR", 0.44, 0.80))
+                    .isBetween(0.60, 0.85);
+            assertThat(EngagementTargetCalculator.voteAShareForLean(id, null, 0.44, 0.80))
+                    .isBetween(0.44, 0.80);
+        }
+    }
 }

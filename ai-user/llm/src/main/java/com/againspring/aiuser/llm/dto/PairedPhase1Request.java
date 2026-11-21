@@ -24,6 +24,12 @@ public class PairedPhase1Request {
     private String styleReference;
     /** 크롤 원문 본문 글자 수. null이면 길이 지시 없음. */
     private Integer sourceLength;
+    /**
+     * 크롤 원문 댓글(최대 12개). 댓글 문체·길이·온도 참고 전용 — 내용 복사 금지. null/빈 목록이면 기존 동작.
+     */
+    private List<String> commentStyleReference;
+    /** 크롤 원문 제목(게시판 접두어 "썸·연애: " 포함 가능). 제목 길이·말투 참고 전용. null/blank면 기존 동작. */
+    private String sourceTitle;
     private String dynamicExamples;
     private List<String> recentOutputs;
     /** Metaphor ids used too often recently (orchestrator-computed) — LLM should avoid repeating these. */

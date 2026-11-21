@@ -169,6 +169,8 @@ public class ThreadPlanPublisher {
      */
     private boolean isForbiddenStorySideBystander(AiThreadPlanItem item) {
         if (item.getHumanAuthorId() != null && !item.getHumanAuthorId().isBlank()) return false;
+        // 2026-11: 사연 작성자·상대방의 대댓글(REPLY)은 허용 — 최상위 댓글만 금지.
+        if (item.getParentItemId() != null) return false;
         if (item.getPersonaId() == null || item.getPersonaId().isBlank()
                 || item.getTargetPostId() == null || item.getTargetPostId().isBlank()) {
             return false;

@@ -182,4 +182,19 @@ public final class EngagementTargetCalculator {
         boolean fillA = currentA < targetAShare * (currentA + currentB + 1);
         return fillA ? 0 : 1;
     }
+
+    /**
+     * 원문 뼈대의 {@code verdict_lean}을 따르는 글별 목표 A(작성자측) 비율 — 고정 할당량 없이 원문이 정한다.
+     * PARTNER → 25~45%, SPLIT → 45~60%, AUTHOR → 60~85% 구간 안에서 postId 해시로 결정적으로 정한다.
+     * lean이 null/알 수 없는 값이면(뼈대·분석 신호 없음) {@code fallbackMin..fallbackMax} 구간(기존 동작).
+     */
+    public static double voteAShareForLean(String postId, String lean, double fallbackMin, double fallbackMax) {
+        String l = lean == null ? "" : lean.trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (l) {
+            case "PARTNER" -> voteAShare(postId, 0.25, 0.45);
+            case "SPLIT" -> voteAShare(postId, 0.45, 0.60);
+            case "AUTHOR" -> voteAShare(postId, 0.60, 0.85);
+            default -> voteAShare(postId, fallbackMin, fallbackMax);
+        };
+    }
 }

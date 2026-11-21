@@ -167,7 +167,7 @@ class AiPostBundleServiceTest {
                 "시어머니가 육아에 간섭한다",
                 Map.of("exampleId", 99L, "body", "원본 사연", "reconstructMode", true, "sourceUrl", "https://nate.example/1"),
                 true, 99L, "원본 사연 본문", "natepan", "https://nate.example/1", "원제목",
-                "문체앵커", List.of("내가 예전에 쓴 글"));
+                "문체앵커", List.of("내가 예전에 쓴 글"), List.of("실제 댓글 A", "실제 댓글 B"));
         when(sourceStoryResolver.claimAndResolve(eq(author), eq("natepan"), anyString(), any(Instant.class), eq("FAMILY"), any()))
                 .thenReturn(Optional.of(source));
 
@@ -200,6 +200,8 @@ class AiPostBundleServiceTest {
         // 2026-11: 원문은 문체 참고로만 전달(styleReference + sourceLength)
         assertThat(req.get("styleReference")).isEqualTo("원본 사연 본문");
         assertThat(req.get("sourceLength")).isEqualTo("원본 사연 본문".length());
+        assertThat(req.get("commentStyleReference")).isEqualTo(List.of("실제 댓글 A", "실제 댓글 B"));
+        assertThat(req.get("sourceTitle")).isEqualTo("원제목");
         assertThat(req.get("recentOutputs")).isInstanceOf(List.class);
         assertThat(req.get("storySearchDoc")).isInstanceOf(String.class);
         assertThat(req.get("storyProfile")).isInstanceOf(Map.class);

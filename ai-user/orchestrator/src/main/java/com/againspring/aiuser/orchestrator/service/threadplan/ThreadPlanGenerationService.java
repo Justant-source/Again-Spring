@@ -644,6 +644,8 @@ public class ThreadPlanGenerationService {
         }
         AiThreadPlan plan = planRepository.findById(planId).orElseThrow();
         Map<String, String> refs = new HashMap<>();
+        Map<String, Instant> refTimes = new HashMap<>();
+        Set<String> storySide = loadStorySidePersonaIds(plan.getPostId());
         int sequence = 0;
         for (Map<String, Object> row : quality.keptItems()) {
             String ref = text(row.get("ref"));
@@ -656,6 +658,14 @@ public class ThreadPlanGenerationService {
             Instant scheduled = stored != null
                     ? stored
                     : candidateScheduleSupport.schedule(plan.getPublishedAt(), sequence, type == ThreadPlanItemType.REPLY);
+            // 사연 작성자·상대방 답글: 부모 댓글이 게시된 뒤 사람이 답하는 간격(8~75분)을 보장한다.
+            if (type == ThreadPlanItemType.REPLY && storySide.contains(personaId)
+                    && refTimes.get(parentRef) != null) {
+                Instant earliest = refTimes.get(parentRef)
+                        .plusSeconds(60L * ThreadLocalRandom.current().nextInt(8, 76));
+                if (scheduled.isBefore(earliest)) scheduled = earliest;
+            }
+            refTimes.put(ref, scheduled);
             sequence++;
             AiThreadPlanItem.AiThreadPlanItemBuilder itemBuilder = AiThreadPlanItem.builder().planId(planId).itemType(type)
                     .status(ThreadPlanItemStatus.SCHEDULED).sequenceNo(sequence).parentItemId(parentItemId)

@@ -129,10 +129,15 @@ Hold 직전 맞춤법: `SoftProofread` — 오탈자 휴리스틱이 있을 때�
    **AI_POST `promo_title`**: 광장 `title`과 **독립**인 **master SNS scroll-stop 훅**. 도발적·호기심 유발 한 줄(개행 허용, 줄≤20·평탄화 4~80자). 원제 글자 복제 금지. 없거나 무효면 title 하드랩 폴백. 게시 시 `posts.promo_title`에 저장(미전달 시 AS `PromoTitleService` 폴백).
    **AI_POST `hook_emotion`**: 필수 enum `shock|anger|tension|sad|hype` (훅이 겨냥하는 감정). sanitize 시 누락/무효 → `tension`. BE `hookEmotion`(V108+) 전달 — 엔드포인트 미수락이면 JSON/DTO에만 유지.
    **AI_POST 캡쳐 분할 (2026-11-21 개편, 미배포)**: 본문 형식은 자유다 — "한 줄 한 문장, 빈 줄 금지" 규칙은 폐지됐고 평소 습관대로 줄바꿈하되 최소 2줄, 한 줄(문단) 약 300자 이하다. 제목도 본문과 같은 말투로 쓴다. LLM은 `capture_split_after_lines`를 **항상 null**로 두고, llm 워커의 `CaptureSplitPlanner`가 본문에서 컷을 계산해 채운다(범위 밖 값은 parse 시 null 강등). 최종 결정권은 backend `CaptureSplitSupport`다(블록 무게=ceil(글자수/22), 파트당 8블록 이하·24줄 이하, "컷 없음"=8블록 이하·28줄 이하, 24줄 넘는 단일 블록은 단독 파트). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
+   **AI_POST 제목 (2026-11-21 추가 개편, 미배포)**: plan/paired 경로의 제목 규칙은 8~30자(상한 40), 줄거리 요약 금지. 요청 필드 `sourceTitle`(게시판 접두어 제거)이 `TITLE_STYLE_REFERENCE`로 들어가 길이·말투 참고가 된다. 레거시 `voice/post.md`(12~40자)·`ActionExecutor.executePost`·`PromptAssembler` 경로는 이번에 바뀌지 않았다. 위 4~40자 검증 하한/상한은 그대로.
+   **댓글 규칙 `COMMENT_RULES` (2026-11-21, 미배포)**: thread plan·paired phase1/phase2·사람 댓글 답글 프롬프트에 공통 주입. 길이 분포(절반쯤 30자 이하, 대부분 60자 이하, 100자 초과는 스레드당 1~2개), 한 줄 기본, 논평 일색 금지, 직업 비유 금지, 자기소개 시작 스레드당 1개 이하, 같은 첫 어절 중복 금지, 커뮤니티 호칭. 형태·분포 지시이며 표현 denylist가 아니다(절대 규칙 #3 유지). SelfCritique·축 순응 재시도가 댓글을 늘리지 않도록 수정했다. 짧은 반응 댓글("헐"·"ㅋㅋㅋ")이 통과하도록 llm 파서의 댓글 최소 길이는 1자, 한글 비율 검사는 자모를 한글로 세고 `korean_check_min_chars` 미만이면 건너뛰며, `ContentSafetyGuard`의 최소 길이 5자는 글(POST)에만 적용한다.
+   **실제 댓글 참고 (2026-11-21)**: 요청 필드 `commentStyleReference`(List<String>, 최대 12, 항목당 160자 절단)가 `COMMENT_STYLE_REFERENCE`/`COMMENT_STYLE_REFERENCE_RULE`로 프롬프트에 들어간다(문체·길이·온도 참고 전용, 내용 복사 금지). orchestrator는 learning `POST /examples/source-comments`로 표본을 받아 solo·paired 요청에 싣는다([learning.md](../30-components/learning.md)).
+   **VERDICT_LEAN (2026-11-21)**: 골격 `verdict_lean`(AUTHOR|PARTNER|SPLIT, 누락·이상값은 SPLIT)이 `sourceContext`로 전달되면 생성 프롬프트가 사실 배치와 댓글 stance 분포(`작성자 공감`/`상대방 이해`/`중립`)를 lean에 맞춘다. 골격에는 `has_conflict`(누락 시 true)도 추가됐다 — false면 `PlanSourceStoryResolver`가 learning `POST /examples/reject-source`로 그 원문을 영구 제외하고 다음 원문을 claim한다(한 번 생성에 최대 3개 원문, `MAX_SKELETON_ATTEMPTS`). 수치는 골격이 뭉개더라도 생성 시 구체 숫자로 새로 정해 쓴다.
+   **작성자·상대방 대댓글 (2026-11-21)**: 사연 작성자(양면 phase2는 상대방도)는 **대댓글에 한해** 등장할 수 있다(작성자 최대 2, 상대방 최대 1; 최상위 댓글은 여전히 금지, 자기 댓글에 자기 답글 금지). llm 파서(`MAX_AUTHOR_REPLIES`/`MAX_PARTNER_REPLIES` 초과 항목 드롭)·`StoryPersonaCommentFilter`·`ThreadQualityGate`·`ThreadPlanPublisher`가 이를 통과시키고, 예약 시각은 부모 댓글보다 8~75분 뒤다. 아래 4번의 "story-side 제외"는 최상위 댓글 기준으로 읽는다.
    **AI_POST 본문 길이 (2026-11-21)**: 원문 길이 L에 맞춘다 — 목표 하한 max(120, 0.7L), 상한 min(900, max(220, 1.3L)). 검증 하한(20자)·상한(1000자)은 그대로. 축 순응 재시도(`enforceAxisCompliance`)는 `styleReference`가 있는 사연 본문에는 적용하지 않고 fix 문구를 완화했다(WALL 위반 판정은 비어 있지 않은 줄 5개 이상일 때만).
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
-4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). `stance`는 LLM의 자유 라벨을 보존하는 최대 64자 필드다(V19; 예: `concerned_supportive`). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
+4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 최상위 댓글 불가 — `STORY_PERSONA`; 2026-11-21부터 대댓글은 위 한도 내 허용)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). `stance`는 LLM의 자유 라벨을 보존하는 최대 64자 필드다(V19; 예: `concerned_supportive`). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.
 5. 품질 게이트 후 잔여가 운영 READY 하한(`ai-user.thread-plan.ready-min-top-level` 기본 3 · `ready-min-items` 기본 6) 미만이면 **댓글만** `HUMAN_POST`로 LLM **1회** 재생성한다. 재생성 후에도 하한 미달(또는 재생성 불가)이면 kept item을 **버리지 않고** 개수와 무관하게 얇은 READY→ACTIVE로 진행한다(구 `QUALITY_BELOW_MIN_ITEMS` 전량 discard 폐지). 하한 통과 시에도 READY→ACTIVE.
 6. 구조 자체가 깨진 응답(빈 items·상한 초과 등)은 기존처럼 `INVALID_STRUCTURED_OUTPUT`. 동일 provider/model로 한 번만 재시도한다.
 
@@ -272,7 +277,10 @@ Hold 직전 맞춤법: `SoftProofread` — 오탈자 휴리스틱이 있을 때�
   - **A:B 편향**: 옛 서비스는 항상 `voteOptions.get(0)`만 찍어 100:0으로
     쏠렸다. 지금은 글마다 결정적 목표 A(작성자측) 비율을
     `EngagementTargetCalculator.voteAShare(postId, min, max)`로 구하고(기본
-    `[0.44, 0.80]`, prod 자연 분포 실측치), `chooseVoteOptionIndex(currentA,
+    `[0.44, 0.80]`, prod 자연 분포 실측치; 2026-11-21부터 글의 `verdict_lean` 신호가 있으면
+    PARTNER 0.25~0.45 · SPLIT 0.45~0.60 · AUTHOR 0.60~0.85 구간을 쓰고, lean은
+    `ai_scheduled_posts.candidates_json._sourceProvenance.verdictLean`에서 읽으며 없으면
+    `post_analysis.author_sympathy`(≥0.65 AUTHOR, ≤0.35 PARTNER)로 폴백, 둘 다 없으면 기존 구간), `chooseVoteOptionIndex(currentA,
     currentB, targetAShare)`로 그 목표에 못 미치는 쪽에만 표를 얹는다 — 표를
     **추가만** 하므로 사람이 이미 던진 표를 뒤집지 않는다. `voteAShare`는
     `jitter()`와 **다른 솔트**(`"ashare:"+postId`)로 해시한다 — 같은 해시를

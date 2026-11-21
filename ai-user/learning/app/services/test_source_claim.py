@@ -618,3 +618,36 @@ def test_filter_chatter_exclusion_edge_cases():
 
     ids = [r["id"] for r in result]
     assert set(ids) == {2, 3}, f"Expected {{2, 3}}, got {set(ids)}"
+
+def test_rejected_reservation_blocks_forever():
+    from app.services.source_claim import STATUS_REJECTED
+    now = datetime(2026, 11, 21, 12, 0, 0)
+    assert is_reservation_blocking(STATUS_REJECTED, datetime(2099, 12, 31), now) is True
+    assert is_reservation_blocking(STATUS_REJECTED, now - timedelta(days=400), now) is True
+
+
+def test_filter_claim_candidates_excludes_rejected():
+    now = datetime(2026, 11, 21, 12, 0, 0)
+    row = {"id": 5, "source": "blind", "content_type": "POST", "source_url": "u5",
+           "popularity_pct": 0.9, "content": "x", "category": "marriage", "created_at": now}
+    kw = dict(source="blind", used_example_ids=set(), window_start=now - timedelta(days=14), now=now)
+    assert filter_claim_candidates([row], reservations={}, **kw) == [row]
+    rej = {5: {"status": "REJECTED", "reserve_until": datetime(2099, 12, 31)}}
+    assert filter_claim_candidates([row], reservations=rej, **kw) == []
+
+
+def test_reject_source_upserts_family_and_keeps_committed():
+    from app.services import source_claim
+    cur = MagicMock()
+    cur.fetchone.return_value = {"source_url": "u"}
+    cur.fetchall.return_value = [{"id": 1}, {"id": 2}]
+    conn = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cur
+    with patch.object(source_claim, "get_db") as db:
+        db.return_value.__enter__.return_value = conn
+        out = source_claim.reject_source(example_id=1, reservation_key="k", reason="r")
+    assert out == {"status": "rejected", "ids": [1, 2]}
+    upserts = [c for c in cur.execute.call_args_list if "ON DUPLICATE KEY UPDATE" in c.args[0]]
+    assert len(upserts) == 2
+    sql = upserts[0].args[0]
+    assert sql.index("reserve_until = IF") < sql.index("status = IF")  # 대입 순서: status 변경 전에 reserve_until 판정

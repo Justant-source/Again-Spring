@@ -315,4 +315,82 @@ class PlanSourceStoryResolverTest {
         PlanSourceStoryResolver.putStyleReference(req, "  \n\t ");
         assertThat(req).doesNotContainKeys("styleReference", "sourceLength");
     }
+
+    private static AiLearningClient.ExampleItem example(long id, String title) {
+        AiLearningClient.ExampleItem e = new AiLearningClient.ExampleItem();
+        e.setId(id);
+        e.setContent("본문 " + id);
+        e.setSource("blind");
+        e.setTitle(title);
+        return e;
+    }
+
+    @Test
+    void claimAndResolveRejectsNoConflictSourceAndClaimsNext() {
+        Instant until = Instant.now().plus(1, ChronoUnit.HOURS);
+        when(aiLearningClient.claimPopularSource(eq("blind"), eq("k"), eq(until), eq("FAMILY"), eq(java.util.Set.of())))
+                .thenReturn(Optional.of(example(1L, "t1")));
+        when(aiLearningClient.claimPopularSource(eq("blind"), eq("k"), eq(until), eq("FAMILY"), eq(java.util.Set.of(1L))))
+                .thenReturn(Optional.of(example(2L, "t2")));
+        Map<String, Object> noConflict = skeletonFixture("FAMILY", "정보글", true);
+        noConflict.put("has_conflict", false);
+        Map<String, Object> good = skeletonFixture("FAMILY", "갈등 사건", true);
+        good.put("has_conflict", true);
+        good.put("verdict_lean", "PARTNER");
+        when(llmAiUserClient.extractSkeleton(eq(1L), any(), any(), any(), any())).thenReturn(Optional.of(noConflict));
+        when(llmAiUserClient.extractSkeleton(eq(2L), any(), any(), any(), any())).thenReturn(Optional.of(good));
+        when(aiLearningClient.sourceComments(2L, 12)).thenReturn(List.of("댓글1", "댓글2"));
+
+        Optional<PlanSourceStoryResolver.ResolvedSource> opt =
+                resolver.claimAndResolve(null, "blind", "k", until, "FAMILY");
+
+        assertThat(opt).isPresent();
+        assertThat(opt.get().sourceExampleId()).isEqualTo(2L);
+        assertThat(opt.get().commentStyleReference()).containsExactly("댓글1", "댓글2");
+        assertThat(opt.get().sourceContext().get("verdict_lean")).isEqualTo("PARTNER");
+        assertThat(opt.get().provenanceForTrace()).containsEntry("verdictLean", "PARTNER");
+        verify(aiLearningClient).rejectSource(1L, "k", "no_conflict");
+        verify(aiLearningClient, never()).releaseSource(eq(1L), anyString());
+        verify(aiLearningClient, never()).sourceComments(eq(1L), anyInt());
+    }
+
+    @Test
+    void claimAndResolveGivesUpAfterThreeNoConflictSources() {
+        Instant until = Instant.now().plus(1, ChronoUnit.HOURS);
+        for (long id = 1; id <= 3; id++) {
+            java.util.Set<Long> excluded = new java.util.HashSet<>();
+            for (long j = 1; j < id; j++) excluded.add(j);
+            when(aiLearningClient.claimPopularSource(eq("blind"), eq("k"), eq(until), eq("FAMILY"), eq(excluded)))
+                    .thenReturn(Optional.of(example(id, "t" + id)));
+            Map<String, Object> nc = skeletonFixture("FAMILY", "정보글", true);
+            nc.put("has_conflict", false);
+            when(llmAiUserClient.extractSkeleton(eq(id), any(), any(), any(), any())).thenReturn(Optional.of(nc));
+        }
+
+        Optional<PlanSourceStoryResolver.ResolvedSource> opt =
+                resolver.claimAndResolve(null, "blind", "k", until, "FAMILY");
+
+        assertThat(opt).isEmpty();
+        verify(aiLearningClient, org.mockito.Mockito.times(3)).rejectSource(anyLong(), eq("k"), eq("no_conflict"));
+    }
+
+    @Test
+    void hasConflictDefaultsToTrueWhenMissing() {
+        assertThat(PlanSourceStoryResolver.hasConflict(Map.of())).isTrue();
+        assertThat(PlanSourceStoryResolver.hasConflict(Map.of("has_conflict", "false"))).isFalse();
+        assertThat(PlanSourceStoryResolver.hasConflict(Map.of("has_conflict", true))).isTrue();
+    }
+
+    @Test
+    void putCommentReference_capsAt12AndAddsTitle() {
+        List<String> many = new java.util.ArrayList<>();
+        for (int i = 0; i < 20; i++) many.add("댓글" + i);
+        Map<String, Object> req = new LinkedHashMap<>();
+        PlanSourceStoryResolver.putCommentReference(req, many, " 원문 제목 ");
+        assertThat((List<?>) req.get("commentStyleReference")).hasSize(12);
+        assertThat(req.get("sourceTitle")).isEqualTo("원문 제목");
+        Map<String, Object> empty = new LinkedHashMap<>();
+        PlanSourceStoryResolver.putCommentReference(empty, List.of(), null);
+        assertThat(empty).isEmpty();
+    }
 }

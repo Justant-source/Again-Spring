@@ -209,3 +209,7 @@ prod 한 달 AI 사연 204건 실측에서 58%가 "예민"을 쓰고 34%가 같�
 제거 + 골격 `tone` 키, PersonaCard "명령→말버릇" 개편(예시 인용구 삭제·시그니처 날짜 회전·조합 정리 3종),
 본문 형식 자유화 + `CaptureSplitPlanner`/`CaptureSplitSupport` 시각 줄 가중 분할, 길이를 원문 L에 맞춤
 (하한 max(120,0.7L)·상한 min(900,max(220,1.3L))), 크롤 원문 정화(`source_quality.py`, blind 통과율 13.1%).
+
+## 2026-11-21 AI 사연·댓글 사람다움 2차 (코드·단위 테스트 완료, 미배포)
+
+앞선 개편 뒤에도 댓글이 길고 논평 일색이며 사연의 쟁점 구도가 원문과 어긋나는 문제를 다뤘다. 대응: 공통 `COMMENT_RULES`(형태·분포 지시, denylist 아님)와 원문 실제 댓글 참고(`commentStyleReference`, learning `/examples/source-comments`), 제목 8~30자 + `sourceTitle` 참고, 뼈대 `has_conflict`(갈등 없는 원문은 `/examples/reject-source`로 영구 제외, 예약 status `REJECTED` 신설)·`verdict_lean`(사실 배치·댓글 stance·AI 투표 작성자 비율), 작성자·상대방의 대댓글 한정 등장 허용, PersonaCard 입버릇 약화, 수치 구체화, paired 원문 provenance 기록. 레거시 `executePost`·`PromptAssembler`·`voice/post.md`는 변경 없음. 측정 도구 `scripts/story_turing_test.py`(블라인드 판별 테스트).

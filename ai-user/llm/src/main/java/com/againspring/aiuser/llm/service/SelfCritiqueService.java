@@ -413,11 +413,14 @@ public class SelfCritiqueService {
                 %s
                 고칠 문제: %s
                 다음도 피하라: 마지막 문단에서 전체를 요약해 마무리하지 마라. "A가 아니라 B다" 식 대조 구문을 반복하지 마라. 비슷한 구조의 문장을 세 개 나란히 나열하지 마라. 별것 아닌 일을 거창한 의미로 포장하지 마라. 장면을 연출하거나 대구를 맞춘 경구로 마무리하지 마라. 자기 잘못을 저울질하는 문장을 새로 넣지 마라. 한 줄에 한 문장씩 균일하게 끊지 마라.
-                의미·사실·줄바꿈 구조를 유지하고 문제만 고쳐라. 본문만 출력하라.
+                의미·사실·줄바꿈 구조를 유지하고 문제만 고쳐라. 본문만 출력하라.%s
 
                 [원문]
                 %s
-                """.formatted(kind, register, issueDetail, draft == null ? "" : draft);
+                """.formatted(kind, register, issueDetail,
+                "post".equalsIgnoreCase(contentType) ? ""
+                    : " 댓글이므로 분량을 늘리지 마라(더 줄여도 된다). 줄바꿈 없는 한 줄로 유지하라.",
+                draft == null ? "" : draft);
     }
 
     // ── 어휘이질 탐지용 한국어 토크나이저 (Python build_common_words.py와 동일 알고리즘) ──

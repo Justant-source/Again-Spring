@@ -186,6 +186,10 @@ slice와 파트너(B) 경로에는 보내지 않는다. 사실은 여전히 SKEL
 (`PlanPersonaMapper`). 렌더 단계 조합 정리 3종(JONDAE+HEAVY→MILD, SOFT+HEAVY→MILD, emoticon
 HIGH+SERIOUS+ANALYTIC→LOW)은 렌더에서만 적용하고 DB 값은 바꾸지 않는다.
 
+**PersonaCard 입버릇 (2026-11-21, 미배포)**: 카드당 입버릇 1개, "열 번에 한 번쯤 나오는 말, 글 첫머리에는 두지 않는다. 안 써도 된다"로 서술한다(prod 입버릇이 글·댓글 첫머리에 6.9% 반복되던 문제). 위 시그니처 "최대 2개 회전"은 입버릇 외 시그니처 문구 기준이다.
+
+**양면 사연 원문 기록 (2026-11-21)**: paired 사연도 `posts.source_*` provenance를 backend로 전달한다(solo와 동일). 골격 `verdict_lean`이 생성 프롬프트와 AI 투표 비율에 반영되는 방식은 [thread-planning.md](../60-runtime/thread-planning.md).
+
 ## 검증 명령 (변경 시 재확인)
 
 ```bash

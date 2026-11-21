@@ -484,6 +484,15 @@ postId로 찍힘)로 남으면 봇 계정 JWT 발급 실패(`BotTokenCache`)가 
 많다 — `Bot login failed ... 429 Too Many Requests` 로그 확인. 리콘실러는
 수렴형이라 다음 5분 주기에 저절로 재시도된다(자동 복구, 별도 조치 불필요).
 
+### `story_turing_test.py` — 실제 글 vs 생성 글 블라인드 판별 (2026-11-21)
+
+prod DB를 SELECT만 하는 `scripts/story_turing_test.py`(표준 라이브러리만; 비밀번호는 `env/.env.prod`에서 읽어 자식 프로세스 env로만 전달).
+
+```bash
+python3 scripts/story_turing_test.py --since 2026-10-21 --n 20 --comments 20 [--seed 1] [--out DIR]   # test.md + answer-key.json 생성(기본 .temp/story-turing-test/<날짜>/)
+python3 scripts/story_turing_test.py --score <DIR>   # test.md에 표시한 뒤 채점. answer-key.json은 채점 전에 열지 않는다
+```
+
 ## 9. persona-diversity-v4 — 기존 글 정리 · 게이트 스크립트
 
 트랙 상세: [history.md](../history.md). 페르소나 연령대를 23~49세로 재구성하면서

@@ -26,6 +26,9 @@ DEFAULT_WINDOW_DAYS = 14
 DEFAULT_EXPAND_DAYS = 30
 STATUS_SOFT = "SOFT"
 STATUS_COMMITTED = "COMMITTED"
+# 영구 기각: 원문 판정(LLM)이 "갈등 없음"으로 거른 글. 다시 claim되지 않는다. 스키마 변경 없음(varchar(16)).
+STATUS_REJECTED = "REJECTED"
+_REJECTED_RESERVE_UNTIL = "2099-12-31 00:00:00"
 # Max candidates to try per window when soft-reserve races
 _CLAIM_ATTEMPTS_PER_WINDOW = 8
 # Max candidates rejected by source_quality per window (not counted in the race budget above).
@@ -84,7 +87,7 @@ def is_reservation_blocking(
     """True if a reservation row permanently or currently blocks reclaim."""
     if not status:
         return False
-    if status == STATUS_COMMITTED:
+    if status in (STATUS_COMMITTED, STATUS_REJECTED):
         return True
     if status == STATUS_SOFT and reserve_until is not None and reserve_until > now:
         return True
@@ -295,7 +298,7 @@ WHERE eb.content_type = 'POST'
       WHERE sib.source_url = eb.source_url
         AND (
             p.id IS NOT NULL
-            OR r.status = 'COMMITTED'
+            OR r.status IN ('COMMITTED', 'REJECTED')
             OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
         )
   )
@@ -404,12 +407,12 @@ def _family_is_blocked(cur, sibling_ids: Sequence[int]) -> bool:
         SELECT 1 FROM example_source_reservations
         WHERE example_id IN ({placeholders})
           AND (
-              status = %s
+              status IN (%s, %s)
               OR (status = %s AND reserve_until > NOW(3))
           )
         LIMIT 1
         """,
-        [*params, STATUS_COMMITTED, STATUS_SOFT],
+        [*params, STATUS_COMMITTED, STATUS_REJECTED, STATUS_SOFT],
     )
     return cur.fetchone() is not None
 
@@ -605,3 +608,33 @@ def expire_source_reservations() -> dict[str, Any]:
                 (STATUS_SOFT,),
             )
             return {"status": "ok", "deleted": int(cur.rowcount)}
+
+
+def reject_source(*, example_id: int, reservation_key: str, reason: str = "") -> dict[str, Any]:
+    """원문을 영구 기각한다 — 같은 source_url 형제 행까지 REJECTED 예약으로 묶어 다시 claim되지 않게 한다.
+
+    claim/available-count/_family_is_blocked 가 REJECTED를 COMMITTED처럼 영구 사용 중으로 취급한다.
+    expire(SOFT만 삭제)·release(SOFT만 삭제)는 REJECTED를 건드리지 않는다.
+    이미 COMMITTED(게시에 쓰인 원문)인 행은 덮어쓰지 않는다.
+    """
+    key = (str(reservation_key).strip() or "rejected")[:128]
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            ids = _sibling_ids_for_url(cur, int(example_id))
+            for sid in ids:
+                cur.execute(
+                    """
+                    INSERT INTO example_source_reservations
+                        (example_id, reservation_key, status, reserve_until, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW(3), NOW(3))
+                    ON DUPLICATE KEY UPDATE
+                        reserve_until = IF(status = %s, reserve_until, VALUES(reserve_until)),
+                        status = IF(status = %s, status, VALUES(status)),
+                        updated_at = NOW(3)
+                    """,
+                    (sid, key, STATUS_REJECTED, _REJECTED_RESERVE_UNTIL,
+                     STATUS_COMMITTED, STATUS_COMMITTED),
+                )
+    logger.info("rejected source example_id=%s siblings=%s key=%s reason=%s",
+                example_id, ids, key, (reason or "")[:200])
+    return {"status": "rejected", "ids": ids}

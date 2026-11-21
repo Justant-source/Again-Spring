@@ -78,6 +78,17 @@ class SourceReservationKeyRequest(CamelCompatModel):
     reservation_key: str
 
 
+class SourceCommentsRequest(CamelCompatModel):
+    example_id: int
+    limit: int = 12
+
+
+class RejectSourceRequest(CamelCompatModel):
+    example_id: int
+    reservation_key: str
+    reason: str = ""
+
+
 @router.post("/save")
 def save_example(req: SaveRequest, request: Request):
     from app.services.register_classifier import classify as classify_register
@@ -411,6 +422,39 @@ def release_source(req: SourceReservationKeyRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/source-comments")
+def source_comments(req: SourceCommentsRequest):
+    """원문 글에 실제로 달린 댓글 무작위 표본(문체·길이 참고용). 없으면 같은 source 최근 댓글로 보충.
+
+    예외·미존재·POST 아님 → 404가 아니라 {"comments": [], "matched": false} (호출부는 참고 없이 진행).
+    """
+    from app.services import source_comments as sc
+
+    try:
+        return sc.get_source_comments(req.example_id, req.limit)
+    except Exception as e:
+        logger.error(f"source_comments error: example_id={req.example_id} {e}")
+        return {"comments": [], "matched": False}
+
+
+@router.post("/reject-source")
+def reject_source(req: RejectSourceRequest):
+    """원문 영구 기각 — 예약 status를 REJECTED로 바꿔 다시 claim되지 않게 한다."""
+    from fastapi import HTTPException
+    from app.services import source_claim
+
+    try:
+        source_claim.reject_source(
+            example_id=req.example_id,
+            reservation_key=req.reservation_key,
+            reason=req.reason,
+        )
+    except Exception as e:
+        logger.error(f"reject_source error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"ok": True}
+
+
 @router.post("/expire-source-reservations")
 def expire_source_reservations():
     """Delete SOFT reservations past reserve_until."""
@@ -504,7 +548,7 @@ def available_count(
                 WHERE sib.source_url = eb.source_url
                   AND (
                       p.id IS NOT NULL
-                      OR r.status = 'COMMITTED'
+                      OR r.status IN ('COMMITTED', 'REJECTED')
                       OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
                   )
             )

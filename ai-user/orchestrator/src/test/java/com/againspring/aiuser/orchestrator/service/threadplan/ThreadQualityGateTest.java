@@ -146,6 +146,25 @@ class ThreadQualityGateTest {
         assertThat(result.passedOperationalMin()).isTrue();
     }
 
+    @Test
+    void allowsStorySideRepliesOutsideCastButNotTopLevel() {
+        List<Map<String, Object>> items = List.of(
+                item("c1", null, "p1", "남 최상위 댓글 하나", "AUTHOR"),
+                item("c2", null, "author-1", "작성자 최상위는 안 됨", "AUTHOR"),
+                item("r1", "c1", "author-1", "작성자 답글 하나입니다", "NEUTRAL"),
+                item("r2", "c1", "author-1", "작성자 답글 둘입니다", "NEUTRAL"),
+                item("r3", "c1", "author-1", "작성자 답글 셋은 상한 초과", "NEUTRAL"),
+                item("c3", null, "p3", "남 최상위 댓글 둘", "NEUTRAL"));
+
+        ThreadQualityGate.QualityResult result = gate.evaluate(
+                items, Set.of("p1", "p3"), id -> true, 2, 2,
+                ThreadQualityGate.DEFAULT_STANCE_SHARE_MAX, Set.of("author-1"));
+
+        assertThat(result.keptItems()).extracting(m -> m.get("ref")).containsExactly("c1", "r1", "r2", "c3");
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("STORY_PERSONA:c2"));
+        assertThat(result.reasons()).anyMatch(r -> r.startsWith("STORY_PERSONA:r3"));
+    }
+
     private static Map<String, Object> item(String ref, String parentRef, String personaId,
                                             String body, String stance) {
         Map<String, Object> m = new LinkedHashMap<>();

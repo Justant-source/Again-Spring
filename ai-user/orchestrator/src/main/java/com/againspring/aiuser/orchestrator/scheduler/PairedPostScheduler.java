@@ -397,6 +397,11 @@ public class PairedPostScheduler {
                         pairedSkeleton.put("sourceExampleId", resolvedSource.sourceExampleId());
                     }
                     pairedSkeleton.put("bSideViable", isBSideViable(resolvedSource));
+                    // phase2(PartnerAnswerPublisher)가 실제 댓글 문체 참고를 재사용한다.
+                    if (resolvedSource.commentStyleReference() != null
+                            && !resolvedSource.commentStyleReference().isEmpty()) {
+                        pairedSkeleton.put("commentStyleReference", resolvedSource.commentStyleReference());
+                    }
                     payload.put(PAIRED_SKELETON_KEY, pairedSkeleton);
                 }
                 candidatesJson = objectMapper.writeValueAsString(payload);
@@ -571,6 +576,8 @@ public class PairedPostScheduler {
             PlanSourceStoryResolver.putStyleReference(request, resolvedSource.sourceBody());
             if (resolvedSource.sourceExampleId() != null) {
                 request.put("sourceExampleId", resolvedSource.sourceExampleId());
+                PlanSourceStoryResolver.putCommentReference(
+                        request, resolvedSource.commentStyleReference(), resolvedSource.sourceTitle());
             }
             if (resolvedSource.dynamicExamples() != null && !resolvedSource.dynamicExamples().isBlank()) {
                 request.put("dynamicExamples", resolvedSource.dynamicExamples());

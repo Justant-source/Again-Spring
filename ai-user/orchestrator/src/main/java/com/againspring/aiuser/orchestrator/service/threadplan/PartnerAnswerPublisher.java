@@ -235,6 +235,9 @@ public class PartnerAnswerPublisher {
             if (skeleton.bSideViable() != null) {
                 request.put("bSideViable", skeleton.bSideViable());
             }
+            if (skeleton.commentStyleReference() != null && !skeleton.commentStyleReference().isEmpty()) {
+                request.put("commentStyleReference", skeleton.commentStyleReference());
+            }
         });
 
         // LLM Generation Gate check: skip generation if held
@@ -260,7 +263,8 @@ public class PartnerAnswerPublisher {
             storySides.add(row.getAuthorPersonaId());
         }
         storySides.add(partner.getId());
-        int stripped = StoryPersonaCommentFilter.stripFromResponse(response, storySides);
+        int stripped = StoryPersonaCommentFilter.stripFromResponse(
+                response, storySides, Map.of(partner.getId(), 1));
         if (stripped > 0) {
             log.info("[PartnerAnswer] Call2 stripped {} story-persona comment(s) corrId={}", stripped, corr);
         }
@@ -333,7 +337,8 @@ public class PartnerAnswerPublisher {
                                Map<String, Object> response, int itemCount, Long sourceExampleId) { }
 
     private record PairedSkeleton(Map<String, Object> sourceContext, Boolean reconstructMode,
-                                   Long sourceExampleId, Boolean bSideViable) { }
+                                   Long sourceExampleId, Boolean bSideViable,
+                                   List<String> commentStyleReference) { }
 
     /**
      * Re-reads the Call1 hold row ({@code ai_scheduled_posts}) by {@code scheduledPostId} and
@@ -363,7 +368,12 @@ public class PartnerAnswerPublisher {
             Boolean reconstructMode = meta.get("reconstructMode") instanceof Boolean b ? b : null;
             Long sourceExampleId = meta.get("sourceExampleId") instanceof Number n ? n.longValue() : null;
             Boolean bSideViable = meta.get("bSideViable") instanceof Boolean b2 ? b2 : null;
-            return Optional.of(new PairedSkeleton(sourceContext, reconstructMode, sourceExampleId, bSideViable));
+            List<String> commentRef = new ArrayList<>();
+            if (meta.get("commentStyleReference") instanceof List<?> cl) {
+                for (Object o : cl) if (o != null && !String.valueOf(o).isBlank()) commentRef.add(String.valueOf(o));
+            }
+            return Optional.of(new PairedSkeleton(
+                    sourceContext, reconstructMode, sourceExampleId, bSideViable, commentRef));
         } catch (Exception e) {
             log.debug("[PartnerAnswer] paired skeleton load failed (non-critical) scheduledPostId={}: {}",
                     scheduledPostId, e.getMessage());

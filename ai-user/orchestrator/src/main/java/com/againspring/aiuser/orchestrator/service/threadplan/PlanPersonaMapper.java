@@ -93,7 +93,7 @@ public class PlanPersonaMapper {
         m.put("nickname", nickname == null || nickname.isBlank() ? p.getId() : nickname);
         // WP3 계약 4: voiceProfile 전체 Map은 더 이상 보내지 않는다 — personaCard(400자 이내
         // 텍스트)로 대체. formality만 프롬프트 조립에 계속 쓰여 남긴다.
-        // 시그니처 문구가 매일 다른 2개로 돌도록 날짜 seed를 준다(같은 날 안에서는 결정론).
+        // 시그니처 문구가 매일 다른 1개로 돌도록 날짜 seed를 준다(같은 날 안에서는 결정론).
         m.put("personaCard", PersonaCard.render(p, (int) java.time.LocalDate.now().toEpochDay()));
         m.put("formality", formalityOf(p));
         if (p.getArchetype() != null) m.put("archetype", p.getArchetype());

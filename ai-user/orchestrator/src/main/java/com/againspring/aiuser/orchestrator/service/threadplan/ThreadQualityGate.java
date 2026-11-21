@@ -71,6 +71,8 @@ public class ThreadQualityGate {
         List<Candidate> provisional = new ArrayList<>();
         Set<String> seenRefs = new HashSet<>();
         Set<String> keptTopLevelRefs = new HashSet<>();
+        Map<String, String> topLevelPersona = new HashMap<>();
+        Map<String, Integer> storyReplyCount = new HashMap<>();
         Set<String> cast = requestedCast == null ? Set.of() : requestedCast;
         Set<String> excluded = excludedStoryPersonaIds == null ? Set.of() : excludedStoryPersonaIds;
         Predicate<String> exists = personaExists == null ? id -> true : personaExists;
@@ -94,12 +96,22 @@ public class ThreadQualityGate {
                 reasons.add("INVALID_CANDIDATE:" + (ref.isBlank() ? "?" : ref));
                 continue;
             }
+            // 사연 작성자·상대방은 최상위 댓글 금지. 대댓글(parentRef 있음)만 허용 — 단 남의 댓글에만,
+            // 인물당 상한(StoryPersonaCommentFilter.DEFAULT_STORY_REPLY_CAP)까지. cast 검사는 면제(llm은 AUTHOR에서 id를 안다).
+            boolean storySideReply = false;
             if (!excluded.isEmpty() && excluded.contains(personaId)) {
-                dropped++;
-                reasons.add("STORY_PERSONA:" + ref);
-                continue;
+                boolean ok = !parentRef.isBlank()
+                        && keptTopLevelRefs.contains(parentRef)
+                        && !personaId.equals(topLevelPersona.get(parentRef))
+                        && storyReplyCount.getOrDefault(personaId, 0) < StoryPersonaCommentFilter.DEFAULT_STORY_REPLY_CAP;
+                if (!ok) {
+                    dropped++;
+                    reasons.add("STORY_PERSONA:" + ref);
+                    continue;
+                }
+                storySideReply = true;
             }
-            if (!cast.isEmpty() && !cast.contains(personaId)) {
+            if (!storySideReply && !cast.isEmpty() && !cast.contains(personaId)) {
                 dropped++;
                 reasons.add("CAST:" + ref);
                 continue;
@@ -126,7 +138,11 @@ public class ThreadQualityGate {
             Map<String, Object> normalized = copyRow(row, ref, parentRef, body, personaId, stance);
             Candidate c = new Candidate(ref, parentRef, personaId, body, stance, normalized);
             provisional.add(c);
-            if (parentRef.isBlank()) keptTopLevelRefs.add(ref);
+            if (storySideReply) storyReplyCount.merge(personaId, 1, Integer::sum);
+            if (parentRef.isBlank()) {
+                keptTopLevelRefs.add(ref);
+                topLevelPersona.put(ref, personaId);
+            }
         }
 
         boolean anyStance = provisional.stream().anyMatch(c -> !c.stance().isBlank());

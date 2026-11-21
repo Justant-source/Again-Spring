@@ -147,4 +147,69 @@ class SkeletonExtractionServiceTest {
 
         assertFalse(resp.isOk());
     }
+
+    private SkeletonExtractResponse run(String json) throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        when(pool.executeSyncTask(anyString(), isNull(), anyLong(), anyString())).thenReturn(json);
+        SkeletonExtractRequest req = new SkeletonExtractRequest();
+        req.setCategory("COUPLE");
+        req.setTitle("t");
+        req.setContent("오빠 보고싶다");
+        return new SkeletonExtractionService(pool).extract(req, "c");
+    }
+
+    @Test
+    void noConflictParsesAsOkWithEmptyFields() throws Exception {
+        SkeletonExtractResponse r = run("{\"has_conflict\":false,\"verdict_lean\":\"SPLIT\"}");
+        assertTrue(r.isOk());
+        assertEquals(Boolean.FALSE, r.getHasConflict());
+        assertEquals("SPLIT", r.getVerdictLean());
+        assertEquals(null, r.getIncident());
+    }
+
+    @Test
+    void missingHasConflictDefaultsTrueAndVerdictDefaultsSplit() throws Exception {
+        SkeletonExtractResponse r = run("""
+                {"category":"WORK","author_role":"대리","counterpart_role":"팀장",
+                 "relationship":"직장","incident":"기획안 가로챔","sequence":["기획","보고","칭찬"],
+                 "stakes":"고과","author_claim":"내 안","counterpart_claim":"팀 성과",
+                 "emotion":"억울함","gray_zone":"공유 안 함","b_side_viable":false}
+                """);
+        assertTrue(r.isOk());
+        assertEquals(Boolean.TRUE, r.getHasConflict());
+        assertEquals("SPLIT", r.getVerdictLean());
+    }
+
+    @Test
+    void verdictLeanNormalizedAndKept() throws Exception {
+        String base = """
+                {"has_conflict":true,"verdict_lean":"%s","category":"WORK","author_role":"대리","counterpart_role":"팀장",
+                 "relationship":"직장","incident":"기획안 가로챔","sequence":["기획","보고","칭찬"],
+                 "stakes":"고과","author_claim":"내 안","counterpart_claim":"팀 성과",
+                 "emotion":"억울함","gray_zone":"공유 안 함","b_side_viable":false}
+                """;
+        assertEquals("PARTNER", run(base.formatted("partner")).getVerdictLean());
+        assertEquals("AUTHOR", run(base.formatted("AUTHOR")).getVerdictLean());
+        assertEquals("SPLIT", run(base.formatted("뭐든")).getVerdictLean());
+    }
+
+    @Test
+    void conflictTrueStillRequiresFields() throws Exception {
+        assertFalse(run("{\"has_conflict\":true,\"verdict_lean\":\"AUTHOR\"}").isOk());
+    }
+
+    @Test
+    void noConflictStillRejectsRefusalSignature() throws Exception {
+        assertFalse(run("{\"has_conflict\":false,\"incident\":\"I can't help with this request\"}").isOk());
+    }
+
+    @Test
+    void jsonUsesSnakeCaseKeys() throws Exception {
+        SkeletonExtractResponse r = run("{\"has_conflict\":false,\"verdict_lean\":\"AUTHOR\"}");
+        var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+                new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(r));
+        assertTrue(node.has("has_conflict"));
+        assertFalse(node.has("hasConflict"));
+        assertEquals("AUTHOR", node.get("verdict_lean").asText());
+    }
 }

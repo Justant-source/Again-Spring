@@ -159,9 +159,9 @@ public class ScheduledPostPublisher {
                     .hookEmotion(readHookEmotionFromCandidates(row.getCandidatesJson()))
                     .metaphorId(readMetaphorIdFromCandidates(row.getCandidatesJson()))
                     .metaphorIds(readMetaphorIdsFromCandidates(row.getCandidatesJson()));
-            if (!paired) {
-                applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
-            }
+            // 양면 사연도 원문을 쓰므로 솔로와 같이 provenance를 backend로 넘긴다
+            // (PairedPostScheduler가 candidates_json의 _sourceProvenance에 기록한다).
+            applyProvenanceFromCandidates(postBuilder, row.getCandidatesJson());
             Optional<PostDto> published = backend.createPost(jwt.get(), postBuilder.build());
             if (published.isEmpty() || published.get().getId() == null) {
                 // Cap retries: a permanent reject must not monopolize the due queue.
