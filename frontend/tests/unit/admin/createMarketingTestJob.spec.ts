@@ -28,3 +28,17 @@ describe('createMarketingTestJob', () => {
     expect(body.autoPublish).toBe(false);
   });
 });
+
+describe('startPreviewBatch', () => {
+  it('preview-batch 엔드포인트에 본문을 그대로 보낸다', async () => {
+    post.mockReset();
+    post.mockResolvedValue({ data: { postIds: ['a'], arms: ['dilemma'], platform: 'youtube_shorts' } });
+    const { startPreviewBatch } = await import('@/lib/api/admin/marketingExperiment');
+    const r = await startPreviewBatch({ postCount: 5, platform: 'youtube_shorts' });
+    expect(post).toHaveBeenCalledWith('/api/admin/marketing/experiment/preview-batch', {
+      postCount: 5,
+      platform: 'youtube_shorts',
+    });
+    expect(r.arms).toEqual(['dilemma']);
+  });
+});

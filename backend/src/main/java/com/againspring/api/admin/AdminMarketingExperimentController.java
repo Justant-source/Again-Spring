@@ -7,6 +7,7 @@ import com.againspring.marketing.experiment.FormatArm;
 import com.againspring.marketing.experiment.MarketingExperimentSettings;
 import com.againspring.marketing.experiment.MarketingFormatArmService;
 import com.againspring.marketing.experiment.MarketingOutcomeService;
+import com.againspring.marketing.experiment.MarketingPreviewBatchService;
 import com.againspring.marketing.experiment.MarketingTopicBiasService;
 import com.againspring.repository.marketing.MarketingAccountStatsRepository;
 import com.againspring.repository.marketing.MarketingFormatArmRepository;
@@ -49,6 +50,7 @@ public class AdminMarketingExperimentController {
     private final MarketingFormatArmRepository armRepository;
     private final MarketingOutcomeService outcomeService;
     private final MarketingTopicBiasService topicBiasService;
+    private final MarketingPreviewBatchService previewBatchService;
     private final MarketingPublicationOutcomeRepository outcomeRepository;
     private final MarketingAccountStatsRepository accountStatsRepository;
     private final Clock clock;
@@ -112,6 +114,29 @@ public class AdminMarketingExperimentController {
                 org.springframework.http.HttpStatus.BAD_REQUEST, "enabled is required");
         }
         return ResponseEntity.ok(armService.setEnabled(key, body.enabled()));
+    }
+
+    public record PreviewBatchRequest(Integer postCount, List<String> arms, String platform) {}
+
+    @PostMapping("/preview-batch")
+    @Auditable(action = "RUN_MARKETING_PREVIEW_BATCH")
+    @Operation(summary = "포맷 비교용 일괄 테스트 렌더",
+        description = "최근 공개 사연 N개 x arm 목록(기본: baseline 제외 전부)을 자동 게시 없이 렌더. 사연별로 순서대로, 사연끼리 병렬")
+    public ResponseEntity<MarketingPreviewBatchService.Started> startPreviewBatch(
+            @RequestBody(required = false) PreviewBatchRequest body) {
+        try {
+            var started = previewBatchService.start(
+                body != null && body.postCount() != null ? body.postCount() : 5,
+                body != null ? body.arms() : null,
+                body != null ? body.platform() : null);
+            return ResponseEntity.accepted().body(started);
+        } catch (IllegalStateException e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     @PostMapping("/score/run")

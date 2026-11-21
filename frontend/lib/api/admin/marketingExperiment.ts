@@ -67,3 +67,17 @@ export async function runExperimentScoring(): Promise<{ created: number }> {
   const res = await api.post<{ created: number }>(`${BASE}/score/run`);
   return res.data;
 }
+
+export interface PreviewBatchStarted {
+  postIds: string[];
+  arms: string[];
+  platform: string;
+}
+
+/** 최근 공개 사연 N개 x arm(기본: baseline 제외 전부)을 자동 게시 없이 순차 렌더한다. 진행 중이면 409. */
+export async function startPreviewBatch(
+  body: { postCount?: number; arms?: string[]; platform?: string } = {}
+): Promise<PreviewBatchStarted> {
+  const res = await api.post<PreviewBatchStarted>('/api/admin/marketing/experiment/preview-batch', body);
+  return res.data;
+}

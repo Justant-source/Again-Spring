@@ -35,6 +35,7 @@ class AdminMarketingExperimentControllerTest {
     @Mock MarketingFormatArmRepository armRepository;
     @Mock MarketingOutcomeService outcomeService;
     @Mock MarketingTopicBiasService topicBiasService;
+    @Mock MarketingPreviewBatchService previewBatchService;
     @Mock MarketingPublicationOutcomeRepository outcomeRepository;
     @Mock MarketingAccountStatsRepository accountStatsRepository;
 
@@ -43,7 +44,7 @@ class AdminMarketingExperimentControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AdminMarketingExperimentController(settings, armService, armRepository, outcomeService,
-            topicBiasService, outcomeRepository, accountStatsRepository,
+            topicBiasService, previewBatchService, outcomeRepository, accountStatsRepository,
             Clock.fixed(Instant.parse("2026-11-21T00:00:00Z"), ZoneOffset.UTC));
     }
 

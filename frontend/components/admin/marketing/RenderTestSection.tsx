@@ -19,7 +19,7 @@ import {
   getMarketingJob,
 } from '@/lib/api/admin/marketing';
 import { useRenderTestStore, formatApiError, EMPTY_REVIEW, TestRun, ReviewItem } from '@/lib/store/renderTestStore';
-import { getExperiment, ExperimentArm } from '@/lib/api/admin/marketingExperiment';
+import { getExperiment, startPreviewBatch, ExperimentArm } from '@/lib/api/admin/marketingExperiment';
 import { RefreshCw, Play, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -490,6 +490,25 @@ export function RenderTestSection() {
   const [manualRenderProfile, setManualRenderProfile] = useState<string>('marketing_v2');
   const [manualFormatArm, setManualFormatArm] = useState<string>('');
 
+  // 포맷 비교용 일괄 렌더(최근 사연 5개 x 포맷 4개, 쇼츠). 같은 사연은 순서대로, 사연끼리는 병렬.
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const runPreviewBatch = async () => {
+    if (!window.confirm('최근 공개 사연 5개를 포맷 4종으로 각각 렌더합니다(총 20개, 쇼츠, 게시 안 함). LLM 호출이 20회 발생하고 렌더에 1~2시간이 걸릴 수 있습니다. 시작할까요?')) {
+      return;
+    }
+    setBatchBusy(true);
+    setBatchMsg(null);
+    try {
+      const r = await startPreviewBatch({ postCount: 5, platform: 'youtube_shorts' });
+      setBatchMsg(`시작했습니다: 사연 ${r.postIds.length}개 x 포맷 ${r.arms.length}개 (${r.arms.join(', ')}). 아래 「서버의 최근 테스트 잡」에서 진행을 봅니다.`);
+    } catch (err: unknown) {
+      setBatchMsg(`시작하지 못했습니다: ${formatApiError(err)}`);
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   // 포맷 arm 목록(실험 API). 불러오지 못하면 arm 선택 UI만 숨기고 기존 테스트 탭은 그대로 쓴다.
   const [arms, setArms] = useState<ExperimentArm[]>([]);
   useEffect(() => {
@@ -748,6 +767,20 @@ export function RenderTestSection() {
           </div>
         </div>
       </Card>
+
+      {/* 포맷 비교용 일괄 렌더 */}
+      <div className="rounded-lg border border-violet-200 bg-violet-50 p-4" data-testid="render-test-batch-card">
+        <h3 className="mb-2 text-sm font-semibold text-violet-900">🎞️ 포맷 비교용 일괄 렌더</h3>
+        <p className="mb-3 text-xs text-violet-800">
+          최근 공개 사연 5개를 새 포맷 4종(short_reveal · dilemma · kinetic_reveal · reaction_reveal)으로 각각 렌더합니다.
+          자동 게시는 하지 않습니다. 결과는 아래 「서버의 최근 테스트 잡」에서 사연별로 나란히 비교할 수 있습니다.
+        </p>
+        <Button size="sm" onClick={runPreviewBatch} disabled={batchBusy} data-testid="render-test-batch-button">
+          <Play className="mr-1 h-3 w-3" />
+          {batchBusy ? '시작 중…' : '5개 사연 × 4포맷 렌더 시작'}
+        </Button>
+        {batchMsg && <p className="mt-2 text-xs text-violet-900">{batchMsg}</p>}
+      </div>
 
       {/* WS6.6 승인 세트 렌더 */}
       <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">

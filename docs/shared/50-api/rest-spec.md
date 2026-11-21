@@ -417,6 +417,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 | PUT | `/api/admin/marketing/experiment/settings` | **JWT + ADMIN** | 200 | Body `{enabled?, topicBiasEnabled?}` 부분 갱신. 키 `marketing.experiment.enabled`·`topic_bias_enabled`(기본 false). 감사 로그 |
 | PATCH | `/api/admin/marketing/experiment/arms/{key}` | **JWT + ADMIN** | 200 / 400 / 404 | Body `{enabled}`. arm 켜기/끄기. 감사 로그 |
 | POST | `/api/admin/marketing/experiment/score/run` | **JWT + ADMIN** | 200 | 지금 채점. `{created}` = 새로 만든 `marketing_publication_outcome` 행 수. 감사 로그 |
+| POST | `/api/admin/marketing/experiment/preview-batch` | **JWT + ADMIN** | 202 | 포맷 비교용 일괄 테스트 렌더(자동 게시 없음). body `{postCount?=5(최대 10), arms?=baseline 제외 전부, platform?=youtube_shorts\|instagram_reels}` → `{postIds, arms, platform}`. 사연별 arm 순차·사연끼리 병렬, 한 번에 한 배치(진행 중이면 409), 잘못된 platform·arm은 400. 서버 재시작 시 남은 arm은 이어지지 않음. 감사 로그 |
 | GET | `/api/admin/marketing/weekly-report` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 리포트. Query `weeksAgo`(기본0). top/bottom 사연 · byEmotion · byCategory · utmInflow(`visit_events` utm_campaign=`story_%`) |
 | POST | `/api/admin/marketing/score-weights/auto-adjust/run` | **JWT + ADMIN** | 200 | Phase 2.7: 주간 가중치 보정 1회. `auto_adjust=false`면 applied=false(report-only). 델타 캡 ±5%/±0.05. 프롬프트 패치 없음(M4) |
 | GET/POST/… | `/api/admin/marketing/jobs*` · `/credentials*` · `/performance` · `/timeline` | **JWT + ADMIN** | — | 잡·자격증명·통계 (ASM 프록시). 상세: [platforms.md](../marketing/70-policy/platforms.md) |

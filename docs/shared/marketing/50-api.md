@@ -849,6 +849,7 @@ PATCH /api/admin/marketing/experiment/arms/{key}
       Body: { enabled }                       → arm | 400 (enabled 누락) | 404 (모르는 key)
 
 POST  /api/admin/marketing/experiment/score/run
+POST  /api/admin/marketing/experiment/preview-batch   body {postCount?, arms?, platform?} → 202 {postIds, arms, platform} (포맷 비교용 일괄 테스트 렌더, 409=진행 중)
       → { created }                            지금 채점. 새로 만든 outcome 행 수
 ```
 
