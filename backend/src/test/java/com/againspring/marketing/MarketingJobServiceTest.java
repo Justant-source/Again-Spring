@@ -2022,6 +2022,39 @@ class MarketingJobServiceTest {
     }
 
     @Test
+    void regenerateJob_ofTestJob_staysNonPublishing() throws Exception {
+        // 2026-11-21 prod: 실패한 테스트 잡(autoPublish=false)이 자동 재시도로 되살아나 YouTube에 게시됐다.
+        stubVideoJob("youtube_shorts");
+        MarketingJob previous = MarketingJob.builder()
+            .id(7L).postId(TEST_POST_ID).status("FAILED").failureCode("SIBOM_PLAN_EMPTY")
+            .generationAttempt(1).targets("[\"youtube_shorts\"]").autoPublish(false)
+            .renderProfile("marketing_v2").build();
+        when(marketingJobRepository.findById(7L)).thenReturn(Optional.of(previous));
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(List.of("youtube_shorts"));
+
+        MarketingJob child = marketingJobService.regenerateJob(7L, "system:auto-retry");
+
+        assertThat(child.getAutoPublish()).isFalse();
+        assertThat(sentRequest().getOptions().isAutoPublish()).isFalse();
+    }
+
+    @Test
+    void regenerateJob_ofAutoPublishJob_keepsPublishing() throws Exception {
+        stubVideoJob("youtube_shorts");
+        MarketingJob previous = MarketingJob.builder()
+            .id(8L).postId(TEST_POST_ID).status("FAILED").failureCode("SIBOM_PLAN_EMPTY")
+            .generationAttempt(1).targets("[\"youtube_shorts\"]").autoPublish(true)
+            .renderProfile("marketing_v2").build();
+        when(marketingJobRepository.findById(8L)).thenReturn(Optional.of(previous));
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(List.of("youtube_shorts"));
+
+        MarketingJob child = marketingJobService.regenerateJob(8L, "system:auto-retry");
+
+        assertThat(child.getAutoPublish()).isTrue();
+        assertThat(sentRequest().getOptions().isAutoPublish()).isTrue();
+    }
+
+    @Test
     void regenerateJob_inheritsArmOfPreviousJob_withoutPickingNew() throws Exception {
         stubVideoJob("instagram_reels");
         MarketingJob previous = MarketingJob.builder()

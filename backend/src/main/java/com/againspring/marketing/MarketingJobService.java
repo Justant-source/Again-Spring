@@ -539,7 +539,9 @@ public class MarketingJobService {
             throw new IllegalStateException("Job targets cannot be read for regeneration", e);
         }
         int nextAttempt = previous.getGenerationAttempt() == null ? 2 : previous.getGenerationAttempt() + 1;
-        return createJob(previous.getPostId(), targets, true,
+        // 원래 잡의 자동 게시 여부를 그대로 물려받는다. 항상 true로 만들면 실패한 테스트 잡(autoPublish=false)이
+        // 자동 재시도로 되살아나며 실제 채널에 게시된다(2026-11-21 prod: 테스트 영상 7개가 YouTube에 게시됨).
+        return createJob(previous.getPostId(), targets, Boolean.TRUE.equals(previous.getAutoPublish()),
             requestedBy == null ? "admin:regenerate:" + jobId : requestedBy,
             previous.getId(), nextAttempt, previous.getRenderProfile());
     }
@@ -1570,7 +1572,7 @@ public class MarketingJobService {
                     result.put("action", "REGENERATED");
                 } else {
                     // Use recreate fallback
-                    child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
+                    child = createJob(source.getPostId(), targets, Boolean.TRUE.equals(source.getAutoPublish()), requestedBy, source.getId(),
                         (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1,
                         source.getRenderProfile());
                     result.put("action", "RECREATED");
@@ -1582,7 +1584,7 @@ public class MarketingJobService {
                 // 409 Conflict on regenerate → fallback to createJob
                 if (e.getMessage() != null && e.getMessage().contains("409")) {
                     try {
-                        child = createJob(source.getPostId(), targets, true, requestedBy, source.getId(),
+                        child = createJob(source.getPostId(), targets, Boolean.TRUE.equals(source.getAutoPublish()), requestedBy, source.getId(),
                             (source.getGenerationAttempt() != null ? source.getGenerationAttempt() : 1) + 1,
                             source.getRenderProfile());
                         result.put("action", "RECREATED");
