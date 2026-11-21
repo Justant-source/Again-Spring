@@ -166,3 +166,38 @@ class TestResolveCategory:
             "아빠 본가",
             board_category="workplace",
         ) == "FAMILY"
+
+
+# --- 본문 추출 (2026-11: og:description 미리보기 → p.contents-txt 전체 본문) ---
+from app.crawlers.blind import _extract_content  # noqa: E402
+
+_BODY_HTML = """
+<html><head>
+<meta property="og:description" content="부부상담만 하고나면 더 싸우네요우리만 그런줄 알았는데 그런부부 많다고 하더라구요결국은 부부상담응 돈벌이고 생각하고 화해는 커녕오히려 화를 더 키우게됐네요상담받고 이혼하는 부부도 많다더니만..."/>
+</head><body><main>
+<div class="article-view-contents">
+  <p class="contents-txt" id="contentArea">부부상담만 하고나면 더 싸우네요<br/>우리만 그런줄 알았는데 그런부부 많다고 하더라구요<br/>결국은 부부상담응 돈벌이고 생각하고 화해는 커녕<br/>오히려 화를 더 키우게됐네요<br/>상담받고 이혼하는 부부도 많다더니만...</p>
+  <ul class="tag-actions"><li><a class="action-tag"><span class="text">직장인끼리 소개팅하러 가기 by 소개팅앱</span></a></li></ul>
+  <div class="article_info"><div class="info"><span class="like"><i class="blind">좋아요</i>1</span></div></div>
+</div>
+<div class="rcmd_tp rcmd_btm"><section class="article-list"><a>가연에서 솔로 탈출 가능할까?</a>
+<a>(광고) 오휘 미라클 모이스처 핑크 베리어 스킨 150ml</a></section></div>
+</main></body></html>
+"""
+
+
+def test_extract_content_uses_full_body_with_br_newlines_not_sidebar():
+    content = _extract_content(BeautifulSoup(_BODY_HTML, "html.parser"))
+    assert content.count("\n") == 4  # <br> → 줄바꿈 보존
+    assert content.startswith("부부상담만 하고나면 더 싸우네요\n우리만")
+    assert "소개팅" not in content and "광고" not in content and "가연" not in content
+
+
+def test_extract_content_no_body_node_falls_back_to_og_but_never_main_sidebar():
+    html = _BODY_HTML.replace('id="contentArea"', "").replace("contents-txt", "x").replace("article-view-contents", "y")
+    content = _extract_content(BeautifulSoup(html, "html.parser"))
+    assert content is not None and content.startswith("부부상담만")
+    assert "광고" not in content and "\n" not in content  # og 미리보기: 줄바꿈 없음 → 품질 게이트가 판정
+
+    html_no_og = html.replace("og:description", "og:none")
+    assert _extract_content(BeautifulSoup(html_no_og, "html.parser")) is None  # <main> 폴백 삭제

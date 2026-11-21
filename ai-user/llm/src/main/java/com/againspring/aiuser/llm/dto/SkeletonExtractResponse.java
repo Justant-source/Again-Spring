@@ -30,6 +30,8 @@ public class SkeletonExtractResponse {
     @JsonProperty("counterpart_claim") private final String counterpartClaim;
     private final String emotion;
     @JsonProperty("gray_zone") private final String grayZone;
+    /** 원문 글의 성격·화자 태도(고민 상담/분노 토로/웃긴 썰 등). 선택 키 — null이면 응답에서 생략. */
+    private final String tone;
     /**
      * Lombok의 기본 getter-이름 맹글링(연속 대문자 "BS" → "bs")이 필드명 mangling과
      * 어긋나 Jackson이 이 필드를 두 개의 서로 다른 프로퍼티(필드 쪽 "b_side_viable",

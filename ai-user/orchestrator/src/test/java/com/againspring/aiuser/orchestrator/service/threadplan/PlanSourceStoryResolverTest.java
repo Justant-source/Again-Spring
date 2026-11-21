@@ -289,4 +289,30 @@ class PlanSourceStoryResolverTest {
                 .createdAt(Instant.now())
                 .build();
     }
+
+    @Test
+    void putStyleReference_truncatesTo1500CodePointsAndReportsFullLength() {
+        String body = "가".repeat(1400) + "😀".repeat(300); // 1700 코드포인트, 서러게이트 포함
+        Map<String, Object> req = new java.util.LinkedHashMap<>();
+        PlanSourceStoryResolver.putStyleReference(req, body);
+        String ref = (String) req.get("styleReference");
+        assertThat(ref.codePointCount(0, ref.length())).isEqualTo(1500);
+        assertThat(req.get("sourceLength")).isEqualTo(1700);
+    }
+
+    @Test
+    void putStyleReference_shortBodyKeptWhole() {
+        Map<String, Object> req = new java.util.LinkedHashMap<>();
+        PlanSourceStoryResolver.putStyleReference(req, "짧은 원문");
+        assertThat(req.get("styleReference")).isEqualTo("짧은 원문");
+        assertThat(req.get("sourceLength")).isEqualTo(5);
+    }
+
+    @Test
+    void putStyleReference_omittedWhenNullOrBlank() {
+        Map<String, Object> req = new java.util.LinkedHashMap<>();
+        PlanSourceStoryResolver.putStyleReference(req, null);
+        PlanSourceStoryResolver.putStyleReference(req, "  \n\t ");
+        assertThat(req).doesNotContainKeys("styleReference", "sourceLength");
+    }
 }

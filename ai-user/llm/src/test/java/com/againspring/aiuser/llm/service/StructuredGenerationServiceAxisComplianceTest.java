@@ -76,9 +76,13 @@ class StructuredGenerationServiceAxisComplianceTest {
 
     @Test
     void axisViolations_linebreakWallButChopped() {
-        String choppedBody = "오늘 진짜 있었던 일 말할게\n아침부터 팀장이 갑자기 불러서\n혼났음 진짜 어이없어서 눈물 남";
+        String choppedBody = "오늘 진짜 있었던 일 말할게\n아침부터 팀장이 갑자기 불러서\n혼났음 진짜 어이없어서 눈물 남\n그래서 말했지\n싫다고";
         List<String> v = StructuredGenerationService.axisViolations(choppedBody, Map.of("linebreak", "WALL"));
-        assertTrue(v.contains("linebreak_wall_but_chopped"));
+        assertTrue(v.contains("linebreak_wall_but_chopped"), "5개 이상 줄은 WALL 위반");
+        // 덩어리 문단 2~4개는 WALL과 모순되지 않는다.
+        String paragraphs = "오늘 진짜 있었던 일 말할게 아침부터 팀장이 갑자기 불러서\n혼났음 진짜 어이없어서 눈물 남 그래서 말했지 싫다고";
+        assertFalse(StructuredGenerationService.axisViolations(paragraphs, Map.of("linebreak", "WALL"))
+                .contains("linebreak_wall_but_chopped"));
     }
 
     @Test
@@ -118,8 +122,9 @@ class StructuredGenerationServiceAxisComplianceTest {
     void buildAxisRetryPrompt_containsFixInstructionsAndOriginalDraft() {
         String prompt = StructuredGenerationService.buildAxisRetryPrompt(
             "원본 초안", List.of("emoticon_high_but_absent", "linebreak_wall_but_chopped"), "post");
-        assertTrue(prompt.contains("문단마다 최소 1개씩 실제로 넣어라"));
-        assertTrue(prompt.contains("줄바꿈을 없애라"));
+        assertTrue(prompt.contains("두세 번만 넣어라"));
+        assertFalse(prompt.contains("문단마다 최소 1개씩"));
+        assertTrue(prompt.contains("2~4개 덩어리"));
         assertTrue(prompt.contains("원본 초안"));
         assertFalse(prompt.contains("PERSONAS="), "스키마·페르소나 목록 재첨부 금지");
     }
@@ -160,6 +165,25 @@ class StructuredGenerationServiceAxisComplianceTest {
         assertEquals("이모티콘 넣어서 다시 씀 ㅋㅋㅋ 완전 웃김 ㅠㅠ", response.getPost().getBody());
         verify(pool, times(1)).executeSyncTask(anyString(), anyString(), anyLong(),
             eq("corr-axis-on-axis-retry"), eq(LlmProvider.CLAUDE));
+    }
+
+    @Test
+    void enforceAxisCompliance_skippedForPostWithStyleReference() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configuredService(pool);
+        ReflectionTestUtils.setField(service, "axisComplianceEnabled", true);
+
+        ThreadPlanRequest request = planRequestWithCard(CARD_EMOTICON_HIGH);
+        request.setStyleReference("원문 문체 참고용 본문입니다 ㅎㅎ");
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.THREAD_PLAN)))
+            .thenReturn(planJsonWithPostBody("이모티콘 하나도 없는 담담한 본문입니다"));
+
+        ThreadPlanResponse response = service.createThreadPlan(request, "corr-axis-styleref");
+
+        assertEquals("이모티콘 하나도 없는 담담한 본문입니다", response.getPost().getBody());
+        verify(pool, never()).executeSyncTask(anyString(), anyString(), anyLong(),
+            eq("corr-axis-styleref-axis-retry"), any());
     }
 
     @Test

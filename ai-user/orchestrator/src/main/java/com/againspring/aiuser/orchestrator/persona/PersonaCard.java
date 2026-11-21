@@ -25,6 +25,12 @@ import java.util.Map;
  * 이유: {@code StructuredGenerationService}의 결정론적 self-critique가 같은 문자열에서
  * 정규식으로 의도 값을 파싱해 출력과 대조할 수 있어야 하기 때문이다(라벨 문구가 바뀌어도
  * axis=VALUE 토큰은 안정적).
+ *
+ * <p><b>2026-11 개정(명령→배경)</b> — prod 실측: 명령형 문체 지시 + 예시 인용구 때문에
+ * DEFENSIVE 글 71%가 예시 문구를 첫 문장에 복사, 시그니처 문구가 28% 글에 토씨 그대로 등장했다.
+ * 이제 머리말은 "평소 말버릇(배경)", 축 서술은 성향, 예시 인용구는 어떤 축에도 없고, 시그니처는
+ * 최대 2개 "가끔 쓰는 표현"이며, 모순 조합은 렌더 단계에서 낮춘다({@link #effectiveAxes}).
+ * 표현 denylist는 두지 않는다(절대 규칙 #3).
  */
 public final class PersonaCard {
 
@@ -45,12 +51,25 @@ public final class PersonaCard {
     }
 
     public static String render(Persona p, String nickname) {
+        return render(p, nickname, 0);
+    }
+
+    /** 닉네임 폴백 + 시그니처 회전 seed. 생성 요청 매퍼가 날짜 seed로 호출해 같은 문구 반복을 줄인다. */
+    public static String render(Persona p, int seed) {
+        return render(p, fallbackNickname(p), seed);
+    }
+
+    /**
+     * 시그니처 문구 선택을 호출마다 달리하고 싶은 호출자용 오버로드. {@code seed}가 같으면 출력도
+     * 같다(순수 함수 유지). seed=0이면 앞 2개 고정. PlanPersonaMapper는 날짜(epochDay) seed로 호출한다.
+     */
+    public static String render(Persona p, String nickname, int seed) {
         if (p == null) return "";
         StringBuilder sb = new StringBuilder();
         sb.append("[페르소나] ").append(line1(p, nickname));
         sb.append('\n').append("[말투] ").append(line2(p));
 
-        String habits = line3(p);
+        String habits = line3(p, seed);
         if (!habits.isBlank()) sb.append('\n').append("[버릇] ").append(habits);
 
         String interests = line4(p);
@@ -73,7 +92,8 @@ public final class PersonaCard {
         parts.add(jobKr(p));
         String region = stringField(p, "region");
         if (!region.isBlank()) parts.add(region);
-        return String.join(" · ", parts);
+        return String.join(" · ", parts)
+                + " (직업·나이·지역은 배경 사실이다. 사건과 관계 없으면 글에서 언급하지 않고, 직업을 소재로 농담하지 않는다)";
     }
 
     private static String genderKr(String gender) {
@@ -123,8 +143,8 @@ public final class PersonaCard {
      * 파싱하지 않음 — 순수 렌더러 책임 분리).
      */
     private static String line2(Persona p) {
-        Map<String, String> axes = p.getStyleAxes();
-        if (axes == null || axes.isEmpty()) return "정보 없음";
+        Map<String, String> axes = effectiveAxes(p.getStyleAxes());
+        if (axes.isEmpty()) return "정보 없음";
 
         List<String> bullets = new java.util.ArrayList<>();
         for (String key : AXIS_ORDER) {
@@ -132,69 +152,96 @@ public final class PersonaCard {
             if (directive != null) bullets.add("- " + directive);
         }
         if (bullets.isEmpty()) return "정보 없음";
-        return "아래 문체 지시는 라벨이 아니라 명령이다 — 전부 실제 문장에 반영할 것:\n"
+        return "평소 말버릇이다. 자연스러운 자리에서만 드러나고, 전부 넣으려 하지 않는다:\n"
                 + String.join("\n", bullets);
     }
 
     /**
-     * {@code key=VALUE: 한국어 지시문} 한 줄, 인식 불가 값이면 null(해당 축 생략).
-     * 지시문은 "무엇을 하라"는 구체 행동으로 쓴다 — 형용사 라벨 금지.
+     * 렌더 단계 전용 조합 정리(DB 값은 그대로). 없는 화자를 만드는 모순 조합을 한 단계 낮춘다.
+     * 낮춘 값은 태그의 VALUE에도 그대로 반영된다(llm 자기검증과 어긋나지 않게).
+     * <ul>
+     *   <li>speech=JONDAE + profanity=HEAVY → profanity=MILD</li>
+     *   <li>directness=SOFT + profanity=HEAVY → profanity=MILD (에둘러 말하는 화자의 폭언)</li>
+     *   <li>emoticon=HIGH + humor=SERIOUS + affect=ANALYTIC → emoticon=LOW</li>
+     * </ul>
+     */
+    static Map<String, String> effectiveAxes(Map<String, String> raw) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (raw == null) return out;
+        for (Map.Entry<String, String> e : raw.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            out.put(e.getKey(), e.getValue().trim().toUpperCase(java.util.Locale.ROOT));
+        }
+        if ("HEAVY".equals(out.get("profanity"))
+                && ("JONDAE".equals(out.get("speech")) || "SOFT".equals(out.get("directness")))) {
+            out.put("profanity", "MILD");
+        }
+        if ("HIGH".equals(out.get("emoticon"))
+                && "SERIOUS".equals(out.get("humor")) && "ANALYTIC".equals(out.get("affect"))) {
+            out.put("emoticon", "LOW");
+        }
+        return out;
+    }
+
+    /**
+     * {@code key=VALUE: 한국어 서술} 한 줄, 인식 불가 값이면 null(해당 축 생략).
+     * 할당량("최소 N번")이나 예시 인용구를 쓰지 않고 성향만 서술한다 — 예시는 모델이 그대로 복사한다.
      */
     private static String axisDirective(String key, String rawValue) {
         if (rawValue == null || rawValue.isBlank()) return null;
         String v = rawValue.toUpperCase(java.util.Locale.ROOT);
         String directive = switch (key) {
             case "directness" -> switch (v) {
-                case "BLUNT" -> "돌려 말하지 않고 하고 싶은 말을 바로 한다";
-                case "SOFT" -> "직접 말하지 않고 에둘러 표현한다";
+                case "BLUNT" -> "돌려 말하지 않고 하고 싶은 말을 바로 하는 편";
+                case "SOFT" -> "직접 말하기보다 에둘러 표현하는 편";
                 default -> null;
             };
             case "affect" -> switch (v) {
-                case "EMOTIONAL" -> "감정을 억누르지 않고 그대로 터뜨리듯 쓴다";
-                case "ANALYTIC" -> "감정보다 상황을 분석하듯 담담하게 설명한다";
+                case "EMOTIONAL" -> "감정이 말에 그대로 묻어나는 편";
+                case "ANALYTIC" -> "감정보다 상황을 따져 담담하게 설명하는 편";
                 default -> null;
             };
             case "humor" -> switch (v) {
-                case "JOKER" -> "자조나 드립을 최소 1번은 실제로 넣는다";
-                case "SERIOUS" -> "농담 없이 시종일관 진지하게 쓴다";
+                case "JOKER" -> "분위기상 어울릴 때 자조 섞인 농담이 슬쩍 나오는 편";
+                case "SERIOUS" -> "농담 없이 진지한 편";
                 default -> null;
             };
             case "stance" -> switch (v) {
-                case "OFFENSIVE" -> "상대 잘못을 직접 지적하며 몰아붙인다";
-                case "DEFENSIVE" -> "내 잘못일 가능성을 먼저 방어적으로 깔고 말한다(예: \"내가 예민한 걸 수도 있는데\")";
+                case "OFFENSIVE" -> "자기가 옳다고 확신하고 상대 탓을 하는 편";
+                case "DEFENSIVE" -> "확신이 없어 남들 생각을 묻는 편";
                 default -> null;
             };
             case "length" -> switch (v) {
-                case "LONG" -> "문장을 길게 늘여 쓴다";
-                case "SHORT" -> "문장을 짧게 끊어 쓴다";
+                case "LONG" -> "문장이 긴 편";
+                case "SHORT" -> "문장이 짧게 끊기는 편";
                 default -> null;
             };
             case "speech" -> switch (v) {
-                case "BANMAL" -> "반말만 쓴다 — ~요/~습니다 종결 절대 금지";
-                case "JONDAE" -> "존댓말만 쓴다 — 반말 종결 절대 금지";
-                case "MIXED" -> "반말과 존댓말을 문장마다 섞어 쓴다";
+                case "BANMAL" -> "반말로 쓴다";
+                case "JONDAE" -> "존댓말로 쓴다";
+                case "MIXED" -> "반말과 존댓말이 섞이는 편";
                 default -> null;
             };
             case "emoticon" -> switch (v) {
-                case "NONE" -> "ㅋㅋ·ㅠㅠ 등 이모티콘을 전혀 쓰지 않는다";
-                case "LOW" -> "이모티콘은 글 전체에서 한두 번만 쓴다";
-                case "HIGH" -> "문단마다 ㅋㅋ·ㅠㅠ 같은 표현을 실제로 넣는다";
+                case "NONE" -> "ㅋㅋ·ㅠㅠ 같은 표현을 쓰지 않는 편";
+                case "LOW" -> "ㅋㅋ·ㅠㅠ 같은 표현은 드물게 쓰는 편";
+                case "HIGH" -> "ㅋㅋ·ㅠㅠ 같은 표현을 자주 쓰는 편";
                 default -> null;
             };
             case "spelling" -> switch (v) {
-                case "CLEAN" -> "맞춤법·띄어쓰기를 정확히 지킨다";
-                case "SLOPPY" -> "오탈자·축약을 자연스럽게 섞는다(예: ㄱㅊ, 어케, 담에)";
+                case "CLEAN" -> "맞춤법·띄어쓰기를 지키는 편";
+                case "SLOPPY" -> "맞춤법·띄어쓰기가 느슨하고 축약이 섞이는 편";
                 default -> null;
             };
             case "linebreak" -> switch (v) {
-                case "WALL" -> "줄바꿈 없이 한 문단으로 몰아 쓴다";
-                case "CHOPPED" -> "한두 문장마다 줄을 바꾼다";
+                case "WALL" -> "줄바꿈이 적고 한 덩어리로 쓰는 편";
+                case "CHOPPED" -> "줄을 자주 바꾸는 편";
                 default -> null;
             };
             case "profanity" -> switch (v) {
-                case "NONE" -> "욕설을 전혀 쓰지 않는다";
-                case "MILD" -> "욕설을 아주 가끔, 약하게만 섞는다";
-                case "HEAVY" -> "욕설·비속어를 실제로 섞어 쓴다 — 순화하지 않는다";
+                case "NONE" -> "욕설을 쓰지 않는 편";
+                case "MILD" -> "욕설은 아주 가끔, 약하게만 나오는 편";
+                case "HEAVY" -> "화가 날 때 거친 말이 튀어나오는 편";
                 default -> null;
             };
             default -> null;
@@ -205,7 +252,7 @@ public final class PersonaCard {
     // ── [버릇] ────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private static String line3(Persona p) {
+    private static String line3(Persona p, int seed) {
         Map<String, Object> vp = p.getVoiceProfile();
         if (vp == null) return "";
         Object lexiconObj = vp.get("lexicon");
@@ -215,10 +262,13 @@ public final class PersonaCard {
         List<String> segments = new java.util.ArrayList<>();
         Object phrasesObj = lexicon.get("signature_phrases");
         if (phrasesObj instanceof List<?> list && !list.isEmpty()) {
-            String joined = list.stream().limit(3)
-                    .map(o -> "\"" + o + "\"")
-                    .collect(java.util.stream.Collectors.joining(", "));
-            segments.add("시그니처: " + joined);
+            // 최대 2개. seed=0이면 앞 2개 고정, 아니면 seed로 시작 위치만 돌린다(순수 함수).
+            int n = list.size();
+            int start = n <= 2 ? 0 : Math.floorMod(seed, n);
+            List<String> picked = new java.util.ArrayList<>();
+            for (int k = 0; k < Math.min(2, n); k++) picked.add("\"" + list.get((start + k) % n) + "\"");
+            segments.add("가끔 쓰는 표현 — 안 써도 되고, 쓰더라도 그대로 붙이지 않는다: "
+                    + String.join(", ", picked));
         }
         Object habit = lexicon.get("typing_habit");
         if (habit != null && !String.valueOf(habit).isBlank()) {

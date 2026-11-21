@@ -61,7 +61,7 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 해시태그(브랜드 2만): 메인 또는 체인 말미에 `#다시봄` `#againspring` — 카테고리 태그 없음 ([`platforms.md`](platforms.md)).
 링크에는 UTM 부착 → 사연 상세 랜딩 (Phase 1 계측).
 
-본문이 **8줄 이하**(`SHORT_POST_MAX_LINES`)면 나누지 않고, 그보다 길면 LLM/BE의 `capture_split_after_lines`로 **N장**(진영당 최대 4, 장당 ≤8 개행 블록)으로 나눈다.
+본문이 **8줄 이하**(`SHORT_POST_MAX_LINES`)면 나누지 않고, 그보다 길면 BE `CaptureSplitSupport`가 계산한 `capture_split_after_lines`로 **N장**(진영당 최대 4, 장당 ≤8 개행 블록)으로 나눈다.
 **양면 사연**이면 작성자 본문 뒤에 상대방 본문도 같은 규칙으로 이어 붙이되 **작성자+상대 본문 합 ≤6장**. 예산 초과분은 마케팅 캡처에서만 뒤를 자른다(앱 본문 유지).
 어느 쪽이든 각 잡의 `x_thread__upload.json`에 실제 스텝 목록(`steps`)이 기록되고, 발행측(`dispatcher.py`)은
 이 목록을 그대로 따른다 — 문서의 표는 설명용이고 실제 동작의 SSOT는 코드다.
@@ -132,8 +132,11 @@ X는 비로그인 접근이 402로 차단되어, nitter 미러(`nitter.privacyre
 1. 해당 본문의 **비어 있지 않은 개행 블록** 수가 `SHORT_POST_MAX_LINES`(8) 이하면 미분할(1장).
 2. 그보다 길면 AS brief의 `capture_split_after_lines` / `partner_capture_split_after_lines`
    (1-based, 각 장 마지막 블록; 마지막 장 제외)에서 DOM으로 자른다.
-3. PLAN/Call1·Call2 LLM이 배열을 고르고 `posts.capture_split_after_lines` /
-   `partner_capture_split_after_lines`(JSON)에 저장. 없거나 범위 밖이면 BE 휴리스틱(8블록 청크).
+3. **(2026-11-21 개편, 미배포)** LLM은 배열을 항상 null로 두고 llm 워커 `CaptureSplitPlanner`가 계산해
+   `posts.capture_split_after_lines` / `partner_capture_split_after_lines`(JSON)에 저장한다. 분할 기준은 블록 수가 아니라
+   **시각 줄 가중**이다: 블록 무게=ceil(글자수/22), 파트당 8블록 이하이면서 24줄 이하, "컷 없음"=8블록 이하이면서
+   28줄 이하(`NO_CUT_MAX_VISUAL_LINES`), 24줄 넘는 단일 블록은 단독 파트. 최종 결정권은 backend이며 없거나 범위 밖이면
+   BE 휴리스틱으로 보완한다. ASM 코드 변경 없음.
 4. 진영당 최대 4장, 양면 본문 합 ≤6. 초과 블록은 **마케팅 캡처만** 뒤 절단(`capture_block_count`).
 5. BE `CaptureHeightCalculator.partHeightsCss`가 컷별 후보 Y를 brief에 실음.
 6. 댓글 캡처는 **최대 4개** 고정.

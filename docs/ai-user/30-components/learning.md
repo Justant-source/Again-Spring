@@ -178,6 +178,19 @@ learning container가 뜨면 아래가 항상 실행된다.
 
 **⑥** (`f5e1ec7a` FAMILY 흡수): 세 접근(채널 추가·재분류·분류기 개선)을 모두 시도했으나 FAMILY 재고를 늘리지 못했다(FAMILY ±0). prod 재고: MARRIED 411·OTHER 430·COUPLE 271·WORK 224·FAMILY 21·FRIEND 5. 코퍼스에 가족 갈등 사연이 실제로 없어 나이틀리 fill이 채울 수 없는 광장을 계속 요청했다. 환경변수 `AI_USER_FAMILY_PLAZA_ENABLED`(기본 false)로 끄면 페르소나 관심사에서 FAMILY를 필터해 OTHER로 재배치하고, 재고 사전조회에서도 FAMILY 조합 건너뛴다. 사용자 대면은 일절 변화 없음 — 검색 필터 '가족' 칩, 글쓰기 카테고리, 상세·프로필 라벨, 관리자 선택지 모두 유지. 발행된 26건도 그대로. 사용자는 가족 글을 쓰고 검색하되 AI만 그 광장을 채우지 않는다.
 
+### 크롤 원문 정화 (2026-11-21, 미배포)
+
+- **Blind 본문 추출** (`crawlers/blind.py`): 기존에는 og:description(250자 미리보기 + `...`, 줄바꿈 소실)을
+  본문으로 쓰고 `<main>` 폴백이 사이드바·광고·댓글까지 긁었다. 이제 `p.contents-txt`를 우선 추출하고
+  (`<br>` 줄바꿈 보존) 본문 상한을 1500자에서 8000자로 올렸다.
+- **품질 판정** (`app/services/source_quality.py` 신규, `assess_source`): 사유 `truncated_preview`·
+  `ad_marker`·`sidebar_boilerplate`·`duplicate_lines`·`too_short`(150자 미만). ingest(`app/api/crawl.py`)와
+  claim(`source_claim.py`) 양쪽에 적용한다. claim의 품질 스킵 예산은
+  `_CLAIM_QUALITY_SKIPS_PER_WINDOW=80`으로 기존 경합 예산(8)과 별개다.
+- 기존 `example_bank` 행은 수정하지 않는다. prod 최근 30일 실측 통과율: blind 13.1%(210/1605),
+  natepan 75.9%(1035/1363).
+- 반영에는 learning 컨테이너 `--build` 재빌드가 필요하다(crawl budget은 불변).
+
 ## Popular source claim (2026-08-05)
 
 AI 예약 글의 **primary reconstruct source**는 topic RAG(`findSimilar`)가 아니라

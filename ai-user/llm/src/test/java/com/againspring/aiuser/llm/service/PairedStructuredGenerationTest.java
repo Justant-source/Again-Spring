@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -42,6 +43,40 @@ class PairedStructuredGenerationTest {
         assertNull(response.getItems().get(0).getParentRef());
         verify(pool).executeProviderTask(anyString(), eq("gpt-5.6-terra"), anyLong(), eq("corr-p1"),
                 eq(LlmProvider.CODEX), eq(StructuredOutputSchema.PAIRED_PHASE1));
+    }
+
+    @Test
+    void phase1PromptIncludesStyleReferenceAndLengthWhenProvided() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.PAIRED_PHASE1))).thenReturn(phase1Json(2));
+        PairedPhase1Request req = phase1Request();
+        req.setStyleReference("남친이랑 싸웠는데 걍 어이없음\n내가 먼저 연락해야 됨?");
+        req.setSourceLength(500);
+        service.createPairedPhase1(req, "corr-p1-style");
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(captor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.PAIRED_PHASE1));
+        String prompt = captor.getValue();
+        assertTrue(prompt.contains("STYLE_REFERENCE=남친이랑 싸웠는데"));
+        assertTrue(prompt.contains("about 350~650 characters"));
+        assertFalse(prompt.contains("one Korean sentence"));
+        assertTrue(prompt.contains("Always set capture_split_after_lines to null"));
+    }
+
+    @Test
+    void phase1PromptWithoutStyleReferenceHasNoStyleBlock() throws Exception {
+        LlmWorkerPool pool = mock(LlmWorkerPool.class);
+        StructuredGenerationService service = configured(pool);
+        when(pool.executeProviderTask(anyString(), anyString(), anyLong(), anyString(), eq(LlmProvider.CODEX),
+                eq(StructuredOutputSchema.PAIRED_PHASE1))).thenReturn(phase1Json(2));
+        service.createPairedPhase1(phase1Request(), "corr-p1-nostyle");
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pool).executeProviderTask(captor.capture(), anyString(), anyLong(), anyString(),
+                eq(LlmProvider.CODEX), eq(StructuredOutputSchema.PAIRED_PHASE1));
+        assertFalse(captor.getValue().contains("STYLE_REFERENCE="));
+        assertFalse(captor.getValue().contains("BODY_LENGTH_TARGET (hard)"));
     }
 
     @Test

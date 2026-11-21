@@ -275,6 +275,25 @@ public class PlanSourceStoryResolver {
         }
     }
 
+    /** 문체 참고용 원문 최대 길이(코드포인트). llm 워커 계약: styleReference ≤ 1500자. */
+    public static final int STYLE_REFERENCE_MAX_CODEPOINTS = 1500;
+
+    /**
+     * 2026-11 방침: 원문을 <b>문체 참고</b>로만 작성 호출에 전달한다(사실은 여전히 골격 기준).
+     * {@code styleReference}=원문 앞 1500자(코드포인트), {@code sourceLength}=자르기 전 글자 수.
+     * 원문이 없거나 공백뿐이면 두 필드 모두 생략. 본문을 쓰는 첫 호출에만 쓴다(follow-up 금지).
+     */
+    public static void putStyleReference(Map<String, Object> request, String sourceBody) {
+        if (request == null || sourceBody == null || sourceBody.isBlank()) return;
+        String t = sourceBody.trim();
+        int total = t.codePointCount(0, t.length());
+        String ref = total <= STYLE_REFERENCE_MAX_CODEPOINTS
+                ? t
+                : t.substring(0, t.offsetByCodePoints(0, STYLE_REFERENCE_MAX_CODEPOINTS));
+        request.put("styleReference", ref);
+        request.put("sourceLength", total);
+    }
+
     static String truncate(String s, int max) {
         if (s == null) return null;
         String t = s.trim();

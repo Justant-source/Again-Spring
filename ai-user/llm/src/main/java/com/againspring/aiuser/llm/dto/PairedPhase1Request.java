@@ -20,6 +20,10 @@ public class PairedPhase1Request {
     private Map<String, Object> sourceContext;
     private Boolean reconstructMode;
     private Long sourceExampleId;
+    /** 크롤 원문 본문(최대 1500자). 작성자 본문 문체 참고 전용. null이면 기존 동작. */
+    private String styleReference;
+    /** 크롤 원문 본문 글자 수. null이면 길이 지시 없음. */
+    private Integer sourceLength;
     private String dynamicExamples;
     private List<String> recentOutputs;
     /** Metaphor ids used too often recently (orchestrator-computed) — LLM should avoid repeating these. */

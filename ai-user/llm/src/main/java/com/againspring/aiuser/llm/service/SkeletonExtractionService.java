@@ -86,6 +86,7 @@ public class SkeletonExtractionService {
         String counterpartClaim = text(node, "counterpart_claim");
         String emotion = text(node, "emotion");
         String grayZone = text(node, "gray_zone");
+        String tone = text(node, "tone"); // 선택 키 — 누락돼도 실패시키지 않는다(구 골격 호환)
         List<String> sequence = textArray(node, "sequence");
         Boolean bSideViable = node.path("b_side_viable").isBoolean() ? node.path("b_side_viable").asBoolean() : null;
 
@@ -109,7 +110,7 @@ public class SkeletonExtractionService {
         }
 
         String allText = collectAllText(category, authorRole, counterpartRole, relationship, incident,
-                sequence, stakes, authorClaim, counterpartClaim, emotion, grayZone);
+                sequence, stakes, authorClaim, counterpartClaim, emotion, grayZone) + " " + (tone == null ? "" : tone);
         LlmErrorSignatures sig = LlmErrorSignatures.get();
         String lower = allText.toLowerCase(Locale.ROOT);
         if (sig.containsSignature(lower)) {
@@ -135,6 +136,7 @@ public class SkeletonExtractionService {
                 .counterpartClaim(counterpartClaim)
                 .emotion(emotion)
                 .grayZone(grayZone)
+                .tone(blank(tone) ? null : tone)
                 .bSideViable(bSideViable)
                 .sourceExampleId(req.getSourceExampleId())
                 .build();

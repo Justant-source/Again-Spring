@@ -31,6 +31,13 @@ public class ThreadPlanRequest {
     private Long sourceExampleId;
     /** Full primary source body for reconstruct mode (orchestrator may also put a truncated copy in sourceContext). */
     private String sourceBody;
+    /**
+     * 크롤 원문 본문(orchestrator가 최대 1500자로 잘라 전달). 문체 참고 전용 — 사건 사실은 SKELETON에서만 가져온다.
+     * null/blank면 기존 동작(하위 호환).
+     */
+    private String styleReference;
+    /** 크롤 원문 본문 글자 수. 있으면 본문 목표 길이를 원문에 맞춘다. null이면 길이 지시 없음. */
+    private Integer sourceLength;
     /** Style-only few-shot anchors (not the reconstruct primary). */
     private String dynamicExamples;
     /** Recent post bodies for anti-self-copy (list of short strings). */

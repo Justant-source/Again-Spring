@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks
 from app.db.session import get_db
 from app.services.quality_filter import QualityFilter
+from app.services.source_quality import assess_source
 from app.services.register_classifier import classify as classify_register
 from app.services.community_reference_sanitizer import sanitize_crawled_item
 from app.services.popularity_gate import (
@@ -89,9 +90,34 @@ async def _do_crawl_inner(source, daily_limit, embed_service):
         )
 
         rows = []
+        skipped_source_quality = 0
+        sq_reasons: dict = {}
+        rejected_parents: set = set()
         for item in gated_items:
             if not quality.passes(item["content"]):
                 continue
+
+            # 거절된 POST에 딸린 댓글(source_url = "<post_url>#comment-…")도 저장하지 않는다.
+            if (item.get("content_type") or "COMMENT") != "POST" and rejected_parents:
+                _parent = (item.get("source_url") or "").split("#", 1)[0]
+                if _parent in rejected_parents:
+                    continue
+
+            # 사연 재구성 원문 품질 게이트 — POST만. 잘린 미리보기·광고/사이드바 오염·
+            # 지나치게 짧은 글은 저장하지 않는다 (COMMENT는 문체 앵커라 대상 아님).
+            if (item.get("content_type") or "COMMENT") == "POST":
+                usable, why = assess_source(item.get("title"), item["content"], source_key)
+                if not usable:
+                    skipped_source_quality += 1
+                    if item.get("source_url"):
+                        rejected_parents.add(item["source_url"])
+                    for w in why:
+                        sq_reasons[w] = sq_reasons.get(w, 0) + 1
+                    logger.info(
+                        "Crawl %s source-quality skip url=%s reasons=%s len=%s",
+                        source_key, item.get("source_url"), ",".join(why), len(item["content"]),
+                    )
+                    continue
 
             source_url = item.get("source_url")
             if source_url is not None and source_url in existing_urls:
@@ -143,6 +169,12 @@ async def _do_crawl_inner(source, daily_limit, embed_service):
 
             if source_url is not None:
                 existing_urls.add(source_url)
+
+        if skipped_source_quality:
+            logger.info(
+                "Crawl %s source-quality gate: skipped=%s reasons=%s",
+                source_key, skipped_source_quality, sq_reasons,
+            )
 
         sql = """INSERT INTO example_bank
                  (content, content_type, category, source, quality_score, register,

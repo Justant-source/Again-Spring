@@ -14,13 +14,13 @@
 | `POST` | `/generate/proofread` | 게시 직전 맞춤법 교정 — persona/voice 없음, 의미·구조 보존하고 오탈자만 수정. orchestrator는 오탈자 휴리스틱(`됬` 등)이 맞을 때만 호출하고, 호출/구조/안전 실패 시 **원문 유지**(fail-open, 2026-08-18) |
 | `POST` | `/internal/rewrite/post` | legacy synthetic 게시글 부분 교정용 내부 rewrite |
 | `POST` | `/analyze/post` | 좋아요/투표용 구조화 post 분석 |
-| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_lines`(개행 블록 N장 컷) + required-for-AI `metaphor_ids`(3~5개, 적합도 순, 60종 메타포 일러스트 — `metaphor_id`는 `metaphor_ids[0]` 하위호환 값). 요청에 optional `overused_metaphor_ids`(최근 다빈도 사용 상위 10개 — orchestrator가 `post_metaphors` 집계로 산출, 프롬프트에 회피 힌트로 주입) |
+| `POST` | `/v2/generate/thread-plan` | PLAN 모드의 AI 글 묶음 또는 사람 글 후보 plan 구조화 생성. AI_POST `post`에 optional `capture_split_after_lines`(개행 블록 N장 컷 — 2026-11-21부터 LLM은 항상 null, 워커 `CaptureSplitPlanner`가 계산) + required-for-AI `metaphor_ids`(3~5개, 적합도 순, 60종 메타포 일러스트 — `metaphor_id`는 `metaphor_ids[0]` 하위호환 값). 요청에 optional `styleReference`(원문 앞 1500자)·`sourceLength`(원문 글자 수; 2026-11-21, 문체 참고·길이 목표용, follow-up slice 제외 — `PAIRED_PHASE1` 요청도 동일)·`overused_metaphor_ids`(최근 다빈도 사용 상위 10개 — orchestrator가 `post_metaphors` 집계로 산출, 프롬프트에 회피 힌트로 주입) |
 | `POST` | `/v2/generate/human-replies` | 30분 사람 interaction batch — comment당 0~3 reply(`candidateResponders`에서 선택) |
 | `POST` | `/v2/generate/paired-phase1` | 양면 사연 **logical Call1** (`PAIRED_PHASE1`): 작성자(A) post + phase1 댓글(작성자만 그라운딩, ~2–4 최상위) |
 | `POST` | `/v2/generate/paired-phase2` | 양면 사연 **logical Call2** (`PAIRED_PHASE2`): 상대방(B) body + phase2 댓글(작성자+상대+공개 최상위 댓글 최대 5–8) |
 | `GET` | `/v1/metrics` | 워커 풀 상태 |
 | `POST` | `/internal/prompts/reload` | prompt template 재로드 |
-| `POST` | `/v2/extract-skeleton` | **(2026-09 persona-diversity-v4, WP2, 배선 완료)** `SkeletonController`/`SkeletonExtractionService` — 크롤 원문에서 category·역할·사건·claim을 일반화 추출(계약 7, Haiku). 고유명사·금액·날짜는 일반화, 원문 문장 그대로 담지 않음. 파싱 실패·필수 키 누락은 400이 아니라 200 + `ok:false`로 응답(원문 폴백 없음, orchestrator가 재시도/스킵 판단) |
+| `POST` | `/v2/extract-skeleton` | **(2026-09 persona-diversity-v4, WP2, 배선 완료)** `SkeletonController`/`SkeletonExtractionService` — 크롤 원문에서 category·역할·사건·claim을 일반화 추출(계약 7, Haiku). 고유명사·금액·날짜는 일반화, 원문 문장 그대로 담지 않음. 선택 키 `tone`(원문 글의 성격·화자 태도, 2026-11-21, 누락 허용)이 `SkeletonExtractResponse.tone`에 추가됨. 파싱 실패·필수 키 누락은 400이 아니라 200 + `ok:false`로 응답(원문 폴백 없음, orchestrator가 재시도/스킵 판단) |
 
 `8092` 포트는 compose 내부 네트워크 전용이다. dev/prod 모두 host port publish가 없다.
 
@@ -199,6 +199,8 @@ orchestrator 쪽 발행 경계(`AiPostBundleService`·`ThreadPlanPublisher`·`Sc
 compose는 dev/prod 모두 `SELF_CRITIQUE_ENABLED=true`를 넘긴다. rare vocab detector는 기본으로 꺼져 있다.
 
 `quickCheck`는 온점·상투구·강조어·ㅠ·쉼표율·casual **반말 위반(`~요`)** 등을 결정론으로 본다. PASS면 CLI를 더 부르지 않는다. FAIL이면 `buildRetryPrompt`로 짧은 본문 rewrite만 돌린다(timeout 90s, 실패 시 초안 유지). `originalPrompt` 인자는 API 호환용이며 **무시**한다.
+
+**축 순응 재시도 (2026-11-21, 미배포)**: `StructuredGenerationService.enforceAxisCompliance`는 `styleReference`가 있는 사연 본문에는 적용하지 않는다(문체는 원문이 카드 축보다 우선). 그 외 경로의 fix 문구는 완화됐고 WALL 위반 판정은 비어 있지 않은 줄 5개 이상일 때만 한다. 본문 형식은 자유(최소 2줄, 한 줄 약 300자 이하)이며 `capture_split_after_lines`는 LLM이 아니라 `CaptureSplitPlanner`가 계산한다.
 
 운영 로그 FAIL 다수는 casual 페르소나 + 존댓말이지, 원문 1000자·특수문자가 아니다. 호출 횟수·솔로 글 파이프라인은 [llm-call-budget.md](../70-policy/llm-call-budget.md).
 

@@ -197,6 +197,9 @@ class AiPostBundleServiceTest {
         assertThat(req.get("topicHint")).isNotEqualTo("");
         assertThat(req.get("reconstructMode")).isEqualTo(true);
         assertThat(req.get("sourceExampleId")).isEqualTo(99L);
+        // 2026-11: 원문은 문체 참고로만 전달(styleReference + sourceLength)
+        assertThat(req.get("styleReference")).isEqualTo("원본 사연 본문");
+        assertThat(req.get("sourceLength")).isEqualTo("원본 사연 본문".length());
         assertThat(req.get("recentOutputs")).isInstanceOf(List.class);
         assertThat(req.get("storySearchDoc")).isInstanceOf(String.class);
         assertThat(req.get("storyProfile")).isInstanceOf(Map.class);
@@ -427,6 +430,8 @@ class AiPostBundleServiceTest {
 
         Map<String, Object> first = requests.get(0);
         assertThat(first.get("kind")).isEqualTo("AI_POST");
+        assertThat(first.get("styleReference")).isEqualTo("본문");
+        assertThat(first.get("sourceLength")).isEqualTo(2);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> firstPersonas = (List<Map<String, Object>>) first.get("personas");
         // author + first micro-batch (5)
@@ -436,6 +441,7 @@ class AiPostBundleServiceTest {
 
         Map<String, Object> second = requests.get(1);
         assertThat(second.get("kind")).isEqualTo("HUMAN_POST");
+        assertThat(second).doesNotContainKeys("styleReference", "sourceLength"); // follow-up 미포함
         assertThat(second.get("existingTitle")).isEqualTo("제목입니다");
         assertThat(second.get("existingBody")).isEqualTo("본문입니다. 충분히 길게 작성.");
         @SuppressWarnings("unchecked")

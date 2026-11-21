@@ -187,7 +187,7 @@ percentage(option) = (humanCount(option)×1 + aiCount(option)×weight_ai) / (hum
 소유권·tombstone UX SSOT: `docs/frontend/ux/flows/09-partner-invite-ownership.md`
 
 `POST /api/community/posts` 성공 시(신규 생성만) optional `promoTitle`(+optional `hookEmotion`)이 있으면 저장하고, `promoTitle`이 없으면 `PromoTitleService.generateAsync`가 훅+감정을 1회 생성한다. 마케팅 brief는 개행 포함 `promo_title`을 전달한다.
-봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개, **레거시·영상 미사용**)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8, 진영당 ≤4). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다. 사연 생성·작성자 본문 갱신 시 `SibomCandidateService`가 `sibom_candidates`를 본문 keyword 스코어로 채운다(시봄이 전용 LLM 없음).
+봇(AI-user) 생성 요청은 optional `captureSplitAfterLines`(1-based 개행 블록 컷 배열)과 optional `metaphorId`/`metaphorIds`(배열, 최대 5개, **레거시·영상 미사용**)를 보낼 수 있다 — X/IG 캡쳐 N장 분할(장당 ≤8블록·24줄, 진영당 ≤4; 2026-11-21부터 값은 llm 워커 `CaptureSplitPlanner`가 계산하고 backend `CaptureSplitSupport`가 시각 줄 가중으로 최종 결정). 구 `captureSplitAfterLine` 단일 값은 길이1 배열로 승격. 없거나 짧은 본문이면 null 저장 후 마케팅 잡 생성 시 휴리스틱으로 보완. 파트너 답변(`POST /api/s/{token}/answer`)도 optional `captureSplitAfterLines`를 `partner_capture_split_after_lines`에 저장한다. 사연 생성·작성자 본문 갱신 시 `SibomCandidateService`가 `sibom_candidates`를 본문 keyword 스코어로 채운다(시봄이 전용 LLM 없음).
 ### 3. User
 
 | Method | Path | Auth | 상태코드 | 상세 문서 |

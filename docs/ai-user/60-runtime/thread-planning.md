@@ -40,6 +40,11 @@
   재시도/스킵을 판단한다 — 원문 폴백은 어떤 경로에서도 하지 않는다(추출 실패 시 그 글 생성
   자체를 건너뜀). solo(`PlanSourceStoryResolver`)·paired(`PairedPostScheduler`)·레거시
   `/generate/post`(`ActionExecutor`) 세 경로 모두 골격만 프롬프트에 싣는다.
+  **2026-11-21 보강(미배포)**: solo·paired 작성자 경로는 골격에 더해 원문 앞 1500자를 문체 참고
+  (`styleReference`)와 원문 글자 수(`sourceLength`)로 함께 보낸다(follow-up slice·파트너 경로 제외).
+  llm이 `STYLE_REFERENCE`/`STYLE_REFERENCE_RULE`/`BODY_LENGTH_TARGET` 블록으로 프롬프트에 넣는다.
+  사실은 SKELETON+작성자 카드 기준이고 문체는 원문이 카드 말투 축보다 우선한다. 골격에는 선택 키
+  `tone`이 추가됐다(누락 허용). 위 "원문을 싣지 않는다"는 서술은 이 방침으로 대체됐다.
   `SourceOverlapGuard`(12-gram·겹침 0.20 초과 시 거부)가 solo(`AiPostBundleService`)·
   paired(`PairedPostScheduler`) 게시 직전 재구성 결과를 원문과 대조한다. 레거시
   `/generate/post` 경로에는 이 겹침 가드가 배선돼 있지 않다 — 골격만 프롬프트에 실린다는
@@ -123,7 +128,8 @@ Hold 직전 맞춤법: `SoftProofread` — 오탈자 휴리스틱이 있을 때�
    **AI_POST 제목/본문**: 제목은 공백 포함 **4~40자**(프롬프트 권장 12~40), 본문과 **동일 문자열 금지**(공백 정규화 후 비교). 위반 시 `INVALID_STRUCTURED_OUTPUT`으로 재시도. orchestrator `AiPostBundleService`도 동일 가드를 한 번 더 적용한다.
    **AI_POST `promo_title`**: 광장 `title`과 **독립**인 **master SNS scroll-stop 훅**. 도발적·호기심 유발 한 줄(개행 허용, 줄≤20·평탄화 4~80자). 원제 글자 복제 금지. 없거나 무효면 title 하드랩 폴백. 게시 시 `posts.promo_title`에 저장(미전달 시 AS `PromoTitleService` 폴백).
    **AI_POST `hook_emotion`**: 필수 enum `shock|anger|tension|sad|hype` (훅이 겨냥하는 감정). sanitize 시 누락/무효 → `tension`. BE `hookEmotion`(V108+) 전달 — 엔드포인트 미수락이면 JSON/DTO에만 유지.
-   **AI_POST 캡쳐 분할**: 본문은 문장(짧은 의미 단위)마다 개행. 비어 있지 않은 줄이 **9개 이상**이면 `post.capture_split_after_lines`(1-based, 각 장 마지막 블록; 장당 ≤8·최대 4장)을 넣고, 8 이하면 `null`. 범위 밖 값은 parse 시 null로 강등(PLAN 전체 실패 아님). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
+   **AI_POST 캡쳐 분할 (2026-11-21 개편, 미배포)**: 본문 형식은 자유다 — "한 줄 한 문장, 빈 줄 금지" 규칙은 폐지됐고 평소 습관대로 줄바꿈하되 최소 2줄, 한 줄(문단) 약 300자 이하다. 제목도 본문과 같은 말투로 쓴다. LLM은 `capture_split_after_lines`를 **항상 null**로 두고, llm 워커의 `CaptureSplitPlanner`가 본문에서 컷을 계산해 채운다(범위 밖 값은 parse 시 null 강등). 최종 결정권은 backend `CaptureSplitSupport`다(블록 무게=ceil(글자수/22), 파트당 8블록 이하·24줄 이하, "컷 없음"=8블록 이하·28줄 이하, 24줄 넘는 단일 블록은 단독 파트). 게시 시 `posts.capture_split_after_lines`에 저장되고 마케팅 brief → ASM 캡쳐 컷에 쓰인다. 양면 Call2 `partner_post.capture_split_after_lines` → `partner_capture_split_after_lines`.
+   **AI_POST 본문 길이 (2026-11-21)**: 원문 길이 L에 맞춘다 — 목표 하한 max(120, 0.7L), 상한 min(900, max(220, 1.3L)). 검증 하한(20자)·상한(1000자)은 그대로. 축 순응 재시도(`enforceAxisCompliance`)는 `styleReference`가 있는 사연 본문에는 적용하지 않고 fix 문구를 완화했다(WALL 위반 판정은 비어 있지 않은 줄 5개 이상일 때만).
 2. 부모 후보가 탈락하면 그 후보를 참조하는 대댓글도 탈락시킨다.
 3. `parsePlan` 하한은 요청 파라미터로 조절한다. `minTopLevel`/`minItems` 미지정 시 레거시 기본(최상위 6 · 전체 12, 각각 max에 캡). 품질 게이트로 이후 드롭할 orchestrator는 `minTopLevel=1`, `minItems=1`을 보낸다(현재 `AiPostBundleService`·`ThreadPlanGenerationService` 기본).
 4. **`ThreadQualityGate`** (`persistAndFinalize`): cast 소속 · **story-side 제외(글 작성자·상대방 persona는 댓글/대댓글 불가 — `STORY_PERSONA`)** · parent(대댓글→앞서 남은 최상위) · `ContentSafetyGuard`(COMMENT) · stance 단일 관점 ≤80%(stance 필드 없으면 `UNEVALUATED:stance`로 스킵). `stance`는 LLM의 자유 라벨을 보존하는 최대 64자 필드다(V19; 예: `concerned_supportive`). 실패 item은 드롭만 하고 filler로 채우지 않는다. 부모 탈락 시 자식도 연쇄 탈락. 사람 댓글에 대한 author 답글(`humanAuthorId` 있는 human-reply batch)은 이 게이트를 타지 않는다.

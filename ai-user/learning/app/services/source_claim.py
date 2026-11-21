@@ -17,6 +17,7 @@ from typing import Any, Mapping, Optional, Sequence
 from pymysql.err import IntegrityError
 
 from app.db.session import get_db
+from app.services.source_quality import assess_source
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,10 @@ STATUS_SOFT = "SOFT"
 STATUS_COMMITTED = "COMMITTED"
 # Max candidates to try per window when soft-reserve races
 _CLAIM_ATTEMPTS_PER_WINDOW = 8
+# Max candidates rejected by source_quality per window (not counted in the race budget above).
+# 실측(prod 30일): 통과율 blind 13% / natepan 76%, 블라인드 플라자 범위로 좁히면 ~8%까지 낮다.
+# 인기순 1건씩 가져와 거르므로, 80회면 통과율 8%에서도 실패 확률 약 0.1% 미만(0.92^80).
+_CLAIM_QUALITY_SKIPS_PER_WINDOW = 80
 
 # Plaza (posts.category) → example_bank.category values that may ground it.
 # Blind crawler stores romance/marriage/workplace; natepan stores plaza enums.
@@ -278,6 +283,9 @@ WHERE eb.content_type = 'POST'
     eb.content REGEXP '라고 (함|한다|했다|밝혔|전했)|다고 (함|한다|했다|밝혔|전했|알려)|소속사|인터뷰|보도|누리꾼|기록으로'
     AND eb.content NOT REGEXP '했는데|하는데|했음|더라|했어요|했습니다|어떡|제가 |내가 '
   )
+  -- 광고 사이드바가 섞인 오염 본문 선배제(싼 사전 필터). 최종 판정은 파이썬 assess_source.
+  -- 퍼센트 기호는 파라미터 바인딩 때문에 두 개로 이스케이프해야 한다(위 주의 참조).
+  AND eb.content NOT LIKE '%%(광고)%%'
   {category_clause}
   AND NOT EXISTS (
       SELECT 1
@@ -472,11 +480,30 @@ def claim_popular_source(
         with conn.cursor() as cur:
             for days in window_attempts(window_days, expand_days):
                 skipped: list[int] = [int(i) for i in (exclude_ids or []) if i is not None]
-                for _ in range(_CLAIM_ATTEMPTS_PER_WINDOW):
+                race_attempts = 0
+                quality_skips = 0
+                while race_attempts < _CLAIM_ATTEMPTS_PER_WINDOW:
                     row = _select_candidate(cur, src, days, skipped, bank_cats)
                     if not row:
                         break
                     eid = int(row["id"])
+                    # 원문 품질 게이트: 잘린 미리보기·사이드바 오염·너무 짧은 글은 예약하지 않고 다음 후보로.
+                    usable, why = assess_source(row.get("title"), row.get("content"), src)
+                    if not usable:
+                        skipped.append(eid)
+                        quality_skips += 1
+                        logger.info(
+                            "claim skip unusable source example_id=%s source=%s reasons=%s",
+                            eid, src, ",".join(why),
+                        )
+                        if quality_skips >= _CLAIM_QUALITY_SKIPS_PER_WINDOW:
+                            logger.warning(
+                                "claim quality-skip budget exhausted source=%s plaza=%s window_days=%s skips=%s",
+                                src, category, days, quality_skips,
+                            )
+                            break
+                        continue
+                    race_attempts += 1
                     if _soft_reserve(cur, eid, str(reservation_key).strip(), until):
                         logger.info(
                             "claimed source example_id=%s source=%s plaza=%s bank_cats=%s window_days=%s pct=%s",

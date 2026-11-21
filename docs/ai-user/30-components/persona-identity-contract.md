@@ -168,6 +168,24 @@ hoursSinceLast: last_post_at(글) 또는 last_comment_at(댓글) 기준. NULL이
 레거시 `/generate/post`(`ActionExecutor`) 경로도 동일 골격 추출을 거치며, 추출 실패 시 원문 폴백 없이
 글 생성을 건너뛴다(원문 800자를 프롬프트에 그대로 싣던 결함의 수정).
 
+**원문 문체 참고 재전달 (2026-11-21, 미배포)**: "원문은 프롬프트에 싣지 않는다"는 위 방침은
+**대체**됐다. prod 한 달 AI 사연 204건 실측에서 58%가 "예민"을 쓰고 34%가 같은 첫 문장으로
+시작했으며 생성글이 원문의 1.74배 길이·전 글 한 줄 한 문장이었다. 이제 solo(`AiPostBundleService`)·
+paired 작성자(`PairedPostScheduler` phase1) 요청에 optional `styleReference`(원문 앞 1500자)·
+`sourceLength`(원문 글자 수)를 보낸다(`PlanSourceStoryResolver.putStyleReference`). follow-up
+slice와 파트너(B) 경로에는 보내지 않는다. 사실은 여전히 SKELETON + 작성자 카드 기준(성별·혼인상태는
+카드 우선, 원문의 고유 세부는 바꾼다)이고, **문체는 원문이 카드 말투 축보다 우선**한다. 표절 사후
+검사는 기존 `SourceOverlapGuard`(문자 12-gram, overlap > 0.20 차단) 그대로다. 골격에는 선택 키
+`tone`(원문 글의 성격·화자 태도, 누락 허용)이 추가됐고, `RECONSTRUCT_RULE`의 `gray_zone`은
+"작성자가 자기 편에서 유리하게 쓰되 본인이 문제인 줄 모르고 흘리는 사실 한 줄"로만 해석한다
+(자기 귀책 고백 제거).
+
+**PersonaCard 개편 (2026-11-21, 미배포)**: 축 렌더가 "명령"에서 "평소 말버릇(자연스러울 때만)"
+서술로 바뀌었다. 예시 인용구는 전부 삭제했고(DEFENSIVE의 "내가 예민한 걸 수도 있는데" 포함), 직업·
+나이·지역은 배경 사실로 표기한다. 시그니처 문구는 최대 2개를 날짜(epochDay) seed로 회전한다
+(`PlanPersonaMapper`). 렌더 단계 조합 정리 3종(JONDAE+HEAVY→MILD, SOFT+HEAVY→MILD, emoticon
+HIGH+SERIOUS+ANALYTIC→LOW)은 렌더에서만 적용하고 DB 값은 바꾸지 않는다.
+
 ## 검증 명령 (변경 시 재확인)
 
 ```bash

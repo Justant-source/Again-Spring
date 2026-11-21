@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.teamblind.com"
 PAGES_PER_CHANNEL = 2   # 채널당 2페이지 × ~40개 = ~80개
 MIN_CONTENT_LENGTH = 100
+MAX_CONTENT_LENGTH = 8000  # natepan(MAX_CONTENT_LEN)과 동일. 예전 1500 자르기는 긴 본문을 문장 중간에서 끊었다
 MIN_COMMENT_LENGTH = 2  # 댓글은 문체 앵커용 — 짧은 한줄도 수집
 
 # (채널 한글명, category값, URL-encoded 경로)
@@ -102,48 +103,38 @@ def _extract_title(soup: BeautifulSoup) -> str | None:
     return None
 
 
-def _clean_soup(soup: BeautifulSoup) -> BeautifulSoup:
-    """nav/header/footer/script/style 노이즈 제거"""
-    for tag in soup.find_all(['nav', 'header', 'footer', 'script', 'style', 'noscript']):
-        tag.decompose()
-    return soup
-
-
-def _filter_lines(text: str, min_line_len: int = 15) -> str:
-    """짧은 UI 라벨(메뉴·버튼) 제거 후 실 본문 텍스트만 반환"""
-    lines = [ln.strip() for ln in text.split("\n") if len(ln.strip()) >= min_line_len]
-    return "\n".join(lines)
+def _body_text(el) -> str:
+    """<br>을 줄바꿈으로 보존해 본문 텍스트를 만든다 (get_text 단독은 <br>을 지워 문장이 붙는다)."""
+    for br in el.find_all("br"):
+        br.replace_with("\n")
+    lines = [ln.strip() for ln in el.get_text().split("\n")]
+    return "\n".join(ln for ln in lines if ln).strip()
 
 
 def _extract_content(soup: BeautifulSoup) -> str | None:
-    # 1. og:description (SSR에서 본문 요약 포함 — 가장 깨끗)
+    """게시글 본문 추출.
+
+    1. `p.contents-txt#contentArea` (article-view-contents 안의 본문) — 전체 본문 + <br> 줄바꿈.
+       (2026-11 실측: 블라인드 SSR 상세에서 확인. 광고 태그·좋아요 바·추천 글은 이 밖에 있다.)
+    2. 폴백 og:description — **250자로 잘린 미리보기**이고 줄바꿈이 없다. 본문 전체가
+       아니므로 source_quality(truncated_preview)가 걸러낸다. 이전엔 이게 1순위였다.
+    <main> 전체/`<p>` 합산/`<article>` 폴백은 삭제: 사이드바(광고·다른 글 제목·댓글)가
+    본문에 섞여 들어가 prod 블라인드 행의 52%를 오염시켰다(source_quality로 측정).
+    """
+    for sel in ("p.contents-txt", "#contentArea", "div.article-view-contents p"):
+        el = soup.select_one(sel)
+        if el is not None:
+            t = _body_text(el)
+            if len(t) >= MIN_CONTENT_LENGTH:
+                return t
+            if t:
+                return None  # 본문은 있으나 너무 짧음 — og 미리보기로 대체하지 않는다
+
     og = soup.find("meta", property="og:description")
     if og and og.get("content"):
         c = og["content"].strip()
         if len(c) >= MIN_CONTENT_LENGTH:
             return c
-
-    # 2. 노이즈 제거 후 <main> 추출
-    clean = _clean_soup(soup)
-    main = clean.find("main")
-    if main:
-        t = _filter_lines(main.get_text(separator="\n", strip=True))
-        if len(t) >= MIN_CONTENT_LENGTH:
-            return t
-
-    # 3. 노이즈 제거 후 실질적인 <p> 태그 합산
-    paras = [p.get_text(strip=True) for p in clean.find_all("p") if len(p.get_text(strip=True)) > 30]
-    if paras:
-        t = "\n".join(paras)
-        if len(t) >= MIN_CONTENT_LENGTH:
-            return t
-
-    # 4. <article>
-    article = clean.find("article")
-    if article:
-        t = _filter_lines(article.get_text(separator="\n", strip=True))
-        if len(t) >= MIN_CONTENT_LENGTH:
-            return t
 
     return None
 
@@ -516,7 +507,7 @@ async def crawl(daily_limit: int = 240) -> List[Dict]:
                     stored_category = _resolve_category(content, title, board_category=category)
 
                     results.append({
-                        "content": content[:1500],
+                        "content": content[:MAX_CONTENT_LENGTH],
                         "content_type": "POST",
                         "category": stored_category,
                         "title": title or None,

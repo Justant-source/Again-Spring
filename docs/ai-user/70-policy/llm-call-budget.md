@@ -41,6 +41,7 @@ claim source (no LLM)
 |---|---|---|
 | micro-batch 슬라이스 | 활성 페르소나 전원(~150)을 5명씩 → 로그 `batches=30`. `remaining>0`(pool=16)이면 HUMAN_POST를 계속 시도 | matcher 상위 `max(batchSize, readyMinItems)+batchSize`명만 (기본 **11명**, 슬라이스 ≤3). 합친 댓글이 **6개 이상이면 후속 HUMAN_POST 생략** |
 | 빈 `b1` | Codex/쿼터 실패 때도 거의 항상 1회는 호출 | 첫 배치가 이미 6개면 `b1` 없음. 미달이면 하한 또는 빈 응답까지 |
+| 축 순응 재시도(`enforceAxisCompliance`) | — | 2026-11-21(미배포)부터 `styleReference`가 있는 사연 본문에는 적용하지 않음(호출 수 감소 방향). 그 외 경로 불변 |
 | SelfCritique 재시도 | 원본 thread-plan 프롬프트 전체(`<<<USER_PROMPT>>>`·소스·캐스트·스키마) + 초안 앞 400자 | **이슈 + 원문 전체 + 반말/존댓말 한 줄**. 생성 프롬프트 재첨부 없음. 90s. 실패 시 초안 유지 |
 | proofread | 번들 성공 후 **항상** `/generate/proofread`. 줄 수 변경·504면 **hold 전체 폐기** | `SoftProofread.needsLlm` (예: `됬`, `되요`, 자모 연속)일 때만 호출. 실패·`PROOFREAD_STRUCTURE_CHANGED`·안전 실패면 **원문 유지 후 hold** |
 | 소스 skip | — | 길이 1000자·특수문자로 claim을 막지 않음. 운영 실패는 proofread fail-closed·반말 위반·풀 빔이 원인 |

@@ -115,8 +115,10 @@ class PairedPostCall1SkeletonTest {
         assertThat(request.get("reconstructMode")).isEqualTo(true);
         assertThat(request.get("sourceExampleId")).isEqualTo(777L);
         assertThat(request.get("topicHint")).isEqualTo("팀장이 내 기획안을 가로챔");
-        // 원문 전문(sourceBody)은 프롬프트로 나가는 request에 실리면 안 된다 — SourceOverlapGuard만의 몫.
-        assertThat(request.values()).doesNotContain("원문 전문 (프롬프트로 나가면 안 됨)");
+        // 2026-11: 원문은 sourceBody 필드가 아니라 문체 참고(styleReference+sourceLength)로만 나간다.
+        assertThat(request.get("styleReference")).isEqualTo("원문 전문 (프롬프트로 나가면 안 됨)");
+        assertThat(request.get("sourceLength")).isEqualTo("원문 전문 (프롬프트로 나가면 안 됨)".length());
+        assertThat(request).doesNotContainKey("sourceBody");
     }
 
     @Test
@@ -131,5 +133,6 @@ class PairedPostCall1SkeletonTest {
 
         assertThat(request).doesNotContainKey("sourceContext");
         assertThat(request).doesNotContainKey("reconstructMode");
+        assertThat(request).doesNotContainKeys("styleReference", "sourceLength");
     }
 }

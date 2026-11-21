@@ -58,12 +58,21 @@ public class StructuredGenerationService {
             RECONSTRUCT_RULE=
             - SKELETON은 뼈대다. 등장인물·직장·동네·금액·기간·순서의 세부는 AUTHOR/PARTNER의 personaCard 삶에 맞게 전부 새로 정한다.
             - 반드시 "누가 무엇을 했다" 형태의 구체 사건 1개를 중심에 둔다. 감정 나열만 하는 글은 실격.
-            - 작성자 시점(A)이면 author_claim을 말하되 gray_zone을 숨기지 않는다. 독자가 B에게도 표를 줄 여지를 남긴다.
-            - 상대방 시점(B) 글이면 counterpart_claim으로 같은 사건을 다시 말한다.
-            - 뼈대 문장을 그대로 옮기지 마라. 카드의 말투 축·시그니처 표현을 실제로 쓴다.
+            - 작성자 시점(A)이면 author_claim을 자기 편에서 유리하게 말한다. 스스로 잘잘못을 저울질하거나 "나도 잘못은 있다"고 정리하지 않는다.
+              gray_zone은 작성자가 대수롭지 않게 흘리는 사실 한 줄로만 넣는다(본인은 그게 문제인 줄 모른다) — 독자가 찾아내 댓글로 다투게 한다.
+              "내가 예민한 건가" 류의 자문으로 글을 열거나 닫는 걸 기본값으로 삼지 않는다.
+            - SKELETON.tone이 있으면(고민 상담/분노 토로/웃긴 썰/단순 질문 등) 그 글의 성격과 원문 화자의 태도를 지킨다. 웃긴 글을 반성문으로 바꾸지 마라.
+            - 상대방 시점(B) 글이면 counterpart_claim으로 같은 사건을 다시 말한다(B도 자기 편에서 유리하게).
+            - 뼈대 문장을 그대로 옮기지 마라. 카드의 말버릇·시그니처 표현은 평소 습관일 뿐이니 자연스러울 때만 쓴다.
             - 글에 쓰는 기간은 personaCard의 나이와 앞뒤가 맞아야 한다: 연애 기간 ≤ (나이−19)년,
               직장 경력 ≤ (나이−22)년, 결혼 년차·자녀 나이는 카드에 적힌 값을 따른다.
               23세가 "6년째 만나는 남친"을 말하는 식의 조합을 쓰지 마라.""";
+    static final int STYLE_REFERENCE_MAX_CHARS = 1500;
+
+    /** 솔로 PLAN 경로에는 voice/post.md 가이드가 주입되지 않으므로 핵심 문체 규칙을 본문에 직접 둔다(토큰 최소화). */
+    static final String AUTHOR_VOICE_RULE = """
+            AI_POST voice rules (hard): the author writes in favor of themselves — never weighs their own fault or concludes "나도 잘못은 있다"; any gray area is dropped as a casual fact the author does not see as a problem. People SUMMARIZE what happened to them; they do not stage scenes. No gaze/prop description (e.g. putting a spoon down, light leaking from a door), no antithetical aphorism endings, no jokes built on the author's occupation. Mention job/age only when it matters to the incident. PERSONA card speech habits are habits, used only where natural — not a checklist (no ㅠㅠ every line, no profanity without cause).""";
+
     private final LlmWorkerPool pool;
     private final SelfCritiqueService selfCritique;
     private final LlmParseFailureSampler parseFailureSampler;
@@ -162,7 +171,7 @@ public class StructuredGenerationService {
             // 제목 ≤40자(공백 포함)·제목≠본문 — 2026-08 prod 동일 제목/본문 회귀 방어
             validText(title, "post.title", 4, 40); validText(body, "post.body", 20, 1000);
             rejectIdenticalTitleBody(title, body);
-            List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
+            List<Integer> splits = sanitizeCaptureSplits(body, CaptureSplitPlanner.plan(body));
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             String promoTitle = sanitizePromoTitle(title,
                     firstNonBlank(nullableText(p, "promo_title"), nullableText(p, "promoTitle")));
@@ -243,7 +252,10 @@ public class StructuredGenerationService {
             String refined = selfCritique.critiqueAndRefine(
                     post.getBody(), "post", prompt, correlationId, provider,
                     resolveFormality(author), model, resolveVoiceType(author));
-            refined = enforceAxisCompliance(refined, "post", author, provider, model, correlationId);
+            // styleReference가 있는 사연은 원문 문체가 우선 — 축 순응 강제를 건너뛴다.
+            if (blank(req.getStyleReference())) {
+                refined = enforceAxisCompliance(refined, "post", author, provider, model, correlationId);
+            }
             post = replacePostBodyIfValid(post, refined);
         }
 
@@ -288,6 +300,7 @@ public class StructuredGenerationService {
     private static final Pattern EMOTICON_CHARS = Pattern.compile("[ㅋㅠㅜ]");
     /** linebreak 검사는 형식을 판단할 만큼 텍스트가 있을 때만(초단문 댓글은 축 표현 여지가 없음). */
     private static final int LINEBREAK_CHECK_MIN_LEN = 40;
+    private static final int WALL_MAX_BLOCKS = 4;
 
     /** personaCard 문자열에서 {@code key=VALUE:} 태그만 뽑는다(PersonaCard.render의 axis 표기와 짝). */
     static Map<String, String> parseStyleAxesFromCard(String personaCard) {
@@ -311,7 +324,8 @@ public class StructuredGenerationService {
         if (body.length() >= LINEBREAK_CHECK_MIN_LEN) {
             String linebreak = axes.get("linebreak");
             long newlines = body.chars().filter(c -> c == '\n').count();
-            if ("WALL".equals(linebreak) && newlines >= 2) out.add("linebreak_wall_but_chopped");
+            // WALL = 덩어리 문단형: 본문 형식이 덩어리 문단 2~4개를 허용하므로 비어 있지 않은 줄이 5개 이상일 때만 위반.
+            if ("WALL".equals(linebreak) && countNonEmptyBlocks(body) > WALL_MAX_BLOCKS) out.add("linebreak_wall_but_chopped");
             if ("CHOPPED".equals(linebreak) && newlines == 0) out.add("linebreak_chopped_but_wall");
         }
         return out;
@@ -320,13 +334,13 @@ public class StructuredGenerationService {
     private static String axisViolationFix(String code) {
         return switch (code) {
             case "emoticon_high_but_absent" ->
-                "이 페르소나는 이모티콘을 자주 쓴다 — ㅋㅋ·ㅠㅠ 같은 표현을 문단마다 최소 1개씩 실제로 넣어라";
+                "이 페르소나는 평소 ㅋㅋ·ㅠㅠ를 자주 쓰는 편이다 — 글 전체에서 자연스러운 자리에 두세 번만 넣어라(줄마다 넣지 마라)";
             case "emoticon_none_but_present" ->
                 "이 페르소나는 이모티콘을 전혀 안 쓴다 — ㅋㅋ·ㅠㅠ 등을 전부 빼라";
             case "linebreak_wall_but_chopped" ->
-                "이 페르소나는 줄바꿈 없이 한 문단으로 몰아 쓴다 — 문장을 이어붙이고 줄바꿈을 없애라";
+                "이 페르소나는 문장을 덩어리로 몰아 쓰는 편이다 — 문단을 2~4개 덩어리로 묶고 한 줄에 여러 문장을 이어라";
             case "linebreak_chopped_but_wall" ->
-                "이 페르소나는 한두 문장마다 줄을 바꾼다 — 문단을 짧게 끊고 줄바꿈을 넣어라";
+                "이 페르소나는 줄을 자주 바꾸는 편이다 — 통짜로 두지 말고 줄을 나눠라";
             default -> code;
         };
     }
@@ -394,7 +408,7 @@ public class StructuredGenerationService {
         if (refined == null || refined.equals(post.getBody())) return post;
         try {
             validText(refined, "post.body", 20, 1000);
-            List<Integer> splits = sanitizeCaptureSplits(refined, post.getCaptureSplitAfterLines());
+            List<Integer> splits = sanitizeCaptureSplits(refined, CaptureSplitPlanner.plan(refined));
             Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
             return ThreadPlanResponse.Post.builder()
                     .title(post.getTitle()).body(refined)
@@ -509,7 +523,7 @@ public class StructuredGenerationService {
         validText(title, "post.title", 4, 40);
         validText(body, "post.body", 20, 1000);
         rejectIdenticalTitleBody(title, body);
-        List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(p));
+        List<Integer> splits = sanitizeCaptureSplits(body, CaptureSplitPlanner.plan(body));
         Integer legacy = (splits != null && !splits.isEmpty()) ? splits.get(0) : null;
         String promoTitle = sanitizePromoTitle(title,
                 firstNonBlank(nullableText(p, "promo_title"), nullableText(p, "promoTitle")));
@@ -556,7 +570,7 @@ public class StructuredGenerationService {
             }
             String body = text(pp, "body");
             validText(body, "partner_post.body", 20, 1000);
-            List<Integer> splits = sanitizeCaptureSplits(body, readCaptureSplits(pp));
+            List<Integer> splits = sanitizeCaptureSplits(body, CaptureSplitPlanner.plan(body));
             partnerPost = PairedPhase2Response.PartnerPost.builder()
                     .body(body)
                     .captureSplitAfterLines(splits)
@@ -663,6 +677,7 @@ public class StructuredGenerationService {
         if (selfCritique == null || parsed == null) return parsed;
         ThreadPlanRequest bridge = new ThreadPlanRequest();
         bridge.setAuthor(req.getAuthor());
+        bridge.setStyleReference(req.getStyleReference());
         bridge.setPersonas(req.getPersonas());
         ThreadPlanResponse critiqued = applySelfCritique(
                 ThreadPlanResponse.builder()
@@ -694,7 +709,7 @@ public class StructuredGenerationService {
             if (refined != null && !refined.equals(partnerPost.getBody())) {
                 try {
                     validText(refined, "partner_post.body", 20, 1000);
-                    List<Integer> splits = sanitizeCaptureSplits(refined, partnerPost.getCaptureSplitAfterLines());
+                    List<Integer> splits = sanitizeCaptureSplits(refined, CaptureSplitPlanner.plan(refined));
                     partnerPost = PairedPhase2Response.PartnerPost.builder()
                             .body(refined)
                             .captureSplitAfterLines(splits)
@@ -753,6 +768,7 @@ public class StructuredGenerationService {
                 grounding.append("\n").append(RECONSTRUCT_RULE);
             }
         }
+        grounding.append(styleReferenceBlock(req.getStyleReference(), req.getSourceLength()));
         if (!blank(req.getDynamicExamples())) {
             grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
         }
@@ -769,10 +785,10 @@ public class StructuredGenerationService {
                 Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment in this response. Do not use personal data, internal notes, or claims of being an AI. Prefer Korean product terms 작성자/상대방. Product framing = plaza empathy votes (공감).
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId to any comment or reply. Phase1 comments are community bystanders only.
                 When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed.
-                AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear enough for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
+                AI_POST title/body rules (hard): title is a short Korean plaza headline of 12~40 characters including spaces (max 40), typed by the author in the same voice and speech level as the body (banmal body → banmal title; do not default to a polite '~습니다/~인가요/~걸까요' question) — it names what happened, like a real community post title, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
-                AI_POST body line rules (hard): one Korean sentence (or short sense unit) per newline — no blank lines; keep each block short (about 1~2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / at most 3 cuts). Prefer even-ish meaningful chunks (e.g. 20 lines → [7,14]). If ≤8 lines, set capture_split_after_lines to null.
+                AI_POST body format rules (hard): break lines the way this person usually types (follow STYLE_REFERENCE habits when present). Several sentences may share one line, and sentence lengths must be uneven — do NOT write one sentence per line, do NOT make every line the same length. Avoid one solid block: use at least 2 lines/paragraphs (2~4 chunky paragraphs is fine). A single line/paragraph must not exceed about 300 characters (a capture card cannot be cut inside a block). Always set capture_split_after_lines to null — the server computes it.
                 AI_POST metaphor_ids rules (hard): pick 3 to 5 ids from METAPHOR_CATALOG, ordered from best-fit to weakest-fit, that match the emotional core of the story (object-as-feeling metaphor). The FIRST id is the representative/primary metaphor and will be used as the video's opening image — it must be the single best match. The remaining ids will illustrate different beats of the story body, so prefer some variety in mood/tone across the list rather than 5 near-duplicates. Prefer group/tone fit over category label. Required for AI_POST.
                 Phase1 comment count: about 2~4 top-level (respect LIMITS). Keep them light reactions to the 작성자 story only.
                 """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase1", req.getPromptOverrides())) +
@@ -802,7 +818,7 @@ public class StructuredGenerationService {
         int maxTop = safe(req.getMaxTopLevel(), 14, 1, 20);
         int maxReplies = safe(req.getMaxReplies(), 10, 0, 20);
         String partnerBlock = wantPartner
-                ? "Include partner_post with body + optional capture_split_after_lines (same rules as author: ≤8 blocks/part, max 4 parts). Stance=PARTNER."
+                ? "Include partner_post with body (capture_split_after_lines always null). Stance=PARTNER."
                 : "Set partner_post to null — this is a comment-only micro-batch continuation of logical Call2; do not regenerate the 상대방 body.";
         // persona-diversity-v4 WP2 재배선 — Call1과 같은 계약7 골격을 partner_post 생성에도 태운다.
         StringBuilder grounding = new StringBuilder();
@@ -826,7 +842,7 @@ public class StructuredGenerationService {
                 Do not use published comment ids as parentRef; replies may only parent earlier top-level refs from this response.
                 Use only supplied personaIds. No personal data, internal notes, or AI identity claims. Use 작성자/상대방.
                 STORY_PERSONA_RULE (hard): never assign the 작성자 or 상대방 personaId to any comment or reply. Those accounts already wrote the story sides; comments are other community members only.
-                Partner body line rules: one Korean sentence per newline; short blocks. If >8 non-empty lines, set capture_split_after_lines (semantic cuts, each part ≤8, max 4 parts); else null.
+                Partner body format rules: break lines the way this person usually types; several sentences may share a line and sentence lengths must be uneven (no one-sentence-per-line pattern); avoid one solid block (at least 2 lines/paragraphs). Keep each line/paragraph under about 300 characters. Always set capture_split_after_lines to null — the server computes it. The partner also writes in favor of themselves (no weighing own fault) and summarizes rather than staging scenes.
                 When SKELETON is present, partner_post must restate the SAME incident as AUTHOR_POST from the 상대방 side via SKELETON's counterpart_claim — never invent a different conflict.
                 """ + "\nGUIDE=\n" + clean(promptAssembler.guide("voice/paired_phase2", req.getPromptOverrides())) +
                 "\nPARTNER_VOICE=\n" + clean(promptAssembler.guide("voice/partner", req.getPromptOverrides())) +
@@ -860,6 +876,10 @@ public class StructuredGenerationService {
                 grounding.append("\n").append(RECONSTRUCT_RULE);
             }
         }
+        if (req.getKind() == ThreadPlanRequest.Kind.AI_POST) {
+            grounding.append("\n").append(AUTHOR_VOICE_RULE);
+            grounding.append(styleReferenceBlock(req.getStyleReference(), req.getSourceLength()));
+        }
         if (!blank(req.getDynamicExamples())) {
             grounding.append("\nSTYLE_EXAMPLES=").append(clean(req.getDynamicExamples()));
         }
@@ -873,16 +893,48 @@ public class StructuredGenerationService {
                 For a HUMAN_POST set post to null; for AI_POST include post. Use only supplied personaIds. A reply's parentRef must refer to an earlier top-level comment. Do not use personal data, internal notes, or claims of being an AI. Product framing = plaza empathy votes (공감).
                 STORY_PERSONA_RULE (hard): never assign AUTHOR.personaId (or the AI_POST author) to any comment or reply. Comments are bystanders only — the story author must not appear as a community commenter.
                 When SKELETON is present, the post must be grounded in that skeleton — TOPIC is only a short seed, not the whole story.
-                AI_POST title/body rules (hard): title is a short informational Korean plaza headline of 12~40 characters including spaces (max 40) — clear for community feed scanning, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
+                AI_POST title/body rules (hard): title is a short Korean plaza headline of 12~40 characters including spaces (max 40), typed by the author in the same voice and speech level as the body (banmal body → banmal title; do not default to a polite '~습니다/~인가요/~걸까요' question) — it names what happened, like a real community post title, not an SNS clickbait rewrite. body must be a separate fuller story — never copy the title into body as the whole body, and never set title equal to body. body expands the incident (when/what/how I felt); title only names the conflict.
                 AI_POST promo_title rules (hard): promo_title is the MASTER SNS scroll-stop hook — independent of title (do NOT copy title characters). Write a provocative Korean line that stops the thumb in a feed (curiosity/conflict/emotional punch). Optional semantic \\n for card layout; each line ≤20 chars; flattened length 4~80. Required for AI_POST.
                 AI_POST hook_emotion rules (hard): required enum exactly one of shock|anger|tension|sad|hype — the dominant emotion the SNS hook is meant to trigger.
-                AI_POST body line rules (hard): write body as one Korean sentence (or short sense unit) per newline — no blank lines; each non-empty line is a capture block; keep blocks short (~1–2 visual lines). If more than 8 non-empty lines, set capture_split_after_lines to 1-based last-block indices of each part except the final (semantic pauses; each part 1~8 blocks; max 4 parts / ≤3 cuts; e.g. 20 lines → [7,14]). If ≤8 lines, null.
+                AI_POST body format rules (hard): break lines the way this person usually types (follow STYLE_REFERENCE habits when present). Several sentences may share one line, and sentence lengths must be uneven — do NOT write one sentence per line, do NOT make every line the same length. Avoid one solid block: use at least 2 lines/paragraphs (2~4 chunky paragraphs is fine). A single line/paragraph must not exceed about 300 characters (a capture card cannot be cut inside a block). Always set capture_split_after_lines to null — the server computes it.
                 AI_POST metaphor_ids rules (hard): pick 3 to 5 ids from METAPHOR_CATALOG, ordered from best-fit to weakest-fit, that match the emotional core of the story (object-as-feeling metaphor). The FIRST id is the representative/primary metaphor and will be used as the video's opening image — it must be the single best match. The remaining ids will illustrate different beats of the story body, so prefer some variety in mood/tone across the list rather than 5 near-duplicates. Prefer group/tone fit over category label. Required for AI_POST; for HUMAN_POST leave post null (no metaphor).
                 """ + "\nKIND=" + req.getKind() + "\nCATEGORY=" + clean(req.getCategory()) + "\nTOPIC=" + clean(req.getTopicHint()) + "\n" + existing +
                 grounding +
                 "\nMETAPHOR_CATALOG=\n" + MetaphorCatalog.compactCatalog() +
                 overusedMetaphorsHint(req.getOverusedMetaphorIds()) +
                 "\nPERSONAS=" + json(personaCardList(req.getPersonas())) + "\nLIMITS=" + json(Map.of("topLevel", safe(req.getMaxTopLevel(),14,1,20), "replies", safe(req.getMaxReplies(),10,0,20)));
+    }
+
+    /** 본문 목표 길이 [하한, 상한]. 하한 = max(120, round(0.7L)), 상한 = min(900, max(220, round(1.3L))). 하한은 상한을 넘지 않게 100 이상 여유를 둔다. */
+    static int[] targetLengthRange(int sourceLength) {
+        int hi = Math.min(900, Math.max(220, (int) Math.round(1.3 * sourceLength)));
+        int lo = Math.max(120, (int) Math.round(0.7 * sourceLength));
+        if (lo > hi - 100) lo = hi - 100;
+        return new int[]{lo, hi};
+    }
+
+    /** 문체 참고(원문) + 길이 목표 블록. 둘 다 없으면 빈 문자열(하위 호환). */
+    static String styleReferenceBlock(String styleReference, Integer sourceLength) {
+        StringBuilder sb = new StringBuilder();
+        if (!blank(styleReference)) {
+            String ref = clean(styleReference);
+            if (ref.length() > STYLE_REFERENCE_MAX_CHARS) ref = ref.substring(0, STYLE_REFERENCE_MAX_CHARS);
+            sb.append("\nSTYLE_REFERENCE=").append(ref);
+            sb.append("\nSTYLE_REFERENCE_RULE (hard): STYLE_REFERENCE is a real community post by a real person, given for STYLE ONLY. "
+                    + "Take from it just the way of talking: tone, breathing, uneven sentence lengths, line-break habits, punctuation, how often ㅋㅋ/ㅠㅠ appear, roughness/sloppiness, and the overall temperature of the writing. "
+                    + "The facts of the incident (who, what, amounts, place names) come from SKELETON and the AUTHOR card — decide them fresh. "
+                    + "The AUTHOR card's gender and marital status are binding: if the original writer differs (e.g. a wife's post, male AUTHOR), flip the roles so the story is the AUTHOR's own. "
+                    + "Swap the identifying specifics that appear in STYLE_REFERENCE (kind of shop/menu/item, numbers, durations, family make-up, where it happened) for different ones of the same weight, so the post is not a paraphrase of the original — but keep it just as short and plain; changing a detail is not a licence to add scenes. "
+                    + "Never copy a sentence or a run of consecutive words from STYLE_REFERENCE (an n-gram plagiarism check runs afterwards and rejects copies). "
+                    + "On style, STYLE_REFERENCE overrides the speech-style axes of the AUTHOR personaCard: use the card only for life facts (age, gender, marital status, job), and mention job/age only when relevant to the incident.");
+        }
+        if (sourceLength != null && sourceLength > 0) {
+            int[] r = targetLengthRange(sourceLength);
+            sb.append("\nBODY_LENGTH_TARGET (hard): body should be about ").append(r[0]).append("~").append(r[1])
+                    .append(" characters (the original is ").append(sourceLength)
+                    .append(" characters). Do not pad or stretch it longer than the original; do not invent scenes to fill length.");
+        }
+        return sb.toString();
     }
 
     /**
@@ -1262,27 +1314,6 @@ public class StructuredGenerationService {
             return null;
         }
         return List.copyOf(cuts);
-    }
-
-    private static List<Integer> readCaptureSplits(JsonNode postNode) {
-        JsonNode arr = postNode.get("capture_split_after_lines");
-        if (arr == null || arr.isNull()) arr = postNode.get("captureSplitAfterLines");
-        if (arr != null && arr.isArray()) {
-            List<Integer> out = new ArrayList<>();
-            for (JsonNode n : arr) {
-                if (n != null && n.isNumber()) out.add(n.asInt());
-            }
-            if (!out.isEmpty()) return out;
-        }
-        Integer legacy = readCaptureSplit(postNode);
-        return legacy == null ? null : List.of(legacy);
-    }
-
-    private static Integer readCaptureSplit(JsonNode postNode) {
-        JsonNode n = postNode.get("capture_split_after_line");
-        if (n == null || n.isNull()) n = postNode.get("captureSplitAfterLine");
-        if (n == null || n.isNull() || !n.isNumber()) return null;
-        return n.asInt();
     }
 
     /**

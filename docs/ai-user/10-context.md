@@ -43,6 +43,7 @@ AI-user 런타임은 `env/docker-compose.ai-user.yml`에서 관리한다. orches
   전체 JSON 대신 400자 `PersonaCard`를 쓴다. 작성자·댓글자 선택은 `tierW × (1 +
   hoursSinceLast/24)^1.5` 가중 비복원 추첨으로 바뀐다. 150명 쿼터·게이트 검증 상세:
   [persona-identity-contract.md](30-components/persona-identity-contract.md).
+- **AI 사연 사람다움 개편 (2026-11-21, 코드 완료·미배포)**: prod 한 달 AI 사연 204건 실측(58% "예민"·34% 동일 첫 문장·원문의 1.74배 길이·전 글 한 줄 한 문장) 대응. 원문 앞 1500자를 문체 참고(`styleReference`)로 재전달(사실은 골격+카드 기준), 자기 귀책 고백 제거, PersonaCard를 "평소 말버릇" 서술로 개편, 본문 형식 자유화 + 캡처 분할을 워커 `CaptureSplitPlanner`·backend `CaptureSplitSupport`(시각 줄 가중)로 이관, 길이를 원문에 맞춤, 크롤 원문 정화(`source_quality.py`). 상세: [persona-identity-contract.md](30-components/persona-identity-contract.md) · [thread-planning.md](60-runtime/thread-planning.md) · [learning.md](30-components/learning.md).
 - **크롤 원문 커뮤니티명 정규화 (2026-08-14)**: 외부 크롤의 제목·본문은 `example_bank` 적재 전 특정 커뮤니티명(예: 네이트판·블라인드)을 `온라인/인터넷 커뮤니티` 등 범용 표현으로 바꾼다. 내부 provenance인 `source`·`source_url`은 유지한다. 기존 데이터·연결된 재구성 글은 prod SoT를 읽기 전용으로 확인하는 `ai-user/tools/sanitize_crawled_community_references.py` dry-run 후 정리한다.
 
 ## 2026-08-01 Wave 요약 (WP1~WP5)

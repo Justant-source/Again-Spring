@@ -567,6 +567,8 @@ public class PairedPostScheduler {
             }
             request.put("sourceContext", resolvedSource.sourceContext());
             request.put("reconstructMode", resolvedSource.reconstructMode());
+            // 2026-11: 작성자(A) 본문 호출에만 원문을 문체 참고로 전달(B 경로는 전달하지 않음).
+            PlanSourceStoryResolver.putStyleReference(request, resolvedSource.sourceBody());
             if (resolvedSource.sourceExampleId() != null) {
                 request.put("sourceExampleId", resolvedSource.sourceExampleId());
             }

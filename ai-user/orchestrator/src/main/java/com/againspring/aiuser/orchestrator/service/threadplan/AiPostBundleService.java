@@ -648,8 +648,10 @@ public class AiPostBundleService {
         request.put("sourceContext", source.sourceContext());
         request.put("reconstructMode", source.reconstructMode());
         if (source.sourceExampleId() != null) request.put("sourceExampleId", source.sourceExampleId());
-        // persona-diversity-v4 WP2 item3: sourceBody(원문 전문) 전달 제거 — sourceContext가
-        // 이제 골격(뼈대) JSON만 담으므로 원문을 별도 필드로 다시 실을 필요가 없다.
+        // 2026-11 방침 변경: item3(원문 전달 제거)을 되돌려 원문을 "문체 참고"로만 다시 전달한다
+        // (styleReference ≤1500자 + sourceLength). 사실관계는 여전히 sourceContext 골격 기준이며,
+        // 복사는 SourceOverlapGuard가 사후 차단한다. follow-up(HUMAN_POST) 호출은 이 맵을 쓰지 않는다.
+        PlanSourceStoryResolver.putStyleReference(request, source.sourceBody());
         if (source.dynamicExamples() != null && !source.dynamicExamples().isBlank()) {
             request.put("dynamicExamples", source.dynamicExamples());
         }
