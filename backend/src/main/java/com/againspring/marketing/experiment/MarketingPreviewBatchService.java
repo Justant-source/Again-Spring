@@ -40,6 +40,8 @@ public class MarketingPreviewBatchService {
     static final long MAX_WAIT_MILLIS = 45L * 60_000L;
     /** 이 시간 안에 이미 완성된 (사연, arm, 플랫폼)은 다시 렌더하지 않는다. */
     static final long REUSE_HOURS = 12L;
+    static final int MAX_LLM_RETRIES = 3;
+    static final long RETRY_PAUSE_MILLIS = 30_000L;
 
     private final PostRepository postRepository;
     private final MarketingJobService jobService;
@@ -139,11 +141,21 @@ public class MarketingPreviewBatchService {
                     continue;
                 }
                 MarketingJob job = jobService.createTestJobWithArm(postId, List.of(platform), "preview-batch", arm);
+                // LLM 호출이 컨테이너 재시작 등으로 끊기면(공유 base 스택의 dev 배포 포함) 잠시 뒤 다시 만든다.
+                for (int retry = 0; retry < MAX_LLM_RETRIES && isTransientLlmFailure(job); retry++) {
+                    log.warn("preview batch retry post={} arm={} ({}회째, VARIANT_LLM_ERROR)", postId, arm, retry + 1);
+                    sleeper.accept(RETRY_PAUSE_MILLIS);
+                    job = jobService.createTestJobWithArm(postId, List.of(platform), "preview-batch", arm);
+                }
                 waitUntilTerminal(job);
             } catch (Exception e) {
                 log.warn("preview batch skip post={} arm={}: {}", postId, arm, e.getMessage());
             }
         }
+    }
+
+    private static boolean isTransientLlmFailure(MarketingJob job) {
+        return job != null && "FAILED".equals(job.getStatus()) && "VARIANT_LLM_ERROR".equals(job.getFailureCode());
     }
 
     private void waitUntilTerminal(MarketingJob created) {

@@ -115,6 +115,36 @@ class MarketingPreviewBatchServiceTest {
     }
 
     @Test
+    void start_retriesWhenLlmCallWasInterrupted_thenContinues() {
+        MarketingJob llmFailed = MarketingJob.builder().id(1L).status("FAILED").failureCode("VARIANT_LLM_ERROR").build();
+        MarketingJob ready = MarketingJob.builder().id(2L).status("READY").build();
+        when(jobService.createTestJobWithArm(eq("p1"), any(), anyString(), eq("short_reveal")))
+            .thenReturn(llmFailed, llmFailed, ready);
+        when(jobService.createTestJobWithArm(anyString(), any(), anyString(), eq("dilemma"))).thenReturn(ready);
+        when(jobService.createTestJobWithArm(eq("p2"), any(), anyString(), eq("short_reveal"))).thenReturn(ready);
+
+        service.start(5, null, null);
+
+        verify(jobService, org.mockito.Mockito.times(3))
+            .createTestJobWithArm("p1", List.of("youtube_shorts"), "preview-batch", "short_reveal");
+    }
+
+    @Test
+    void start_givesUpAfterMaxRetriesButStillRunsNextArm() {
+        MarketingJob llmFailed = MarketingJob.builder().id(1L).status("FAILED").failureCode("VARIANT_LLM_ERROR").build();
+        MarketingJob ready = MarketingJob.builder().id(2L).status("READY").build();
+        when(jobService.createTestJobWithArm(eq("p1"), any(), anyString(), eq("short_reveal"))).thenReturn(llmFailed);
+        when(jobService.createTestJobWithArm(anyString(), any(), anyString(), eq("dilemma"))).thenReturn(ready);
+        when(jobService.createTestJobWithArm(eq("p2"), any(), anyString(), eq("short_reveal"))).thenReturn(ready);
+
+        service.start(5, null, null);
+
+        verify(jobService, org.mockito.Mockito.times(1 + MarketingPreviewBatchService.MAX_LLM_RETRIES))
+            .createTestJobWithArm("p1", List.of("youtube_shorts"), "preview-batch", "short_reveal");
+        verify(jobService).createTestJobWithArm("p1", List.of("youtube_shorts"), "preview-batch", "dilemma");
+    }
+
+    @Test
     void start_rejectsConcurrentBatchAndBadInput() {
         Executor never = r -> { };
         service = new MarketingPreviewBatchService(postRepository, jobService, jobRepository, armService, never, ms -> { });

@@ -75,8 +75,27 @@ function proxyUrl(jobId: number, artifactKey: string) {
 
 // 아티팩트 프록시는 ADMIN JWT 필수 — <img src>/<a href>는 Authorization 헤더를 못 붙이므로
 // 인증된 axios 클라이언트로 blob을 받아 object URL로 표시/다운로드한다.
+// 결과물 요청은 동시에 몇 개만 보낸다. 테스트 탭은 잡 40개가 한꺼번에 마운트되며 upload.json·이미지를
+// 100건 넘게 동시에 요청해 ASM의 DB 연결 풀(16개)을 바닥냈다(2026-11-21). 모듈 전역 큐로 직렬화에 가깝게 보낸다.
+const MAX_CONCURRENT_ARTIFACT_REQUESTS = 3;
+let activeArtifactRequests = 0;
+const artifactRequestWaiters: Array<() => void> = [];
+
+async function withArtifactSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeArtifactRequests >= MAX_CONCURRENT_ARTIFACT_REQUESTS) {
+    await new Promise<void>((resolve) => artifactRequestWaiters.push(resolve));
+  }
+  activeArtifactRequests += 1;
+  try {
+    return await task();
+  } finally {
+    activeArtifactRequests -= 1;
+    artifactRequestWaiters.shift()?.();
+  }
+}
+
 async function fetchArtifactBlobUrl(url: string): Promise<string> {
-  const res = await api.get<Blob>(url, { responseType: 'blob' });
+  const res = await withArtifactSlot(() => api.get<Blob>(url, { responseType: 'blob' }));
   return URL.createObjectURL(res.data);
 }
 
@@ -566,7 +585,7 @@ function PlatformCard({
   useEffect(() => {
     if (!uploadArtifactKey) return;
     const url = proxyUrl(jobId, uploadArtifactKey);
-    api.get(url).then(res => setUploadData(res.data as Record<string, unknown>)).catch(() => {});
+    withArtifactSlot(() => api.get(url)).then(res => setUploadData(res.data as Record<string, unknown>)).catch(() => {});
   }, [uploadArtifactKey, jobId]);
 
   const hasCards = Object.keys(pkg).some(k => k.startsWith('card_'));
