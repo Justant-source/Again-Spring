@@ -23,7 +23,7 @@ Content-Type: application/json
 
 - 허용 목록 밖이면 400. `marketing_hook_a`(숫자 강조·대형 글자)는 2026-10-18 **운영 기본으로 채택**(자동 게시 허용, `.env.prod` `MARKETING_RENDER_PROFILE`). `marketing_hook_b/c`(키네틱 타이포 / 캐릭터 리액션 먼저)는 **테스트 전용** — `autoPublish=true` 와 함께 요청하면 400(서비스 계층도 동일하게 거부).
 - 응답에는 `renderProfile` 과 `hookRule`(훅 프롬프트 규칙 버전, 태그 없는 과거 잡 = `v1`)이 포함된다. 테스트 탭이 배지·필터·나란히 비교에 쓴다.
-- 응답에는 `formatArm`(배정된 포맷 arm key, 실험 미적용 잡은 `null`)도 포함된다. 요청 본문은 바뀌지 않는다 — 자동 게시 영상 잡이고 호출자가 프로필을 지정하지 않았을 때 BE가 arm을 골라 `renderProfile`·대본 스타일·길이 상한·`options`를 채운다([`10-context.md`](10-context.md) 반응 루프). 세부 동작은 `MarketingJobService`가 권위본.
+- 응답에는 `formatArm`(배정된 포맷 arm key, 실험 미적용 잡은 `null`)도 포함된다. 요청 본문에 선택 필드 `formatArm`(테스트 탭 전용)을 줄 수 있다 — arm이 꺼져 있어도 적용되며 `autoPublish=true`와 함께 쓰면 400, 모르는 arm key도 400이다. 그 외에는 요청 본문이 그대로이고, 자동 게시 영상 잡이고 호출자가 프로필을 지정하지 않았을 때 BE가 arm을 골라 `renderProfile`·대본 스타일·길이 상한·`options`를 채운다([`10-context.md`](10-context.md) 반응 루프). 세부 동작은 `MarketingJobService`가 권위본.
 
 **Response 201**
 ```json

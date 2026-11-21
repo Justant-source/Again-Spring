@@ -19,6 +19,7 @@ import {
   getMarketingJob,
 } from '@/lib/api/admin/marketing';
 import { useRenderTestStore, formatApiError, EMPTY_REVIEW, TestRun, ReviewItem } from '@/lib/store/renderTestStore';
+import { getExperiment, ExperimentArm } from '@/lib/api/admin/marketingExperiment';
 import { RefreshCw, Play, X, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -69,10 +70,23 @@ function ProfileRadioGroup({
 }
 
 /** 프로필 + 훅 규칙 버전 배지 한 쌍. */
-function VariantBadges({ profile, hookRule }: { profile: string; hookRule: string }) {
+function VariantBadges({
+  profile,
+  hookRule,
+  formatArm,
+}: {
+  profile: string;
+  hookRule: string;
+  formatArm?: string | null;
+}) {
   const opt = getRenderProfileOption(profile);
   return (
     <>
+      {formatArm && (
+        <Badge className="bg-violet-200 text-violet-800" data-testid="render-test-arm-badge">
+          포맷 {formatArm}
+        </Badge>
+      )}
       <Badge className={opt.badgeClass} data-testid="render-test-profile-badge">
         {opt.short}
       </Badge>
@@ -86,17 +100,51 @@ function VariantBadges({ profile, hookRule }: { profile: string; hookRule: strin
   );
 }
 
+/** 포맷 arm 선택(없음 = 기존 방식). arm을 고르면 프로필·대본 스타일·댓글 수·엔드카드를 arm이 정한다. */
+function ArmSelect({
+  arms,
+  value,
+  onChange,
+  testId,
+}: {
+  arms: ExperimentArm[];
+  value: string;
+  onChange: (v: string) => void;
+  testId: string;
+}) {
+  if (arms.length === 0) return null;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="rounded border px-2 py-1 text-xs"
+      data-testid={testId}
+    >
+      <option value="">포맷 실험 안 함 (위 렌더 프로필 사용)</option>
+      {arms.map((a) => (
+        <option key={a.key} value={a.key}>
+          {a.key}
+          {a.enabled ? ' · 운영 중' : ''} — {a.description}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function PostRow({
   post,
+  arms,
   onLaunch,
   launching,
 }: {
   post: PickerPost;
-  onLaunch: (post: PickerPost, targets: string[], renderProfile?: string) => void;
+  arms: ExperimentArm[];
+  onLaunch: (post: PickerPost, targets: string[], renderProfile?: string, formatArm?: string) => void;
   launching: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(['instagram_reels', 'youtube_shorts']);
   const [renderProfile, setRenderProfile] = useState<string>('marketing_v2');
+  const [formatArm, setFormatArm] = useState<string>('');
 
   const toggle = (key: string) => {
     setSelected((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
@@ -128,7 +176,7 @@ function PostRow({
           <Button
             size="sm"
             disabled={launching || selected.length === 0}
-            onClick={() => onLaunch(post, selected, renderProfile)}
+            onClick={() => onLaunch(post, selected, renderProfile, formatArm || undefined)}
             data-testid="render-test-launch-button"
           >
             <Play className="mr-1 h-3 w-3" />
@@ -141,6 +189,15 @@ function PostRow({
         <span className="text-gray-600">렌더 프로필:</span>
         <ProfileRadioGroup name={`profile-${post.id}`} value={renderProfile} onChange={setRenderProfile} />
       </div>
+      {arms.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span className="text-gray-600">포맷 arm:</span>
+          <ArmSelect arms={arms} value={formatArm} onChange={setFormatArm} testId="render-test-arm-select" />
+          {formatArm && (
+            <span className="text-gray-500">플랫폼별로 따로 렌더합니다(길이 상한이 플랫폼마다 달라서).</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -161,7 +218,7 @@ function TestRunCard({ run, onRemove }: { run: TestRun; onRemove: (runKey: strin
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} />
+          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} formatArm={job?.formatArm ?? run.formatArm} />
           <Badge className={STATUS_COLORS[status] || 'bg-gray-200 text-gray-800'}>{status}</Badge>
           <button
             type="button"
@@ -313,7 +370,7 @@ function ServerJobCard({ job }: { job: MarketingJob }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} />
+          <VariantBadges profile={profile} hookRule={resolveHookRule(job)} formatArm={job.formatArm} />
           <Badge className={STATUS_COLORS[job.status] || 'bg-gray-200 text-gray-800'}>{job.status}</Badge>
         </div>
       </div>
@@ -431,12 +488,40 @@ export function RenderTestSection() {
   }, [page, loadPosts]);
 
   const [manualRenderProfile, setManualRenderProfile] = useState<string>('marketing_v2');
+  const [manualFormatArm, setManualFormatArm] = useState<string>('');
+
+  // 포맷 arm 목록(실험 API). 불러오지 못하면 arm 선택 UI만 숨기고 기존 테스트 탭은 그대로 쓴다.
+  const [arms, setArms] = useState<ExperimentArm[]>([]);
+  useEffect(() => {
+    let alive = true;
+    getExperiment()
+      .then((data) => {
+        if (alive) setArms(data.arms ?? []);
+      })
+      .catch(() => {
+        if (alive) setArms([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const launch = useCallback(
-    async (postId: string, postTitle: string, targets: string[], renderProfile?: string) => {
+    async (
+      postId: string,
+      postTitle: string,
+      targets: string[],
+      renderProfile?: string,
+      formatArm?: string
+    ) => {
       setLaunchingPostId(postId);
       try {
-        await launchRun(postId, postTitle, targets, renderProfile);
+        if (formatArm) {
+          // arm 길이 상한은 단일 플랫폼 잡에서만 적용되므로 플랫폼별로 따로 렌더한다.
+          await Promise.all(targets.map((t) => launchRun(postId, postTitle, [t], renderProfile, formatArm)));
+        } else {
+          await launchRun(postId, postTitle, targets, renderProfile);
+        }
       } finally {
         setLaunchingPostId(null);
       }
@@ -447,7 +532,7 @@ export function RenderTestSection() {
   const handleManualLaunch = () => {
     const postId = manualPostId.trim();
     if (!postId) return;
-    void launch(postId, postId, ['instagram_reels', 'youtube_shorts'], manualRenderProfile);
+    void launch(postId, postId, ['instagram_reels', 'youtube_shorts'], manualRenderProfile, manualFormatArm || undefined);
   };
 
   /**
@@ -609,7 +694,8 @@ export function RenderTestSection() {
             <PostRow
               key={post.id}
               post={post}
-              onLaunch={(p, targets, profile) => void launch(p.id, p.title, targets, profile)}
+              arms={arms}
+              onLaunch={(p, targets, profile, arm) => void launch(p.id, p.title, targets, profile, arm)}
               launching={launchingPostId === post.id}
             />
           ))}
@@ -653,6 +739,7 @@ export function RenderTestSection() {
             {/* 렌더 프로필 선택 (직접 입력) */}
             <div className="text-xs">
               <ProfileRadioGroup name="manual-profile" value={manualRenderProfile} onChange={setManualRenderProfile} />
+              <ArmSelect arms={arms} value={manualFormatArm} onChange={setManualFormatArm} testId="render-test-manual-arm-select" />
             </div>
             <Button size="sm" variant="outline" onClick={handleManualLaunch} disabled={!manualPostId.trim()}>
               <Play className="mr-1 h-3 w-3" />

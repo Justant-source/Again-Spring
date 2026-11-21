@@ -93,7 +93,7 @@ export function groupVariantsByPost(jobs: MarketingJob[]): MarketingJob[][] {
   byPost.forEach((list) => {
     const latestByVariant = new Map<string, MarketingJob>();
     for (const job of list) {
-      const key = `${resolveRenderProfile(job)}|${resolveHookRule(job)}`;
+      const key = `${resolveRenderProfile(job)}|${resolveHookRule(job)}|${job.formatArm ?? ''}`;
       const prev = latestByVariant.get(key);
       if (!prev || new Date(job.createdAt).getTime() > new Date(prev.createdAt).getTime()) {
         latestByVariant.set(key, job);
@@ -103,7 +103,9 @@ export function groupVariantsByPost(jobs: MarketingJob[]): MarketingJob[][] {
       const order = RENDER_PROFILE_OPTIONS.map((o) => o.key);
       const variants = Array.from(latestByVariant.values()).sort((a, b) => {
         const d = order.indexOf(resolveRenderProfile(a)) - order.indexOf(resolveRenderProfile(b));
-        return d !== 0 ? d : resolveHookRule(a).localeCompare(resolveHookRule(b));
+        if (d !== 0) return d;
+        const h = resolveHookRule(a).localeCompare(resolveHookRule(b));
+        return h !== 0 ? h : (a.formatArm ?? '').localeCompare(b.formatArm ?? '');
       });
       groups.push(variants);
     }
@@ -144,9 +146,16 @@ export async function createMarketingJob(
 export async function createMarketingTestJob(
   postId: string,
   targets: string[],
-  renderProfile?: string | null
+  renderProfile?: string | null,
+  formatArm?: string | null
 ): Promise<MarketingJob> {
-  const body: { postId: string; targets: string[]; autoPublish: boolean; renderProfile?: string | null } = {
+  const body: {
+    postId: string;
+    targets: string[];
+    autoPublish: boolean;
+    renderProfile?: string | null;
+    formatArm?: string | null;
+  } = {
     postId,
     targets,
     autoPublish: false,
@@ -154,6 +163,10 @@ export async function createMarketingTestJob(
   // renderProfile이 있을 때만 본문에 포함 (백엔드가 아직 이 필드를 안 받을 수 있으므로)
   if (renderProfile != null) {
     body.renderProfile = renderProfile;
+  }
+  // 포맷 arm(꺼져 있어도 됨): 지정하면 arm이 프로필·대본 스타일·댓글 수·엔드카드를 정한다.
+  if (formatArm) {
+    body.formatArm = formatArm;
   }
   const res = await api.post<MarketingJob>('/api/admin/marketing/jobs', body);
   return res.data;

@@ -57,4 +57,15 @@ describe('render test variants', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].map((j) => j.id)).toEqual([2, 3]);
   });
+
+  it('같은 프로필이어도 포맷 arm이 다르면 별개 변형으로 나란히 비교한다', () => {
+    const jobs = [
+      job({ id: 1, postId: 'a', renderProfile: 'marketing_hook_a', hookRule: 'v2', formatArm: null }),
+      job({ id: 2, postId: 'a', renderProfile: 'marketing_hook_a', hookRule: 'v2', formatArm: 'short_reveal' }),
+      job({ id: 3, postId: 'a', renderProfile: 'marketing_hook_a', hookRule: 'v2', formatArm: 'dilemma' }),
+    ];
+    const groups = groupVariantsByPost(jobs);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].map((j) => j.formatArm ?? '')).toEqual(['', 'dilemma', 'short_reveal']);
+  });
 });

@@ -296,6 +296,21 @@ public class AdminMarketingController {
             }
         }
 
+        String formatArm = req.getFormatArm();
+        if (formatArm != null && !formatArm.isBlank()) {
+            if (req.isAutoPublish()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "formatArm is test-only (autoPublish must be false)");
+            }
+            try {
+                MarketingJob armJob = marketingJobService.createTestJobWithArm(
+                    req.getPostId(), req.getTargets(), null, formatArm.trim());
+                return ResponseEntity.status(HttpStatus.CREATED).body(JobResponse.from(armJob));
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+            }
+        }
+
         MarketingJob job = marketingJobService.createJob(
             req.getPostId(),
             req.getTargets(),

@@ -115,8 +115,28 @@ public class MarketingJobService {
         return createJob(postId, targets, autoPublish, requestedBy, null, 1, renderProfile);
     }
 
+    /**
+     * 테스트 탭용: 지정한 포맷 arm(꺼져 있어도 됨)을 적용해 렌더만 하는 잡을 만든다. autoPublish는 항상 false.
+     *
+     * @throws IllegalArgumentException arm이 없거나 autoPublish=true인 경우
+     */
+    public MarketingJob createTestJobWithArm(String postId, List<String> targets, String requestedBy,
+                                             String formatArmKey) {
+        if (formatArmService.find(formatArmKey).isEmpty()) {
+            throw new IllegalArgumentException("Unknown formatArm: " + formatArmKey);
+        }
+        return createJob(postId, targets, false, requestedBy, null, 1, null, formatArmKey);
+    }
+
     private MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
                                    Long retryOfJobId, int generationAttempt, String renderProfile) {
+        return createJob(postId, targets, autoPublish, requestedBy, retryOfJobId, generationAttempt,
+            renderProfile, null);
+    }
+
+    private MarketingJob createJob(String postId, List<String> targets, boolean autoPublish, String requestedBy,
+                                   Long retryOfJobId, int generationAttempt, String renderProfile,
+                                   String explicitArmKey) {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
         }
@@ -131,7 +151,7 @@ public class MarketingJobService {
             MarketingJob first = null;
             for (List<String> group : asmGroups) {
                 MarketingJob created = createJob(postId, group, autoPublish, requestedBy,
-                    retryOfJobId, generationAttempt, renderProfile);
+                    retryOfJobId, generationAttempt, renderProfile, explicitArmKey);
                 if (first == null) {
                     first = created;
                 }
@@ -284,6 +304,9 @@ public class MarketingJobService {
         FormatArm arm = null;
         if (inheritedArmKey != null) {
             arm = formatArmService.find(inheritedArmKey).orElse(null);
+        } else if (explicitArmKey != null && !autoPublish) {
+            // 테스트 탭이 지정한 arm: 꺼져 있어도 적용한다(자동 게시가 아니라서 실험 규칙을 우회하지 않는다).
+            arm = formatArmService.find(explicitArmKey).orElse(null);
         } else if (retryOfJobId == null && autoPublish && (renderProfile == null || renderProfile.isBlank())
                 && targets != null && targets.size() == 1
                 && ("instagram_reels".equals(targets.get(0)) || "youtube_shorts".equals(targets.get(0)))) {

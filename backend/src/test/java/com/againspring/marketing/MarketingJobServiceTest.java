@@ -1992,6 +1992,36 @@ class MarketingJobServiceTest {
     }
 
     @Test
+    void createTestJobWithArm_appliesDisabledArm_notAutoPublish_withoutPicking() throws Exception {
+        stubVideoJob("youtube_shorts");
+        when(formatArmService.find("short_reveal")).thenReturn(Optional.of(
+            arm("short_reveal", "marketing_hook_a", "narrative", 0, "vote_reveal", 25)));
+
+        MarketingJob job = marketingJobService.createTestJobWithArm(
+            TEST_POST_ID, List.of("youtube_shorts"), "admin", "short_reveal");
+
+        verify(formatArmService, never()).pickForAutoJob(anyString());
+        assertThat(job.getAutoPublish()).isFalse();
+        assertThat(job.getFormatArm()).isEqualTo("short_reveal");
+        CreateJobRequest req = sentRequest();
+        assertThat(req.getOptions().isAutoPublish()).isFalse();
+        assertThat(req.getOptions().getFormatArm()).isEqualTo("short_reveal");
+        assertThat(req.getOptions().getCommentCount()).isEqualTo(0);
+        assertThat(req.getOptions().getOutroMode()).isEqualTo("vote_reveal");
+        assertThat(req.getBrief().getMaxDurationShortsSec()).isEqualTo(25);
+    }
+
+    @Test
+    void createTestJobWithArm_unknownArm_rejected() {
+        when(formatArmService.find("nope")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> marketingJobService.createTestJobWithArm(
+            TEST_POST_ID, List.of("youtube_shorts"), "admin", "nope"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("nope");
+    }
+
+    @Test
     void regenerateJob_inheritsArmOfPreviousJob_withoutPickingNew() throws Exception {
         stubVideoJob("instagram_reels");
         MarketingJob previous = MarketingJob.builder()

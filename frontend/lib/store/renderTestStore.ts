@@ -43,6 +43,7 @@ export interface TestRun {
   postTitle: string;
   targets: string[];
   renderProfile?: string; // 이 실행에서 사용한 렌더 프로필 ('marketing_v2'|'marketing_fast')
+  formatArm?: string; // 이 실행에서 사용한 포맷 arm key (없으면 기존 방식)
   job: MarketingJob | null;
   error: string | null;
 }
@@ -63,7 +64,13 @@ export const EMPTY_REVIEW: ReviewItem = Object.freeze({ flags: [], memo: '' }) a
 interface RenderTestStoreState {
   runs: TestRun[];
   reviews: Record<number, ReviewItem>; // jobId → 체크리스트
-  launch: (postId: string, postTitle: string, targets: string[], renderProfile?: string) => Promise<void>;
+  launch: (
+    postId: string,
+    postTitle: string,
+    targets: string[],
+    renderProfile?: string,
+    formatArm?: string
+  ) => Promise<void>;
   clearRuns: () => void;
   removeRun: (runKey: string) => void;
   resumePolling: () => void;
@@ -114,13 +121,13 @@ export const useRenderTestStore = create<RenderTestStoreState>()(
       runs: [],
       reviews: {},
 
-      launch: async (postId, postTitle, targets, renderProfile) => {
-        const runKey = `${postId}-${targets.join('+')}-${renderProfile ?? 'default'}-${Date.now()}`;
+      launch: async (postId, postTitle, targets, renderProfile, formatArm) => {
+        const runKey = `${postId}-${targets.join('+')}-${renderProfile ?? 'default'}-${formatArm ?? 'noarm'}-${Date.now()}`;
         set((s) => ({
-          runs: [{ runKey, postId, postTitle, targets, renderProfile, job: null, error: null }, ...s.runs],
+          runs: [{ runKey, postId, postTitle, targets, renderProfile, formatArm, job: null, error: null }, ...s.runs],
         }));
         try {
-          const job = await createMarketingTestJob(postId, targets, renderProfile);
+          const job = await createMarketingTestJob(postId, targets, renderProfile, formatArm);
           set((s) => ({ runs: s.runs.map((r) => (r.runKey === runKey ? { ...r, job } : r)) }));
           if (!TERMINAL_STATUSES.has(job.status)) {
             pollJob(runKey, job.id, set);
