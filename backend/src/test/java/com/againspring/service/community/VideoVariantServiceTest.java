@@ -274,6 +274,16 @@ class VideoVariantServiceTest {
     }
 
     @Test
+    void looksLikeLlmError_doesNotTreatCatalogSwapGroupOverloadedAsProviderError() {
+        // 2026-11-21 prod: 정상 응답의 "swap_group":"g_overloaded"가 과부하 오류로 오판돼 VARIANT_LLM_ERROR가 났다.
+        String json = "{\"hook_shorts\":\"점검일지에 서명이 사흘 연속 찍혀 있었어요\",\"sibom_plan\":["
+                + "{\"role\":\"soft_fill\",\"image_id\":\"overloaded\",\"swap_group\":\"g_overloaded\",\"caption\":\"버거움\"}]}";
+        assertThat(VideoVariantService.looksLikeLlmError(json)).isFalse();
+        assertThat(VideoVariantService.looksLikeLlmError("Error: server overloaded")).isTrue();
+        assertThat(VideoVariantService.looksLikeLlmError("overloaded_error")).isTrue();
+    }
+
+    @Test
     void looksLikeLlmError_doesNotTreatSibomCatalogOverloadedIdAsProviderError() {
         String reelsJson = """
             ```json

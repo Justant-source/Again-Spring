@@ -873,7 +873,10 @@ public class VideoVariantService {
             boolean jsonStringValue = idx > 0 && lower.charAt(idx - 1) == '"'
                     && idx + "overloaded".length() < lower.length()
                     && lower.charAt(idx + "overloaded".length()) == '"';
-            if (!jsonStringValue) {
+            // 카탈로그 식별자(swap_group "g_overloaded" 등)의 일부인 경우도 정상 콘텐츠다.
+            boolean identifierPart = idx > 0 && (lower.charAt(idx - 1) == '_'
+                    || Character.isLetterOrDigit(lower.charAt(idx - 1)));
+            if (!jsonStringValue && !identifierPart) {
                 return true;
             }
             from = idx + "overloaded".length();
