@@ -44,6 +44,44 @@ class VideoVariantServiceTest {
         lenient().when(llmAuthGuard.isAuthenticationError(anyString())).thenReturn(false);
     }
 
+    private static final String PLAN_JSON = """
+        {"hook_reels":"훅","script_reels":"대본","sibom_plan":[
+          {"role":"intro","image_id":"side-glance"},{"role":"peak","image_id":"stunned"},
+          {"role":"punch","image_id":"drained"},{"role":"punch","image_id":"indignant"}]}
+        """;
+
+    private String capturePrompt(String scriptStyle, boolean eightArg) throws Exception {
+        org.mockito.Mockito.reset(llmProvider);
+        when(llmProvider.invoke(anyString(), anyString())).thenReturn(PLAN_JSON);
+        if (eightArg) {
+            service.generate("마스터", "shock", "제목", "본문", true, false, List.of("side-glance"), scriptStyle);
+        } else {
+            service.generate("마스터", "shock", "제목", "본문", true, false, List.of("side-glance"));
+        }
+        ArgumentCaptor<String> cap = ArgumentCaptor.forClass(String.class);
+        verify(llmProvider).invoke(cap.capture(), anyString());
+        return cap.getValue();
+    }
+
+    @Test
+    void scriptStyle_nullAndNarrativeAndUnknown_promptIdenticalToLegacy() throws Exception {
+        String legacy = capturePrompt(null, false);
+        assertThat(capturePrompt(null, true)).isEqualTo(legacy);
+        assertThat(capturePrompt("narrative", true)).isEqualTo(legacy);
+        assertThat(capturePrompt("something-else", true)).isEqualTo(legacy);
+        assertThat(legacy).doesNotContain("dilemma 스타일");
+    }
+
+    @Test
+    void scriptStyle_dilemma_addsStructureBlockAndKeepsHookRules() throws Exception {
+        String legacy = capturePrompt(null, false);
+        String dilemma = capturePrompt("dilemma", true);
+        assertThat(dilemma).contains(VideoVariantService.DILEMMA_SCRIPT_BLOCK);
+        assertThat(dilemma).contains("작성자 입장 한 문장", "상대방 입장 한 문장", "공감하는지 묻는 한 문장");
+        assertThat(dilemma).contains("[훅 규칙 v2 — 반드시 지킬 것]", "script는 125~155자 범위");
+        assertThat(dilemma.replace(VideoVariantService.DILEMMA_SCRIPT_BLOCK, "")).isEqualTo(legacy);
+    }
+
     @Test
     void generate_parsesLlmJson_forBothPlatforms() throws Exception {
         when(llmProvider.invoke(anyString(), anyString()))

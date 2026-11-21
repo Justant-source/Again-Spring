@@ -23,6 +23,7 @@ Content-Type: application/json
 
 - 허용 목록 밖이면 400. `marketing_hook_a`(숫자 강조·대형 글자)는 2026-10-18 **운영 기본으로 채택**(자동 게시 허용, `.env.prod` `MARKETING_RENDER_PROFILE`). `marketing_hook_b/c`(키네틱 타이포 / 캐릭터 리액션 먼저)는 **테스트 전용** — `autoPublish=true` 와 함께 요청하면 400(서비스 계층도 동일하게 거부).
 - 응답에는 `renderProfile` 과 `hookRule`(훅 프롬프트 규칙 버전, 태그 없는 과거 잡 = `v1`)이 포함된다. 테스트 탭이 배지·필터·나란히 비교에 쓴다.
+- 응답에는 `formatArm`(배정된 포맷 arm key, 실험 미적용 잡은 `null`)도 포함된다. 요청 본문은 바뀌지 않는다 — 자동 게시 영상 잡이고 호출자가 프로필을 지정하지 않았을 때 BE가 arm을 골라 `renderProfile`·대본 스타일·길이 상한·`options`를 채운다([`10-context.md`](10-context.md) 반응 루프). 세부 동작은 `MarketingJobService`가 권위본.
 
 **Response 201**
 ```json
@@ -355,6 +356,16 @@ Idempotency-Key: <uuid>
 | `post_url` + UTM | 1 유지 | X·YT 출구. `utm_content`의 hookType 구분 |
 | `empathy_ratio` | 1 유지 | **실투표 %** |
 
+**`options` 포맷 실험 필드** (전부 선택. 없으면 페이로드·산출물이 기존과 같다. 영상 잡에서 포맷 arm이 배정됐을 때만 AS가 채운다 — [`10-context.md`](10-context.md) 반응 루프):
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `format_arm` | string | 배정된 arm key (`baseline`·`short_reveal`·`dilemma`·`kinetic_reveal`·`reaction_reveal`) |
+| `comment_count` | int 0~2 | 영상에서 낭독할 댓글 수. ASM이 보내는 댓글을 이 수로 자른다 |
+| `outro_mode` | `partner_cta` \| `vote_reveal` | 엔드카드 방식 |
+
+arm의 길이 상한은 별도 필드 없이 기존 `max_duration_reels_sec` / `max_duration_shorts_sec`(brief)에 arm 값을 넣어 보낸다. ASM은 이 값을 camelCase(`formatArm`·`commentCount`·`outroMode`)로 WaggleBot `options`에 싣고, WaggleBot은 `variant_config`의 `format_arm`·`comment_count`·`outro_mode`로 받는다. `format_arm`이 있고 `baseline`이 아니면 ASM은 WaggleBot `externalId`에 `__fa_<arm>` 접미사를 붙인다(같은 사연의 다른 arm 렌더가 멱등 재사용으로 섞이지 않게). 구현 위치: ASM `app/domain/brief.py`(`JobOptions`) · `app/media/waggle_client.py`.
+
 **Response 202**
 ```json
 {
@@ -405,6 +416,28 @@ Authorization: Bearer <asm-token>
 **Precondition**: `status == READY`  
 **Response 202** — `{ "job_id": "...", "status": "PUBLISHING" }`  
 **오류**: 404, 409 (상태 불일치)
+
+---
+
+### 2.3.1 계정 지표
+
+```
+GET /api/v1/stats/accounts
+Authorization: Bearer <asm-token>
+```
+
+팔로워 등 계정 단위 지표. AS가 하루 1회(통계 수집 뒤) 호출해 `marketing_account_stats`에 적재한다.
+
+```json
+{
+  "x": {"followers": 120, "following": 300},
+  "youtube": {"subscribers": 15, "views": 98000, "videos": 240},
+  "instagram": {"followers": 80, "media_count": 310},
+  "errors": {"youtube": "<사유>"}
+}
+```
+
+값은 모두 `int|null`. 플랫폼 하나가 실패해도 200으로 나머지를 돌려주고 `errors`에 사유를 담는다. AS는 이 엔드포인트가 404이거나 실패하면 경고 로그만 남긴다(ASM 배포 전 상태 포함).
 
 ---
 
@@ -796,3 +829,27 @@ GET  /api/admin/marketing/stats/events?limit=50
 
 **설정 키**: `marketing.theme.boost.{platform}.{emotion}.{category}` · `marketing.theme.shadow`(기본 true) · `last_apply_at` · `min_n=3` · `boost_min/max=0.7/1.3` · `delta_cap=0.05`.  
 **이벤트 테이블**: `marketing_stats_event` (V111) — `COLLECT_*` · `PROPOSE` · `APPLY` · `SHADOW_TOGGLE`.
+
+### 4.6 포맷 실험 (반응 루프)
+
+컨트롤러: `AdminMarketingExperimentController` (`/api/admin/marketing/experiment`, ADMIN). 개념·공식: [`10-context.md`](10-context.md) 반응 루프.
+
+```
+GET  /api/admin/marketing/experiment
+     → { settings:{enabled, topicBiasEnabled, minSamples},
+         arms:[{key, renderProfile, scriptStyle, commentCount, outroMode, maxDurationSec, enabled,
+                description, assigned30d, outcomes60d, meanReward, breakouts}],
+         topics:[{platform, category, hookEmotion, n, meanReward, multiplier}],   (배수 내림차순)
+         accounts:[{platform, collectedOn, followers}] }                         (최근 60일)
+
+PUT   /api/admin/marketing/experiment/settings
+      Body: { enabled?, topicBiasEnabled? }   → settings   (부분 갱신)
+
+PATCH /api/admin/marketing/experiment/arms/{key}
+      Body: { enabled }                       → arm | 400 (enabled 누락) | 404 (모르는 key)
+
+POST  /api/admin/marketing/experiment/score/run
+      → { created }                            지금 채점. 새로 만든 outcome 행 수
+```
+
+**설정 키** (`system_setting`, V132 시드): `marketing.experiment.enabled`(기본 false) · `marketing.experiment.topic_bias_enabled`(기본 false) · `marketing.experiment.min_samples`(기본 8). `PUT /settings`는 앞의 두 키만 바꾼다. 변경은 `@Auditable`로 감사 로그에 남는다.

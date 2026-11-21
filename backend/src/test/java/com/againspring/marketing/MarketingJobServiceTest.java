@@ -98,6 +98,9 @@ class MarketingJobServiceTest {
     @Mock
     org.springframework.core.env.Environment environment;
 
+    @Mock
+    com.againspring.marketing.experiment.MarketingFormatArmService formatArmService;
+
     @InjectMocks
     MarketingJobService marketingJobService;
 
@@ -1874,5 +1877,141 @@ class MarketingJobServiceTest {
             List.of(Map.of("platform", "instagram_reels", "state", "FAILED", "error", "rupload 400")),
             "All publication channels failed"))
             .contains("instagram_reels");
+    }
+
+    // ===== Task 5: format arm wiring =====
+
+    private static com.againspring.marketing.experiment.FormatArm arm(
+            String key, String profile, String style, int comments, String outro, Integer maxSec) {
+        return new com.againspring.marketing.experiment.FormatArm(
+            key, profile, style, comments, outro, maxSec, true, null);
+    }
+
+    private void stubVideoJob(String platform) throws JsonProcessingException {
+        Post post = Post.builder().id(TEST_POST_ID).title("video").bodyPublished("body").build();
+        when(postRepository.findById(TEST_POST_ID)).thenReturn(Optional.of(post));
+        when(asmProperties.isEnabled()).thenReturn(true);
+        when(marketingJobRepository.countActivePlatformJobs(eq(TEST_POST_ID), eq(platform), any(Instant.class)))
+            .thenReturn(0L);
+        when(voteService.getVoteResult(any())).thenReturn(Map.of());
+        when(voteOptionRepository.findByPostIdOrderByOrderIdx(any())).thenReturn(List.of());
+        when(commentService.getTopLevelComments(any())).thenReturn(List.of());
+        when(asmProperties.getCallbackBaseUrl()).thenReturn("http://localhost:8080");
+        when(asmClient.createJob(any(CreateJobRequest.class), any(String.class)))
+            .thenReturn(CreateJobResponse.builder().jobId(TEST_JOB_ID).status("QUEUED").build());
+        stubSaveAssignsId(90L);
+        doReturn("[]").when(objectMapper).writeValueAsString(any());
+        VideoVariantService.Variants v = "instagram_reels".equals(platform)
+            ? new VideoVariantService.Variants("릴스훅", "릴스대본", 30, null, null, null,
+                List.of(plan("a"), plan("b"), plan("c"), plan("d")), List.of())
+            : new VideoVariantService.Variants(null, null, null, "쇼츠훅", "쇼츠대본", 45,
+                List.of(), List.of(plan("a"), plan("b"), plan("c"), plan("d"), plan("e")));
+        boolean reels = "instagram_reels".equals(platform);
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(reels), eq(!reels), any()))
+            .thenReturn(v);
+        when(videoVariantService.generate(any(), any(), any(), any(), eq(reels), eq(!reels), any(), any()))
+            .thenReturn(v);
+    }
+
+    private CreateJobRequest sentRequest() {
+        ArgumentCaptor<CreateJobRequest> captor = ArgumentCaptor.forClass(CreateJobRequest.class);
+        verify(asmClient).createJob(captor.capture(), any(String.class));
+        return captor.getValue();
+    }
+
+    @Test
+    void createJob_experimentOff_payloadHasNoFormatArmKeys() throws Exception {
+        stubVideoJob("instagram_reels");
+        when(formatArmService.pickForAutoJob(anyString())).thenReturn(Optional.empty());
+
+        MarketingJob job = marketingJobService.createJob(
+            TEST_POST_ID, List.of("instagram_reels"), true, "system");
+
+        CreateJobRequest req = sentRequest();
+        String json = new ObjectMapper().writeValueAsString(req);
+        assertThat(json).doesNotContain("format_arm").doesNotContain("comment_count").doesNotContain("outro_mode");
+        assertThat(job.getFormatArm()).isNull();
+        assertThat(req.getBrief().getMaxDurationReelsSec()).isEqualTo(30);
+        verify(videoVariantService).generate(
+            any(), any(), any(), any(), eq(true), eq(false), any());
+    }
+
+    @Test
+    void createJob_armPicked_appliesProfileStyleOptionsAndMaxDuration() throws Exception {
+        stubVideoJob("youtube_shorts");
+        when(formatArmService.pickForAutoJob("youtube_shorts")).thenReturn(Optional.of(
+            arm("dilemma", "marketing_hook_b", "dilemma", 1, "vote_reveal", 30)));
+
+        MarketingJob job = marketingJobService.createJob(
+            TEST_POST_ID, List.of("youtube_shorts"), true, "system");
+
+        CreateJobRequest req = sentRequest();
+        assertThat(job.getFormatArm()).isEqualTo("dilemma");
+        assertThat(job.getRenderProfile()).isEqualTo("marketing_hook_b");
+        assertThat(req.getOptions().getRenderProfile()).isEqualTo("marketing_hook_b");
+        assertThat(req.getOptions().getFormatArm()).isEqualTo("dilemma");
+        assertThat(req.getOptions().getCommentCount()).isEqualTo(1);
+        assertThat(req.getOptions().getOutroMode()).isEqualTo("vote_reveal");
+        assertThat(req.getBrief().getMaxDurationShortsSec()).isEqualTo(30);
+        assertThat(req.getBrief().getMaxDurationSec()).isEqualTo(30);
+        verify(videoVariantService).generate(
+            any(), any(), any(), any(), eq(false), eq(true), any(), eq("dilemma"));
+        String json = new ObjectMapper().writeValueAsString(req);
+        assertThat(json).contains("\"format_arm\":\"dilemma\"").contains("\"comment_count\":1");
+    }
+
+    @Test
+    void createJob_explicitExperimentalProfile_withAutoPublish_stillRejected() {
+        when(asmProperties.isEnabled()).thenReturn(true);
+
+        assertThatThrownBy(() -> marketingJobService.createJob(
+            TEST_POST_ID, List.of("instagram_reels"), true, "admin", "marketing_hook_b"))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(formatArmService, never()).pickForAutoJob(anyString());
+    }
+
+    @Test
+    void createJob_callerSpecifiedProfile_doesNotAssignArm() throws Exception {
+        stubVideoJob("instagram_reels");
+
+        MarketingJob job = marketingJobService.createJob(
+            TEST_POST_ID, List.of("instagram_reels"), true, "system", "marketing_v2");
+
+        verify(formatArmService, never()).pickForAutoJob(anyString());
+        assertThat(job.getFormatArm()).isNull();
+        assertThat(sentRequest().getOptions().getFormatArm()).isNull();
+    }
+
+    @Test
+    void createJob_manualNonAutoPublish_doesNotAssignArm() throws Exception {
+        stubVideoJob("instagram_reels");
+
+        marketingJobService.createJob(TEST_POST_ID, List.of("instagram_reels"), false, "admin");
+
+        verify(formatArmService, never()).pickForAutoJob(anyString());
+    }
+
+    @Test
+    void regenerateJob_inheritsArmOfPreviousJob_withoutPickingNew() throws Exception {
+        stubVideoJob("instagram_reels");
+        MarketingJob previous = MarketingJob.builder()
+            .id(5L).postId(TEST_POST_ID).status("FAILED").failureCode("SIBOM_PLAN_EMPTY")
+            .generationAttempt(1).targets("[\"instagram_reels\"]")
+            .renderProfile("marketing_hook_c").formatArm("reaction_reveal").build();
+        when(marketingJobRepository.findById(5L)).thenReturn(Optional.of(previous));
+        when(objectMapper.readValue(anyString(), any(TypeReference.class)))
+            .thenReturn(List.of("instagram_reels"));
+        when(formatArmService.find("reaction_reveal")).thenReturn(Optional.of(
+            arm("reaction_reveal", "marketing_hook_c", "dilemma", 0, "vote_reveal", 30)));
+
+        MarketingJob child = marketingJobService.regenerateJob(5L, "admin");
+
+        verify(formatArmService, never()).pickForAutoJob(anyString());
+        assertThat(child.getFormatArm()).isEqualTo("reaction_reveal");
+        assertThat(child.getRenderProfile()).isEqualTo("marketing_hook_c");
+        CreateJobRequest req = sentRequest();
+        assertThat(req.getOptions().getFormatArm()).isEqualTo("reaction_reveal");
+        verify(videoVariantService).generate(
+            any(), any(), any(), any(), eq(true), eq(false), any(), eq("dilemma"));
     }
 }

@@ -78,6 +78,8 @@ public class MarketingHoldingCommitService {
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
     private final TelegramNotifier telegramNotifier;
+    private final com.againspring.marketing.experiment.MarketingExperimentSettings experimentSettings;
+    private final com.againspring.marketing.experiment.MarketingTopicBiasService topicBiasService;
 
     public enum ForceMode {
         VIDEO_AND_TEXT,
@@ -206,12 +208,14 @@ public class MarketingHoldingCommitService {
             .collect(Collectors.toMap(Post::getId, p -> p, (a, b) -> a));
         // Shadow = store boosts but do not apply to allocation (plan §4.3 Sprint 3.2).
         boolean themeShadow = themeBoostService.isShadow();
+        // 주제 편향(성과 기반)이 켜지면 테마 배수 자리를 대체한다. 꺼지면 기존 경로 그대로.
+        boolean topicBias = experimentSettings.isTopicBiasEnabled();
 
         List<ScoredDue> pins = new ArrayList<>();
         List<ScoredDue> autos = new ArrayList<>();
         for (DueHoldingProjection row : due) {
             Post post = postsById.get(row.getPostId());
-            ScoredDue scored = toScored(row, weights, themeKeys(post), themeShadow);
+            ScoredDue scored = toScored(row, weights, themeKeys(post), themeShadow, topicBias);
             if (MarketingHoldingStatus.PINNED.name().equals(row.getStatus())) {
                 pins.add(scored);
             } else {
@@ -681,15 +685,26 @@ public class MarketingHoldingCommitService {
             MarketingScoreWeightService.AllPlatformWeights weights,
             ThemeKeys themeKeys,
             boolean themeShadow) {
+        return toScored(row, weights, themeKeys, themeShadow, false);
+    }
+
+    ScoredDue toScored(
+            DueHoldingProjection row,
+            MarketingScoreWeightService.AllPlatformWeights weights,
+            ThemeKeys themeKeys,
+            boolean themeShadow,
+            boolean topicBias) {
         MarketingPopularityScorer.Signals signals = signalsFrom(row);
         String emotion = themeKeys != null ? themeKeys.hookEmotion() : null;
         String category = themeKeys != null ? themeKeys.category() : null;
         Map<String, Double> scores = new HashMap<>();
         for (String platform : MarketingPopularityScorer.RANKED_PLATFORMS) {
             double feature = MarketingPopularityScorer.score(signals, weights.forPlatform(platform));
-            double boost = themeShadow
-                ? 1.0
-                : themeBoostService.getBoost(platform, emotion, category);
+            double boost = topicBias
+                ? topicBiasService.multiplier(platform, category, emotion)
+                : themeShadow
+                    ? 1.0
+                    : themeBoostService.getBoost(platform, emotion, category);
             scores.put(platform, MarketingPopularityScorer.applyThemeBoost(feature, boost));
         }
         MarketingHoldingStatus status;

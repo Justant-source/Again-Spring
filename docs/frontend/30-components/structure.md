@@ -53,7 +53,7 @@ frontend/
 │
 ├── components/
 │   ├── admin/
-│   │   └── marketing/          # 마케팅 대시보드 (`XOpsSettingsSection` — 닮음 뱃지·채점/원글 스위치, 원글 기본 꺼짐)
+│   │   └── marketing/          # 마케팅 대시보드 (`XOpsSettingsSection` — 닮음 뱃지·채점/원글 스위치, 원글 기본 꺼짐 · `ExperimentPanel` — 통계 탭의 포맷 실험 패널: 실험·주제 편향 스위치, arm 표(켜기·배정·채점·평균 점수·확산), 주제 배수 표, 계정 팔로워 추이, "지금 채점". API `lib/api/admin/marketingExperiment.ts`)
 │   │       └── preview/
 │   │
 │   ├── auth/                   # 인증 컴포넌트

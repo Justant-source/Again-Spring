@@ -102,6 +102,16 @@ last_updated: 2026-09-01
 | `MARKETING_CONTENT_LLM_MODEL` | `claude-sonnet-5-5` | 마케팅 마스터 훅·채널 대본(ASM `script_*`). Spring `llm.marketing.model` (`PromoTitleService`, `VideoVariantService`) |
 | `LLM_TONALIZATION_MODEL` | `claude-sonnet-5-5` | 파트너 답변 톤 정규화. Spring `llm.tonalization.model` (`TonalizationService`) |
 
+**포맷 실험 설정 (`system_setting`, V132 시드)** — env가 아니라 DB 키이며 어드민 `실험` 패널·API로 바꾼다. 기본은 전부 꺼짐:
+
+| 키 | 기본값 | 설명 |
+|---|---|---|
+| `marketing.experiment.enabled` | `false` | 영상 자동 게시 잡에 포맷 arm 배정. 꺼짐 = `format_arm` NULL, 기존 동작 |
+| `marketing.experiment.topic_bias_enabled` | `false` | 소재 선택 점수에 성과 기반 주제 배수(0.5~2.0) 적용 |
+| `marketing.experiment.min_samples` | `8` | arm 배정 시 arm당 최소 배정 수(최근 30일). 이 수를 채운 뒤 UCB1로 고른다 |
+
+상세 `docs/shared/marketing/10-context.md` 반응 루프.
+
 **2026-08-15 마케팅 파이프라인 안정화**: 시봄이 영상 생성 LLM 호출이 최대 600초까지 걸릴 수 있어
 `LLM_QUEUE_WAIT_TIMEOUT_MS`를 4배 상향했다(30s는 호출 1건이 600초를 점유하는 상황에서 큐 포화 시
 즉시 실패했다). `LLM_REMOTE_CONNECT_TIMEOUT_MS`·`ASM_REQUEST_TIMEOUT_MS`도 WSL 부하 상황을

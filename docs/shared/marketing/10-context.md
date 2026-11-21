@@ -68,6 +68,84 @@ POST /api/v1/jobs → [Again-Spring-Marketing (ASM)]
 
 **접속**: AS 호스트 Tailscale `100.81.189.92`에서 `ssh justant@100.115.252.61` (암호 없음) → `~/Data/Again-Spring-Marketing`
 
+## 반응 루프 · 포맷 실험 (2026-11-21, 구현 중 · 기본 전부 꺼짐)
+
+게시 성공이 아니라 **사람의 반응**으로 영상 포맷과 소재를 고르는 구조. 진단 배경: 게시물 약 1,250건 중 시험 노출을 넘어 확산된 것이 0건이었고, 영상 포맷이 한 가지(정지 텍스트 카드)뿐이었다. 진행 트랙: `docs/_active/marketing-breakout-loop.md`.
+
+흐름: AS가 영상 잡마다 **포맷 arm**을 배정 → 게시 48시간 뒤 같은 일령의 반응으로 **성과 점수** 계산 → 점수가 다음 arm 배정(UCB1)과 소재 선택 **주제 편향**에 되돌아간다. arm이 정한 영상 매개변수는 AS → ASM → WaggleBot으로 전달된다. 코드: `backend/.../marketing/experiment/`.
+
+### 포맷 arm
+
+`marketing_format_arm` 테이블(V132). 영상 플랫폼(`instagram_reels`, `youtube_shorts`)의 **자동 게시 잡**에만 적용한다. 어드민 `실험` 패널(통계 탭)에서 켜고 끈다.
+
+| arm | 프로필 | 대본 | 댓글 수 | 아웃트로 | 길이 상한 | 시드 |
+|---|---|---|---:|---|---:|---|
+| `baseline` | `marketing_hook_a` | narrative | 2 | `partner_cta` | 플랫폼 기본 | 켜짐 |
+| `short_reveal` | `marketing_hook_a` | narrative | 0 | `vote_reveal` | 25초 | 꺼짐 |
+| `dilemma` | `marketing_hook_a` | dilemma | 0 | `vote_reveal` | 30초 | 꺼짐 |
+| `kinetic_reveal` | `marketing_hook_b` | narrative | 1 | `vote_reveal` | 30초 | 꺼짐 |
+| `reaction_reveal` | `marketing_hook_c` | dilemma | 0 | `vote_reveal` | 30초 | 꺼짐 |
+
+- `dilemma` 대본: 사건 → 작성자 입장 한 문장 → 상대방 입장 한 문장 → 시청자에게 어느 쪽에 공감하는지 묻는 문장으로 끝낸다. 결말·교훈을 서술하지 않는다(`VideoVariantService`의 `scriptStyle`). `narrative`/미지정은 기존 프롬프트와 같다.
+- `vote_reveal`: 엔드카드가 공감 비율 막대와 "당신은 어느 쪽인가요?"를 보여 준다. 비율이 없으면 문구만.
+- `comment_count`: 영상에서 낭독하는 댓글 수(0이면 댓글 장면 없음).
+- 길이 통제는 이 값(`comment_count`, `max_duration_*`)으로 한다. 현행 30초 상한이 실제로는 적용되지 않았다 — [`youtube-shorts-strategy.md`](70-policy/youtube-shorts-strategy.md) §3.
+- 카카오톡 대화형 포맷, X 스레드·IG 피드의 arm은 범위 밖.
+
+### arm 배정 (`pickForAutoJob`)
+
+1. `marketing.experiment.enabled=false`면 배정하지 않는다(`format_arm` NULL, 현행 동작 그대로). 켜진 arm이 없거나 영상 플랫폼이 아니어도 배정 없음. 켜진 arm이 하나뿐이면 그 arm.
+2. 켜진 arm 중 최근 30일 배정 수가 `marketing.experiment.min_samples`(기본 8) 미만이거나 채점 건수가 0인 arm이 있으면, 배정 수가 가장 적은 arm(동률은 key 사전순).
+3. 모두 채웠으면 UCB1: `meanReward + sqrt(2*ln(N)/n)`이 가장 큰 arm. `n` = 해당 arm의 최근 60일 채점 건수, `N` = 그 합.
+
+실험 프로필(`marketing_hook_b/c`)은 arm이 정한 경우에만 자동 게시를 허용한다. arm 없이 들어온 요청은 지금처럼 400으로 거부한다. arm 적용 동작의 세부는 `MarketingJobService`가 권위본이다(배선 진행 중).
+
+### 성과 점수
+
+잡 × 플랫폼마다 1행(`marketing_publication_outcome`). 매일 06:30 KST 통계 수집 뒤 `scorePending()`이 채점하고, 어드민 "지금 채점"으로도 돌릴 수 있다. 게시 시각 = `scheduledPublishAt`(없으면 `createdAt`).
+
+```
+primary    = YouTube views | X impressions | IG reach
+engagement = likes + 2*comments(X는 replies) + 3*(shares+saves)(IG) | 3*reposts(X)
+engRate    = engagement / max(primary, 1)
+viewRatio  = primary / 같은 플랫폼 직전 채점 30건 primary 중앙값       (표본 10건 미만이면 1.0)
+engRatio   = engRate / 같은 30건 engRate 중앙값                      (중앙값 0이면 engRate>0 ? 2.0 : 1.0, 표본 10건 미만이면 1.0)
+reward     = 0.6*min(viewRatio, 10) + 0.4*min(engRatio, 5)
+breakout   = viewRatio >= 3.0
+```
+
+- 스냅샷은 게시 +36h ~ +96h 구간에서 **지표가 있는 가장 이른 것**을 쓴다(지표가 전부 null인 빈 행은 건너뛴다).
+- 구간 안에 스냅샷이 없고 게시 +96h가 지나면 `MISSING`으로 남기고 통계에서 뺀다.
+- 조회가 시험 노출 구간에 묶여 있는 동안은 `engRatio`가 arm을 가른다. 확산이 일어나면 `viewRatio`가 지배한다.
+
+### 주제 편향
+
+`marketing.experiment.topic_bias_enabled=true`일 때만, 소재 선택 점수에 배수를 곱한다(꺼져 있으면 1.0, 기존 동작). 셀 = (platform, category, hook_emotion), 최근 60일 채점 건수 n.
+
+```
+m = ((n*cellMean + 5*platformMean) / (n + 5)) / platformMean     (platformMean <= 0이면 1.0)
+multiplier = clamp(m, 0.5, 2.0)
+```
+
+사람 확정 없이 커밋 틱마다 최신 값으로 계산한다. 어드민 표의 배수는 스위치와 무관하게 현재 계산값을 보여 준다.
+
+### 계정 지표
+
+ASM `GET /api/v1/stats/accounts`(X 팔로워, YouTube 구독자·누적 조회·영상 수, Instagram 팔로워)를 AS가 하루 1회 `marketing_account_stats`에 적재한다(같은 날 재실행은 갱신, 값이 전부 없는 플랫폼은 건너뜀). ASM이 아직 엔드포인트가 없거나 실패하면 경고 로그만 남긴다.
+
+### 기본값과 켜는 절차
+
+**기본은 전부 꺼짐**: `marketing.experiment.enabled=false` · `topic_bias_enabled=false` · `baseline` 외 arm 꺼짐. 꺼져 있으면 잡 페이로드·산출물이 실험 도입 전과 같아야 한다(ASM·WaggleBot도 새 필드가 없으면 기존과 같음). ASM은 dev·prod가 공유하는 단일 인스턴스이고 실계정에 게시한다.
+
+1. dev 배포 → e2e → (명시 지시 시) prod 배포. ASM 재빌드, WaggleBot 백엔드 재빌드·워커 재시작.
+2. 테스트 탭에서 새 arm 영상을 눈으로 확인한 뒤 어드민 `실험` 패널에서 arm을 켠다.
+3. `marketing.experiment.enabled`를 켜고, cap을 권고값으로 내린다: `marketing.cap.youtube_shorts=2` · `instagram_reels=1` · `x_thread=2` · `instagram_feed=0`(후보가 하루 6~7편이라 cap이 크면 주제 편향이 고를 여지가 없다). cap은 코드로 바꾸지 않는다.
+4. 채점이 arm당 8건쯤 쌓이면 주제 편향을 켠다.
+
+API: 어드민 [`50-api.md` §4.6](50-api.md) · ASM/WaggleBot 전달 필드 [`50-api.md` §2.1](50-api.md).
+
+---
+
 ## 파일 구조
 
 ```

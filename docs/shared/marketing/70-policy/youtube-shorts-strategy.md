@@ -69,6 +69,8 @@ AS 24h 분배 (채널별 score·cap)
 - YouTube Data API에는 pin 메서드가 없으므로, 성공 알림의 댓글 링크를 열어 YouTube Studio에서
   운영자가 수동으로 고정한다.
 
+> **길이 상한 실측 (2026-11-21)**: 위 표의 Reels ≤30s는 **실제로는 적용되지 않았다.** 최종 MP4에 하드 상한이 없고(§5: 본문 TTS만 32 / 47초로 판정하고 댓글·아웃트로는 제외), 실측 길이가 릴스 43.2초·쇼츠 45.1초였다. 댓글 2개 낭독이 약 21초를 차지한다. 길이는 포맷 arm의 `comment_count`·`max_duration_*`로 통제한다(`short_reveal` 25초·댓글 0, 나머지 arm 30초 상한). 현행 `baseline` arm은 기존 그대로(댓글 2개)다. arm은 기본 꺼짐이며 [`10-context.md`](../10-context.md) 반응 루프의 절차로 켠다.
+
 ---
 
 ## 4. 시각 레이아웃 계약 (락다운 — 구현 반영)
@@ -149,6 +151,7 @@ Shorts 화면은 다시봄 앱의 **Tone L(편지지)** 팔레트·타이포를 
 | `hook_rule` | 훅 규칙 버전 태그(실험 추적). 영상 잡만 `"v2"`, 태그 없는 과거 잡 = v1. AS `BriefDto.hookRule`(`CreateJobRequest`) → ASM `StoryBrief.hook_rule` → `job.brief_json.hook_rule` 저장 |
 | `max_duration_reels_sec` / `max_duration_shorts_sec` | 본문 목표 30 / 45초 (듀얼·분리 잡). 본문 TTS는 각각 32 / 47초를 넘으면 실패한다. 댓글 2개·아웃트로는 본문 길이 판정에서 제외한다. |
 | `max_duration_sec` | alone 잡의 활성 캡 (30 또는 45) |
+| `format_arm` · `comment_count` · `outro_mode` | 포맷 실험(선택, `options`). arm이 배정된 자동 게시 영상 잡에만. 전달 계약 [`50-api.md`](../50-api.md) §2.1 |
 | `sibom_candidates` | string[] ≤12. 사연 생성 후 코드 keyword shortlist (`posts.sibom_candidates`) |
 | `sibom_plan` | 채널별 삽입 플랜 배열 (`role`/`image_id`/`caption`/`beat_index`/`size`/`dwell`). 인트로·피크·펀치. 상세 [`sibom-video-insertion.md`](sibom-video-insertion.md) |
 | `metaphor_id` / `metaphor_ids` | **영상 렌더에서 무시**. DB 컬럼 보존만. 신규 선택·주입 중지 |

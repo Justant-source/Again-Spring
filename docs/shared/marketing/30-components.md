@@ -183,3 +183,21 @@ INSTAGRAM_TOTP_SECRET=...
 
 `lib/anti-bot.js`의 랜덤 딜레이와 사람처럼 입력하는 방식을 사용하지만,  
 플랫폼 정책 변경으로 차단될 수 있습니다. 셀렉터 파일(`*-selectors.js`)을 업데이트하세요.
+
+---
+
+## AS 측 포맷 실험 컴포넌트
+
+social-poster와 별개로 Again-Spring 백엔드에 있는 반응 루프 구성요소(`backend/.../marketing/experiment/`). 규칙·공식은 [`10-context.md`](10-context.md) 반응 루프.
+
+| 클래스 | 역할 |
+|---|---|
+| `MarketingExperimentSettings` | `system_setting` 3키 읽기·쓰기 (`enabled` · `topic_bias_enabled` · `min_samples`) |
+| `MarketingFormatArmService` | arm 목록·켜기/끄기, 자동 게시 잡용 arm 배정 `pickForAutoJob`(표본 채우기 → UCB1) |
+| `MarketingOutcomeService` | 게시 48시간 성과 채점 `scorePending()` — 일일 통계 수집 뒤와 어드민 "지금 채점"에서 호출 |
+| `MarketingTopicBiasService` | (platform, category, hook_emotion) 셀 배수. 스위치가 꺼져 있으면 1.0 |
+| `MarketingAccountStatsService` | ASM `/api/v1/stats/accounts` → `marketing_account_stats` 일 1행 적재 |
+| `AdminMarketingExperimentController` | `/api/admin/marketing/experiment` 4개 엔드포인트 |
+
+프런트: `frontend/components/admin/marketing/ExperimentPanel.tsx`(통계 탭).
+

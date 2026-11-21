@@ -1,6 +1,7 @@
 package com.againspring.marketing.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -359,5 +360,20 @@ public class CreateJobRequest {
         /** Render policy understood by the WaggleBot marketing fast lane. */
         @JsonProperty("render_profile")
         private String renderProfile;
+
+        /** 포맷 실험 arm key. null이면 JSON에 나가지 않는다(실험 꺼짐 = 기존 요청과 동일). */
+        @JsonProperty("format_arm")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private String formatArm;
+
+        /** 영상에서 낭독할 댓글 수(0~2). arm이 있을 때만. */
+        @JsonProperty("comment_count")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private Integer commentCount;
+
+        /** {@code partner_cta} | {@code vote_reveal}. arm이 있을 때만. */
+        @JsonProperty("outro_mode")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        private String outroMode;
     }
 }

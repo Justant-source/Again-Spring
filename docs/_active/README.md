@@ -22,4 +22,4 @@
 
 ## 현재 트랙
 
-진행 중인 트랙 없음.
+- [`marketing-breakout-loop.md`](marketing-breakout-loop.md) — 마케팅 반응 루프 + 영상 포맷 실험(arm · 성과 점수 · 주제 편향). 구현 중, 기본 전부 꺼짐

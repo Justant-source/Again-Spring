@@ -395,6 +395,27 @@ public class AsmClient {
         }
     }
 
+    /**
+     * 계정 지표 {@code GET /api/v1/stats/accounts}.
+     * 응답: {@code {"x":{followers,following},"youtube":{subscribers,views,videos},
+     * "instagram":{followers,media_count},"errors":{platform:reason}}}.
+     * ASM이 아직 이 엔드포인트를 갖지 않으면(404) 예외 — 호출자는 경고 로그만 남기고 넘어간다.
+     */
+    public JsonNode fetchAccountStats() {
+        try {
+            return statsRestClient
+                .get()
+                .uri("/api/v1/stats/accounts")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(JsonNode.class);
+        } catch (HttpClientErrorException e) {
+            throw new ResponseStatusException(e.getStatusCode(), asmErrorDetail(e), e);
+        } catch (Exception e) {
+            throw new AsmUnavailableException("Failed to fetch ASM account stats: " + e.getMessage(), e);
+        }
+    }
+
     public record XPublishResult(boolean ok, String tweetId, String url, String photo) {}
 
     public record XInboxItem(

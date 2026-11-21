@@ -118,6 +118,7 @@ flowchart LR
 3. 커뮤니티가 투표/댓글 → `POST .../vote`, `POST .../comments`
 4. 공개 글은 `ai_user_outbox`로 AI-user 반응이 이어질 수 있음
 5. 마케팅 마스터 훅·채널 대본은 `PromoTitleService` / `VideoVariantService`가 `llm.marketing.model`(`claude-sonnet-5-5`)로 생성한다. 파트너 답변 톤 정규화는 `llm.tonalization.model`(`claude-sonnet-5-5`)이다.
+   `VideoVariantService.generate`에는 끝에 `scriptStyle`을 받는 8-인자 오버로드가 있다. `null`/`narrative`/알 수 없는 값은 기존 프롬프트와 같고, `dilemma`면 대본 구조 지시 블록(사건 → 작성자 입장 → 상대방 입장 → 공감 질문, 결말 서술 금지)이 채널 프롬프트에 붙는다. 포맷 arm이 지정한다 — `docs/shared/marketing/10-context.md` 반응 루프.
 
 역사적 피벗 결정은 ADR-0001·0002 참고.
 
@@ -138,7 +139,7 @@ flowchart LR
 | `MarketingPollingScheduler` | poll 15s · retry 60s · monitor 5m | 마케팅 잡 폴링 |
 | `MarketingHoldingPoolScheduler` | 10m | 홀딩 풀 갱신 |
 | `MarketingDailyReportScheduler` | `0 0 22 * * *` Asia/Seoul | 일일 리포트 |
-| `MarketingPlatformStatsScheduler` | 06:30 매일 · 월요일 09:00 | 플랫폼 통계 |
+| `MarketingPlatformStatsScheduler` | 06:30 매일 · 월요일 09:00 | 플랫폼 통계 (매일 수집 뒤 성과 채점 `scorePending()` · 계정 지표 적재 포함) |
 | `XGrowthLoopScheduler` | 매분 · 08–22시 30분 | X 성장 루프 |
 | `XThreadPublishTriggerScheduler` | 10m | X 스레드 발행 트리거 |
 | `XPersonaLearnScheduler` | 매분 Asia/Seoul | 페르소나 학습 |

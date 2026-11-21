@@ -182,6 +182,10 @@ public class MarketingJob {
     @Column(length = 16)
     private String hookRule;
 
+    /** 포맷 실험 arm 키(V132). NULL = 실험 비대상(현행 동작). */
+    @Column(name = "format_arm", length = 32)
+    private String formatArm;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

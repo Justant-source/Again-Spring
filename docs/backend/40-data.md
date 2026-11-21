@@ -5,7 +5,7 @@ last_updated: 2026-09-01
 
 # 데이터베이스 스키마 (MariaDB 11)
 
-> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V131.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
+> last-verified: 2026-10-08 · code-ref: `backend/src/main/resources/db/migration/V48~V132.sql` · `backend/.../domain/community/` · `backend/.../domain/marketing/` · `ai-user/orchestrator/src/main/resources/db/migration/V1~V13.sql`
 >
 > 충돌 시 Flyway 마이그레이션 SQL이 우선. 이 ER은 코드 기준 현행 상태 반영.
 
@@ -153,7 +153,10 @@ CHARSET: `utf8mb4` / COLLATION: `utf8mb4_unicode_ci` / TIMEZONE: `UTC`
 | `encrypted_secret` | 앱 시크릿 AES-GCM vault (마케팅 제외) | `secret_key` VARCHAR(128) **V101** |
 | `system_setting` | KV 운영 설정. X 한도·스위치 `marketing.x.*` 포함. 어드민 저장 = 행 UPDATE, 커밋 없음 | `setting_key` VARCHAR(100) **V81** |
 | `marketing_holding` | 마케팅 대기 보드 (초안·순위 스냅샷) | `post_id` VARCHAR(32) PK **V102** |
-| `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) · 품질 진단/재생성 추적 **V115** · 구조화 실패 계약 **V116** · `scheduled_publish_at` NOT NULL **V117** |
+| `marketing_job` | ASM 마케팅 잡 | BIGINT auto · `requested_by` VARCHAR(128) · 품질 진단/재생성 추적 **V115** · 구조화 실패 계약 **V116** · `scheduled_publish_at` NOT NULL **V117** · 포맷 arm `format_arm` **V132** |
+| `marketing_format_arm` | 영상 포맷 arm 정의 (렌더 프로필·대본 스타일·댓글 수·아웃트로·길이 상한·켜짐) | `arm_key` VARCHAR(32) PK **V132** |
+| `marketing_publication_outcome` | 게시 48시간 성과 점수 (잡×플랫폼 1행, SCORED/MISSING) | BIGINT auto **V132** |
+| `marketing_account_stats` | 계정 지표 일별 스냅샷 (팔로워·구독자) | BIGINT auto **V132** |
 | `marketing_generation_trace` | LLM 생성 기록 (프롬프트·응답·시봄이 선택) | BIGINT auto **V119** |
 | `marketing_publication_stats` | 플랫폼 참여 스냅샷 (X/IG/YT best-effort) | BIGINT auto **V110** |
 | `marketing_stats_event` | 통계 탭 활동 타임라인 (수집·제안·확정) | BIGINT auto **V111** |
@@ -556,6 +559,7 @@ MariaDB는 MySQL `FULLTEXT … WITH PARSER ngram` 미지원. 광장 검색용 �
 | **V119** | `marketing_generation_trace` — 영상 변형 단계에서 LLM 호출·시봄이 선택 이력 저장(프롬프트·응답·가드 로그 포함). **사연 본문은 30일 후 NULL이지만 trace에 영구 보관** |
 | **V130** | `visit_events.visitor_class`·`class_reason` 추가 + 과거 행 멱등 백필(`visitor_class IS NULL`만). UA 규칙은 `VisitorClassifier`와 동일한 SQL 사본, SUSPECT_SCANNER_PROXY는 자기조인. 백필 구간은 `VisitorClassBackfillIT`가 그대로 실행 |
 | **V131** | `x_follow_account`(팔로우한 계정별 팔로우 시각·출처·맞팔·팔로워 수·상대의 마지막 반응·언팔 기록, handle unique) + `x_follow_event`(IN/OUT 교환 로그, unique `(handle,direction,kind,occurred_at)`). 7일 무반응 대형 계정 새벽 정리용 — 정책: `justant-bot-x-ops.md` |
+| **V132** | 마케팅 반응 루프·포맷 실험. `marketing_job.format_arm` VARCHAR(32) NULL(+인덱스, NULL=실험 미적용) · `marketing_format_arm`(5행 시드: `baseline`만 `enabled=1`, `short_reveal`·`dilemma`·`kinetic_reveal`·`reaction_reveal`은 0) · `marketing_publication_outcome`(unique `(job_id, platform)`, `status` `SCORED`\|`MISSING`, `primary_metric`·`engagement`·`view_ratio`·`eng_ratio`·`reward`·`breakout`, 채점 당시 `format_arm`·`category`·`hook_emotion` 복사) · `marketing_account_stats`(unique `(platform, collected_on)`, `followers`, `extra_json`) · `system_setting` 3키 `marketing.experiment.enabled=false`·`topic_bias_enabled=false`·`min_samples=8`. 점수 공식·배정 규칙: `docs/shared/marketing/10-context.md` |
 | **V129** | `marketing_job.hook_rule` VARCHAR(16) NULL — 훅 프롬프트 규칙 버전 태그(NULL=v1). 테스트 탭 배지·필터, `scripts/marketing_ab_report.py` 코호트 분리용 |
 
 ### `marketing_generation_trace` (**V119**)

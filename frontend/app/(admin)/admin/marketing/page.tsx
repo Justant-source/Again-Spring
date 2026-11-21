@@ -12,6 +12,7 @@ import { XOpsSettingsSection } from '@/components/admin/marketing/XOpsSettingsSe
 import { HoldingControlsBar } from '@/components/admin/marketing/HoldingControlsBar';
 import { HoldingBoard } from '@/components/admin/marketing/HoldingBoard';
 import { HoldingDraftDialog } from '@/components/admin/marketing/HoldingDraftDialog';
+import { ExperimentPanel } from '@/components/admin/marketing/ExperimentPanel';
 import { MarketingStatsTab } from '@/components/admin/marketing/MarketingStatsTab';
 import { RenderTestSection } from '@/components/admin/marketing/RenderTestSection';
 import {
@@ -364,6 +365,7 @@ export default function MarketingJobsPage() {
 
         <TabsContent value="stats" className="space-y-4">
           <MarketingStatsTab />
+          <ExperimentPanel />
         </TabsContent>
 
         <TabsContent value="test" className="space-y-4">

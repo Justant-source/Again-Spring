@@ -13,6 +13,7 @@ export interface MarketingJob {
   autoPublish: boolean;
   renderProfile?: string | null; // RENDER_PROFILE_OPTIONS 키 | null
   hookRule?: string | null; // 훅 규칙 버전 'v1'|'v2'… (없으면 v1)
+  formatArm?: string | null; // 포맷 실험 arm 키 (실험 비대상 잡은 null)
   artifacts: Record<string, string> | null; // { video_mp4, thumbnail, blog_md, ... }
   publications: Array<{ platform: string; state: string; url: string }> | null;
   errorMessage: string | null;

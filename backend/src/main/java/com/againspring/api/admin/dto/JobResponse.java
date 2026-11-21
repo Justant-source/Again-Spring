@@ -53,6 +53,8 @@ public class JobResponse {
     private String renderProfile;
     /** 훅 규칙 버전(v1 = 태그 없음). */
     private String hookRule;
+    /** 포맷 실험 arm 키(실험 비대상이면 null). */
+    private String formatArm;
 
     /**
      * Convert MarketingJob entity to response DTO
@@ -119,6 +121,7 @@ public class JobResponse {
             .updatedAt(job.getUpdatedAt())
             .renderProfile(profile)
             .hookRule(job.getHookRule() == null ? "v1" : job.getHookRule())
+            .formatArm(job.getFormatArm())
             .build();
     }
 }

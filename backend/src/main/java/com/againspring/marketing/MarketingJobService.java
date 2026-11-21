@@ -44,6 +44,7 @@ import java.util.UUID;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.againspring.marketing.experiment.FormatArm;
 
 /**
  * Service for managing marketing jobs
@@ -69,6 +70,7 @@ public class MarketingJobService {
     private final com.againspring.repository.marketing.MarketingGenerationTraceRepository generationTraceRepository;
     private final com.againspring.service.community.SibomCandidateService sibomCandidateService;
     private final org.springframework.core.env.Environment environment;
+    private final com.againspring.marketing.experiment.MarketingFormatArmService formatArmService;
 
     /**
      * 기본 렌더 프로필. Spring 컨텍스트에서는 {@code @Value}가 덮어쓰지만, 필드 이니셜라이저를
@@ -118,7 +120,9 @@ public class MarketingJobService {
         if (!asmProperties.isEnabled()) {
             throw new AsmUnavailableException("ASM is disabled (ASM_ENABLED=false)");
         }
-        if (autoPublish && MarketingRenderProfiles.isExperimental(renderProfile)) {
+        // 재시도/재생성이 arm을 승계한 잡은 arm이 고른 실험 프로필이므로 자동 게시를 허용한다.
+        if (autoPublish && MarketingRenderProfiles.isExperimental(renderProfile)
+                && inheritedFormatArmKey(retryOfJobId) == null) {
             throw new IllegalArgumentException(
                 "Experimental renderProfile " + renderProfile + " is test-only (autoPublish must be false)");
         }
@@ -275,8 +279,19 @@ public class MarketingJobService {
 
         // Determine render profile (WS6.1 priority: caller → env → default).
         // 빈 문자열·null이 흘러들어와도 절대 프로필 없이 진행하지 않는다.
+        // 포맷 실험 arm: 재시도는 원 잡의 arm 승계, 신규 자동 게시 영상 잡은 pick (실험 꺼짐이면 null).
+        String inheritedArmKey = inheritedFormatArmKey(retryOfJobId);
+        FormatArm arm = null;
+        if (inheritedArmKey != null) {
+            arm = formatArmService.find(inheritedArmKey).orElse(null);
+        } else if (retryOfJobId == null && autoPublish && (renderProfile == null || renderProfile.isBlank())
+                && targets != null && targets.size() == 1
+                && ("instagram_reels".equals(targets.get(0)) || "youtube_shorts".equals(targets.get(0)))) {
+            arm = formatArmService.pickForAutoJob(targets.get(0)).orElse(null);
+        }
+        String formatArmKey = arm != null ? arm.key() : inheritedArmKey;
         String resolvedRenderProfile = firstNonBlank(
-                renderProfile, defaultRenderProfile, "marketing_fast");
+                arm != null ? arm.renderProfile() : null, renderProfile, defaultRenderProfile, "marketing_fast");
 
         MarketingJob.MarketingJobBuilder pendingBuilder = MarketingJob.builder()
             .postId(post.getId())
@@ -289,7 +304,8 @@ public class MarketingJobService {
             .scheduledPublishAt(scheduledPublishAt)
             .originalScheduledAt(scheduledPublishAt)
             .idempotencyKey(idempotencyKey)
-            .renderProfile(resolvedRenderProfile);
+            .renderProfile(resolvedRenderProfile)
+            .formatArm(formatArmKey);
         MarketingJob savedJob = marketingJobRepository.save(pendingBuilder.build());
 
         String campaign = MarketingUtmUrls.campaignForJob(savedJob.getId());
@@ -315,15 +331,12 @@ public class MarketingJobService {
 
             List<String> candidatesForLlm = post.getSibomCandidates() != null
                 ? post.getSibomCandidates() : List.of();
-            variants = videoVariantService.generate(
-                masterHook,
-                hookEmotion,
-                storyTitle,
-                authorBodyFull,
-                needReels,
-                needShorts,
-                candidatesForLlm
-            );
+            // arm 없으면 기존 7-인자 경로 그대로(실험 꺼짐 = 기존 동작).
+            variants = arm == null
+                ? videoVariantService.generate(masterHook, hookEmotion, storyTitle, authorBodyFull,
+                    needReels, needShorts, candidatesForLlm)
+                : videoVariantService.generate(masterHook, hookEmotion, storyTitle, authorBodyFull,
+                    needReels, needShorts, candidatesForLlm, arm.scriptStyle());
         }
 
         VideoVariantService.QualityGateResult qualityGate =
@@ -353,6 +366,19 @@ public class MarketingJobService {
                 ? variants.maxDurationShortsSec() : VideoVariantService.MAX_DURATION_SHORTS_SEC;
         }
 
+        Integer briefMaxReels = variants.maxDurationReelsSec();
+        Integer briefMaxShorts = variants.maxDurationShortsSec();
+        if (arm != null && arm.maxDurationSec() != null) {
+            int cap = arm.maxDurationSec();
+            if (needReels && !needShorts) {
+                briefMaxReels = Math.min(cap, briefMaxReels != null ? briefMaxReels : VideoVariantService.MAX_DURATION_REELS_SEC);
+                maxDurationSec = briefMaxReels;
+            } else if (needShorts && !needReels) {
+                briefMaxShorts = Math.min(cap, briefMaxShorts != null ? briefMaxShorts : VideoVariantService.MAX_DURATION_SHORTS_SEC);
+                maxDurationSec = briefMaxShorts;
+            }
+        }
+
         // Unrequested channel → null; requested empty plan → empty list (not metaphor fallback).
         List<CreateJobRequest.SibomPlanItem> planReels =
             needReels ? toBriefSibomPlan(variants.sibomPlanReels()) : null;
@@ -380,8 +406,8 @@ public class MarketingJobService {
             .hookRule((needReels || needShorts) ? VideoVariantService.HOOK_RULE_VERSION : null)
             .scriptReels(spokenCopy(variants.scriptReels()))
             .scriptShorts(spokenCopy(variants.scriptShorts()))
-            .maxDurationReelsSec(variants.maxDurationReelsSec())
-            .maxDurationShortsSec(variants.maxDurationShortsSec())
+            .maxDurationReelsSec(briefMaxReels)
+            .maxDurationShortsSec(briefMaxShorts)
             .maxDurationSec(maxDurationSec)
             .sibomCandidates(sibomCandidates)
             .sibomPlan(activeSibomPlan)
@@ -436,6 +462,9 @@ public class MarketingJobService {
             .deadlineAt(Instant.now().plusMillis(waggleSlaMs).toString())
             .preScripted(needReels || needShorts)
             .renderProfile((needReels || needShorts) ? resolvedRenderProfile : null)
+            .formatArm(arm != null ? arm.key() : null)
+            .commentCount(arm != null ? arm.commentCount() : null)
+            .outroMode(arm != null ? arm.outroMode() : null)
             .build();
 
         CreateJobRequest request = CreateJobRequest.builder()
@@ -461,6 +490,16 @@ public class MarketingJobService {
                 deriveAsmErrorCode(e), retryable, errorMsg);
             throw e;
         }
+    }
+
+    /** 재시도 원 잡의 format_arm (없거나 재시도가 아니면 null). */
+    private String inheritedFormatArmKey(Long retryOfJobId) {
+        if (retryOfJobId == null) {
+            return null;
+        }
+        String key = marketingJobRepository.findById(retryOfJobId)
+            .map(MarketingJob::getFormatArm).orElse(null);
+        return key == null || key.isBlank() ? null : key;
     }
 
     /** Regenerate a quality-failed video as a separately auditable, auto-publishing child job. */

@@ -73,6 +73,8 @@ class MarketingHoldingCommitServiceTest {
     @Mock PostRepository postRepository;
     @Mock PlatformTransactionManager transactionManager;
     @Mock TelegramNotifier telegramNotifier;
+    @Mock com.againspring.marketing.experiment.MarketingExperimentSettings experimentSettings;
+    @Mock com.againspring.marketing.experiment.MarketingTopicBiasService topicBiasService;
 
     @InjectMocks
     MarketingHoldingCommitService service;
@@ -450,5 +452,49 @@ class MarketingHoldingCommitServiceTest {
             @Override public Number getHasPartner() { return hasPartner; }
             @Override public String getHookText() { return hookText; }
         };
+    }
+
+    @Test
+    void toScored_topicBiasOff_usesExistingThemePath() {
+        when(themeBoostService.getBoost(any(), any(), any())).thenReturn(1.5);
+        MarketingHoldingCommitService.ThemeKeys keys = new MarketingHoldingCommitService.ThemeKeys("ANGER", "COUPLE");
+        var row = due("p", "IN_POOL", null, 100, 50, 40, 20, 1, "훅", T0);
+
+        var shadow = service.toScored(row, PLATFORM_WEIGHTS, keys, true, false);
+        var boosted = service.toScored(row, PLATFORM_WEIGHTS, keys, false, false);
+
+        verify(topicBiasService, never()).multiplier(any(), any(), any());
+        assertThat(boosted.score()).isGreaterThan(shadow.score());
+    }
+
+    @Test
+    void toScored_topicBiasOn_multipliesTopicBiasInsteadOfTheme() {
+        when(topicBiasService.multiplier(any(), any(), any())).thenReturn(2.0);
+        MarketingHoldingCommitService.ThemeKeys keys = new MarketingHoldingCommitService.ThemeKeys("ANGER", "COUPLE");
+        var row = due("p", "IN_POOL", null, 100, 50, 40, 20, 1, "훅", T0);
+
+        var base = service.toScored(row, PLATFORM_WEIGHTS, keys, true, false);
+        var biased = service.toScored(row, PLATFORM_WEIGHTS, keys, true, true);
+
+        verify(topicBiasService).multiplier("x_thread", "COUPLE", "ANGER");
+        base.scores().forEach((platform, score) ->
+            assertThat(biased.scores().get(platform)).isGreaterThan(score));
+        verify(themeBoostService, never()).getBoost(any(), any(), any());
+    }
+
+    @Test
+    void commitTick_readsTopicBiasFlagFromSettings() {
+        when(experimentSettings.isTopicBiasEnabled()).thenReturn(true);
+        when(topicBiasService.multiplier(any(), any(), any())).thenReturn(1.0);
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 1, 1, 1));
+        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
+            due("hot", "IN_POOL", null, 100, 50, 40, 20, 1, "훅", T0)));
+        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED))).thenReturn(List.of());
+        putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
+        stubJobs();
+
+        service.runCommitTick(SINCE);
+
+        verify(topicBiasService, org.mockito.Mockito.atLeastOnce()).multiplier(any(), any(), any());
     }
 }

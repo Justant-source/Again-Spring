@@ -199,6 +199,23 @@ public class VideoVariantService {
             boolean needShorts,
             List<String> sibomCandidates
     ) {
+        return generate(masterHook, hookEmotion, title, body, needReels, needShorts, sibomCandidates, null);
+    }
+
+    /**
+     * @param scriptStyle {@code null}/"narrative"/unknown = existing prompt (byte-identical);
+     *                    "dilemma" = adds the dilemma script-structure block.
+     */
+    public Variants generate(
+            String masterHook,
+            String hookEmotion,
+            String title,
+            String body,
+            boolean needReels,
+            boolean needShorts,
+            List<String> sibomCandidates,
+            String scriptStyle
+    ) {
         if (!needReels && !needShorts) {
             return Variants.empty();
         }
@@ -222,7 +239,7 @@ public class VideoVariantService {
         if (needReels) {
             ChannelResult reels = generateOneChannel(
                     safeHook, hookEmotion, safeTitle, safeBody,
-                    SibomPlanGuard.Channel.REELS, candidates);
+                    SibomPlanGuard.Channel.REELS, candidates, scriptStyle);
             durReels = MAX_DURATION_REELS_SEC;
             hookReels = reels.hook();
             scriptReels = reels.script();
@@ -233,7 +250,7 @@ public class VideoVariantService {
         if (needShorts) {
             ChannelResult shorts = generateOneChannel(
                     safeHook, hookEmotion, safeTitle, safeBody,
-                    SibomPlanGuard.Channel.SHORTS, candidates);
+                    SibomPlanGuard.Channel.SHORTS, candidates, scriptStyle);
             durShorts = MAX_DURATION_SHORTS_SEC;
             hookShorts = shorts.hook();
             scriptShorts = shorts.script();
@@ -296,7 +313,8 @@ public class VideoVariantService {
             String title,
             String body,
             SibomPlanGuard.Channel channel,
-            List<String> sibomCandidates
+            List<String> sibomCandidates,
+            String scriptStyle
     ) {
         int minimum = channel.minSlots();
         int eligibleCandidateCount = eligibleCandidateCount(sibomCandidates);
@@ -317,11 +335,11 @@ public class VideoVariantService {
         }
 
         ChannelResult first = invokeChannelAttempt(
-                masterHook, hookEmotion, title, body, channel, sibomCandidates, null, 1, attempts);
+                masterHook, hookEmotion, title, body, channel, sibomCandidates, null, 1, attempts, scriptStyle);
         ChannelResult resolved = first;
         if (shouldCorrect(first, minimum)) {
             resolved = invokeChannelAttempt(masterHook, hookEmotion, title, body, channel, sibomCandidates,
-                    correctionInstruction(first, minimum), 2, attempts);
+                    correctionInstruction(first, minimum), 2, attempts, scriptStyle);
         }
 
         Map<String, Object> diagnostics = new LinkedHashMap<>();
@@ -336,7 +354,8 @@ public class VideoVariantService {
     private ChannelResult invokeChannelAttempt(
             String masterHook, String hookEmotion, String title, String body,
             SibomPlanGuard.Channel channel, List<String> sibomCandidates,
-            String correction, int attemptNumber, List<Map<String, Object>> attempts
+            String correction, int attemptNumber, List<Map<String, Object>> attempts,
+            String scriptStyle
     ) {
         Instant startedAt = Instant.now();
         ChannelResult llm = ChannelResult.empty(enabled ? "PARSE_ERROR" : "LLM_DISABLED");
@@ -346,7 +365,7 @@ public class VideoVariantService {
         if (enabled) {
             try {
                 promptText = buildChannelPrompt(
-                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction);
+                        masterHook, hookEmotion, title, body, channel, sibomCandidates, correction, scriptStyle);
                 raw = llmProvider.invoke(promptText, model);
                 if (looksLikeLlmError(raw)) {
                     errorMessage = clamp(raw, 200);
@@ -464,6 +483,15 @@ public class VideoVariantService {
                 || lower.contains("session limit") || lower.contains("rate limit");
     }
 
+    static final String SCRIPT_STYLE_DILEMMA = "dilemma";
+
+    /** dilemma 스타일 전용 대본 구조 지시. narrative에는 절대 붙지 않는다. */
+    static final String DILEMMA_SCRIPT_BLOCK =
+            "\n              [대본 구조 — dilemma 스타일 (위 ①~④ 구조보다 우선)]"
+            + "\n              · 대본은 정확히 이 순서로 씁니다: ① 사건(무슨 일이 있었는지, 본문에 있는 숫자·구체 사건) → ② 작성자 입장 한 문장 → ③ 상대방 입장 한 문장 → ④ 마지막 문장은 시청자에게 어느 쪽에 공감하는지 묻는 한 문장으로 끝냅니다."
+            + "\n              · 결말·교훈·판정을 서술하지 마세요. 입장은 본문에 근거해서만 쓰고, 상대방 입장이 본문에 없으면 지어내지 말고 본문에 드러난 범위에서만 요약하세요."
+            + "\n              · 위 \"참여 유도 문구 금지\"는 이 스타일에서 ④ 마지막 문장에 한해 예외입니다. 글자 수 범위는 위 script 범위(상한 포함)를 그대로 지키세요.";
+
     private String buildChannelPrompt(
             String masterHook,
             String emotion,
@@ -471,7 +499,8 @@ public class VideoVariantService {
             String body,
             SibomPlanGuard.Channel channel,
             List<String> sibomCandidates,
-            String correction
+            String correction,
+            String scriptStyle
     ) {
         String rawBody = body != null ? body : "";
         if (rawBody.length() > BODY_PROMPT_MAX) {
@@ -493,6 +522,9 @@ public class VideoVariantService {
         String scriptHint = reels
                 ? "script는 125~155자 범위(재생시간 목표 13~16초). 너무 짧지 않게."
                 : "script는 155~190자 범위(재생시간 목표 16~20초). 너무 짧지 않게.";
+        if (SCRIPT_STYLE_DILEMMA.equals(scriptStyle)) {
+            scriptHint = scriptHint + DILEMMA_SCRIPT_BLOCK;
+        }
         int softTargetLo = reels ? 5 : 6;
         int softTargetHi = reels ? 5 : 7;
 
