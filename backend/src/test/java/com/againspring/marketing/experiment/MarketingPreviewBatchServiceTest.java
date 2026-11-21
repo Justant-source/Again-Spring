@@ -102,6 +102,19 @@ class MarketingPreviewBatchServiceTest {
     }
 
     @Test
+    void start_skipsPairsThatAreAlreadyReady_soRerunOnlyFillsGaps() {
+        MarketingJob ready = MarketingJob.builder().id(1L).status("READY").build();
+        when(jobRepository.countReadyTestJobs(eq("p1"), eq("short_reveal"), eq("youtube_shorts"), any())).thenReturn(1L);
+        when(jobService.createTestJobWithArm(anyString(), any(), anyString(), anyString())).thenReturn(ready);
+
+        service.start(5, null, null);
+
+        verify(jobService, never()).createTestJobWithArm(eq("p1"), any(), anyString(), eq("short_reveal"));
+        verify(jobService).createTestJobWithArm("p1", List.of("youtube_shorts"), "preview-batch", "dilemma");
+        verify(jobService).createTestJobWithArm("p2", List.of("youtube_shorts"), "preview-batch", "short_reveal");
+    }
+
+    @Test
     void start_rejectsConcurrentBatchAndBadInput() {
         Executor never = r -> { };
         service = new MarketingPreviewBatchService(postRepository, jobService, jobRepository, armService, never, ms -> { });

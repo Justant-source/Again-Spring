@@ -559,12 +559,15 @@ function PlatformCard({
   const colorClass = PLATFORM_COLORS[platform] ?? 'bg-gray-600 text-white';
   const [uploadData, setUploadData] = useState<Record<string, unknown> | undefined>(undefined);
 
+  // pkg는 부모가 다시 그릴 때마다(테스트 탭은 10초 폴링) 새 객체가 되므로, 의존성은 문자열 키로 둔다.
+  // 객체를 의존성에 두면 잡 40개가 10초마다 upload.json을 다시 받아 ASM DB 연결 풀이 바닥난다(2026-11-21).
+  const uploadKey = Object.keys(pkg).find(k => k === 'upload' || k.endsWith('upload'));
+  const uploadArtifactKey = uploadKey ? pkg[uploadKey] : undefined;
   useEffect(() => {
-    const uploadKey = Object.keys(pkg).find(k => k === 'upload' || k.endsWith('upload'));
-    if (!uploadKey || !pkg[uploadKey]) return;
-    const url = proxyUrl(jobId, pkg[uploadKey]!);
+    if (!uploadArtifactKey) return;
+    const url = proxyUrl(jobId, uploadArtifactKey);
     api.get(url).then(res => setUploadData(res.data as Record<string, unknown>)).catch(() => {});
-  }, [pkg, jobId]);
+  }, [uploadArtifactKey, jobId]);
 
   const hasCards = Object.keys(pkg).some(k => k.startsWith('card_'));
   const hasImgs = Object.keys(pkg).some(k => k.startsWith('img_'));

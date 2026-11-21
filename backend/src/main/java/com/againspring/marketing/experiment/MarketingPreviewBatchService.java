@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -26,6 +28,7 @@ import java.util.function.LongConsumer;
  * <p>같은 (사연, 플랫폼)에는 동시에 활성 잡을 둘 수 없으므로, 사연별로 arm을 순서대로 렌더하고
  * 사연끼리는 병렬로 돈다. 진행 상황은 테스트 탭의 "서버의 최근 테스트 잡"에서 본다.
  * 한 번에 한 배치만 돌고, 서버를 재시작하면 남은 arm은 이어지지 않는다(1회성 도구).
+ * 같은 버튼을 다시 눌러도 최근 12시간 안에 이미 READY인 (사연, arm, 플랫폼)은 건너뛰어 빠진 것만 채운다.
  */
 @Slf4j
 @Service
@@ -34,7 +37,9 @@ public class MarketingPreviewBatchService {
     static final Set<String> TERMINAL = Set.of("READY", "FAILED", "STALE", "PARTIAL");
     static final Set<String> PLATFORMS = Set.of("youtube_shorts", "instagram_reels");
     static final long POLL_MILLIS = 15_000L;
-    static final long MAX_WAIT_MILLIS = 90L * 60_000L;
+    static final long MAX_WAIT_MILLIS = 45L * 60_000L;
+    /** 이 시간 안에 이미 완성된 (사연, arm, 플랫폼)은 다시 렌더하지 않는다. */
+    static final long REUSE_HOURS = 12L;
 
     private final PostRepository postRepository;
     private final MarketingJobService jobService;
@@ -126,8 +131,13 @@ public class MarketingPreviewBatchService {
     }
 
     private void runPost(String postId, List<String> arms, String platform) {
+        Instant since = Instant.now().minus(REUSE_HOURS, ChronoUnit.HOURS);
         for (String arm : arms) {
             try {
+                if (jobRepository.countReadyTestJobs(postId, arm, platform, since) > 0) {
+                    log.info("preview batch reuse (already READY) post={} arm={}", postId, arm);
+                    continue;
+                }
                 MarketingJob job = jobService.createTestJobWithArm(postId, List.of(platform), "preview-batch", arm);
                 waitUntilTerminal(job);
             } catch (Exception e) {

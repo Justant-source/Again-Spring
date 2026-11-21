@@ -158,4 +158,16 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
      * @return List of child jobs (may be empty)
      */
     List<MarketingJob> findByRetryOfJobId(Long retryOfJobId);
+
+    /** 최근 since 이후 이 사연·포맷 arm·플랫폼으로 이미 완성(READY)된 테스트(자동 게시 아님) 잡 수. 일괄 렌더가 빠진 것만 채우는 데 쓴다. */
+    @org.springframework.data.jpa.repository.Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_job
+        WHERE post_id = :postId AND format_arm = :armKey AND auto_publish = 0
+          AND status = 'READY' AND created_at >= :since
+          AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
+        """)
+    long countReadyTestJobs(@org.springframework.data.repository.query.Param("postId") String postId,
+                            @org.springframework.data.repository.query.Param("armKey") String armKey,
+                            @org.springframework.data.repository.query.Param("platform") String platform,
+                            @org.springframework.data.repository.query.Param("since") java.time.Instant since);
 }
