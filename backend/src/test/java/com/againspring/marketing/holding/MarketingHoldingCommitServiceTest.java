@@ -203,8 +203,7 @@ class MarketingHoldingCommitServiceTest {
             .thenReturn(List.of());
         putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
         putHolding("other", MarketingHoldingStatus.OUT_OF_CUT, null);
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
             .thenThrow(new DataIntegrityViolationException("Column 'scheduled_publish_at' cannot be null"));
 
@@ -229,8 +228,7 @@ class MarketingHoldingCommitServiceTest {
             .thenReturn(List.of());
         putHolding("pin", MarketingHoldingStatus.PINNED, MarketingPinFormat.TEXT);
         putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
             .thenAnswer(inv -> {
                 String postId = inv.getArgument(0);
@@ -254,8 +252,7 @@ class MarketingHoldingCommitServiceTest {
         when(postRepository.existsById("drop1")).thenReturn(true);
         when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
             .thenReturn(List.of("instagram_reels", "x_thread"));
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
             .thenReturn(MarketingJob.builder().id(42L).status("REQUESTED").build());
 
@@ -281,8 +278,7 @@ class MarketingHoldingCommitServiceTest {
         when(postRepository.existsById("drop-uuid")).thenReturn(true);
         when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
             .thenReturn(List.of("x_thread"));
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
             .thenReturn(MarketingJob.builder().id(99L).status("REQUESTED").build());
 
@@ -303,11 +299,10 @@ class MarketingHoldingCommitServiceTest {
         when(postRepository.existsById("c1")).thenReturn(true);
         when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
             .thenReturn(List.of("instagram_reels", "youtube_shorts", "x_thread", "instagram_feed"));
-        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("x_thread"))).thenReturn(1L);
-        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_feed"))).thenReturn(1L);
-        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("instagram_reels"))).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(eq("c1"), eq("youtube_shorts"))).thenReturn(0L);
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("c1"), eq("x_thread"))).thenReturn(1L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("c1"), eq("instagram_feed"))).thenReturn(1L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("c1"), eq("instagram_reels"))).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("c1"), eq("youtube_shorts"))).thenReturn(0L);
         when(marketingJobService.createJob(eq("c1"), any(), eq(true), anyString()))
             .thenReturn(MarketingJob.builder().id(77L).status("REQUESTED").build());
 
@@ -324,14 +319,70 @@ class MarketingHoldingCommitServiceTest {
     }
 
     @Test
+    void force_testJobsOnly_doNotBlockAutoVideoJobCreation() {
+        putHolding("t1", MarketingHoldingStatus.DROPPED, null);
+        when(postRepository.existsById("t1")).thenReturn(true);
+        when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
+            .thenReturn(List.of("instagram_reels", "youtube_shorts"));
+        // 테스트 잡(auto_publish=0)만 있는 사연: auto=0 이므로 건너뛰면 안 된다(any 카운트는 더는 안 본다).
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(5L).status("REQUESTED").build());
+
+        MarketingHoldingCommitService.ForceResult result = service.forceCommit(
+            "t1", MarketingHoldingCommitService.ForceMode.VIDEO_AND_TEXT, "admin");
+
+        assertThat(result.jobIds()).hasSize(2);
+        verify(marketingJobService).createJob(eq("t1"), eq(List.of("instagram_reels")), eq(true), anyString());
+        verify(marketingJobService).createJob(eq("t1"), eq(List.of("youtube_shorts")), eq(true), anyString());
+        verify(marketingJobRepository, never()).countAnyPlatformJobs(anyString(), anyString());
+    }
+
+    @Test
+    void force_autoJobExists_skipsPlatform() {
+        putHolding("t2", MarketingHoldingStatus.DROPPED, null);
+        when(postRepository.existsById("t2")).thenReturn(true);
+        when(platformAutoService.resolveTargets(MarketingPublishFormat.VIDEO))
+            .thenReturn(List.of("instagram_reels", "youtube_shorts"));
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("t2"), eq("instagram_reels"))).thenReturn(1L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("t2"), eq("youtube_shorts"))).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenReturn(MarketingJob.builder().id(6L).status("REQUESTED").build());
+
+        service.forceCommit("t2", MarketingHoldingCommitService.ForceMode.VIDEO_AND_TEXT, "admin");
+
+        verify(marketingJobService, never()).createJob(eq("t2"), eq(List.of("instagram_reels")), anyBoolean(), anyString());
+        verify(marketingJobService).createJob(eq("t2"), eq(List.of("youtube_shorts")), eq(true), anyString());
+    }
+
+    @Test
+    void commitTick_activeTestJobMakesCreateJobThrow_defersAndKeepsHolding() {
+        when(quotaService.remainingCapsMutable()).thenReturn(remaining(1, 0, 1, 0));
+        when(holdingRepository.findDueHoldings(SINCE)).thenReturn(List.of(
+            due("hot", "IN_POOL", null, 100, 20, 10, 5, 0, null, T0.plusSeconds(2))
+        ));
+        when(holdingRepository.findByStatusIn(EnumSet.of(MarketingHoldingStatus.PINNED)))
+            .thenReturn(List.of());
+        putHolding("hot", MarketingHoldingStatus.IN_POOL, null);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
+            .thenThrow(new IllegalStateException("이미 처리 중인 마케팅 잡이 있습니다"));
+
+        MarketingHoldingCommitService.CommitTickResult result = service.runCommitTick(SINCE);
+
+        assertThat(result.autoCommitted()).isZero();
+        assertThat(result.autoDeferred()).isEqualTo(1);
+        assertThat(holdings.get("hot").getStatus()).isEqualTo(MarketingHoldingStatus.IN_POOL);
+    }
+
+    @Test
     void force_alreadyCommitted_allTargetsExist_rejects() {
         putHolding("c2", MarketingHoldingStatus.COMMITTED, null);
         holdings.get("c2").setLockedAt(Instant.now());
         when(postRepository.existsById("c2")).thenReturn(true);
         when(platformAutoService.resolveTargets(MarketingPublishFormat.TEXT))
             .thenReturn(List.of("x_thread"));
-        when(marketingJobRepository.countAnyPlatformJobs(eq("c2"), eq("x_thread"))).thenReturn(1L);
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(eq("c2"), eq("x_thread"))).thenReturn(1L);
 
         assertThatThrownBy(() -> service.forceCommit(
             "c2", MarketingHoldingCommitService.ForceMode.TEXT_ONLY, "admin"))
@@ -410,8 +461,7 @@ class MarketingHoldingCommitServiceTest {
     }
 
     private void stubJobs() {
-        when(marketingJobRepository.countActivePlatformJobs(anyString(), anyString())).thenReturn(0L);
-        when(marketingJobRepository.countAnyPlatformJobs(anyString(), anyString())).thenReturn(0L);
+        when(marketingJobRepository.countAutoPublishPlatformJobs(anyString(), anyString())).thenReturn(0L);
         when(marketingJobService.createJob(anyString(), any(), anyBoolean(), anyString()))
             .thenAnswer(inv -> MarketingJob.builder()
                 .id(1L).postId(inv.getArgument(0)).status("REQUESTED").build());

@@ -618,8 +618,9 @@ public class MarketingHoldingCommitService {
         for (List<String> group : groups) {
             boolean anyActive = false;
             for (String platform : group) {
-                if (marketingJobRepository.countActivePlatformJobs(postId, platform) > 0
-                    || marketingJobRepository.countAnyPlatformJobs(postId, platform) > 0) {
+                // 자동 게시 잡(auto_publish=1)만 "이미 시도"로 센다. 테스트 잡(0)은 무시하고,
+                // 진행 중인 테스트 잡과의 충돌은 createJob 가드가 예외로 올려 다음 틱에 재시도된다.
+                if (marketingJobRepository.countAutoPublishPlatformJobs(postId, platform) > 0) {
                     anyActive = true;
                     break;
                 }
@@ -634,7 +635,7 @@ public class MarketingHoldingCommitService {
         if (created.isEmpty() && !groups.isEmpty()) {
             long any = groups.stream()
                 .flatMap(List::stream)
-                .mapToLong(p -> marketingJobRepository.countAnyPlatformJobs(postId, p))
+                .mapToLong(p -> marketingJobRepository.countAutoPublishPlatformJobs(postId, p))
                 .sum();
             if (any <= 0) {
                 throw new IllegalStateException("No marketing jobs created for " + postId);

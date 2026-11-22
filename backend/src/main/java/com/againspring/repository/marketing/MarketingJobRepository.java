@@ -96,6 +96,20 @@ public interface MarketingJobRepository extends JpaRepository<MarketingJob, Long
         """)
     long countAnyPlatformJobs(String postId, String platform);
 
+    /**
+     * Same as {@link #countAnyPlatformJobs} but counts only auto-publish jobs
+     * ({@code auto_publish = 1}). Test-tab / batch-render jobs ({@code auto_publish = 0}) are never
+     * published, so they must not make the holding commit think a platform was "already attempted".
+     * Returns long (COUNT) — boolean return breaks on MariaDB.
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT COUNT(*) FROM marketing_job
+        WHERE post_id = :postId
+        AND auto_publish = 1
+        AND JSON_CONTAINS(targets, JSON_QUOTE(:platform)) = TRUE
+        """)
+    long countAutoPublishPlatformJobs(String postId, String platform);
+
     List<MarketingJob> findByPostIdIn(Collection<String> postIds);
 
     /**
