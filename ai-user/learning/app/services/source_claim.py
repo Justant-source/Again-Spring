@@ -29,12 +29,18 @@ STATUS_COMMITTED = "COMMITTED"
 # 영구 기각: 원문 판정(LLM)이 "갈등 없음"으로 거른 글. 다시 claim되지 않는다. 스키마 변경 없음(varchar(16)).
 STATUS_REJECTED = "REJECTED"
 _REJECTED_RESERVE_UNTIL = "2099-12-31 00:00:00"
+# 품질 게이트(assess_source)가 거른 행(잘린 미리보기·오염·너무 짧음). **그 행 하나만** 제외한다 —
+# REJECTED와 달리 같은 source_url 형제는 막지 않는다(재크롤로 전문이 들어오면 다시 claim 가능).
+# is_reservation_blocking/_family_is_blocked/형제 NOT EXISTS 는 이 상태를 가족 차단으로 취급하지 않는다.
+STATUS_UNUSABLE = "UNUSABLE"
+_UNUSABLE_RESERVE_UNTIL = "2099-12-31 00:00:00"
 # Max candidates to try per window when soft-reserve races
 _CLAIM_ATTEMPTS_PER_WINDOW = 8
-# Max candidates rejected by source_quality per window (not counted in the race budget above).
-# 실측(prod 30일): 통과율 blind 13% / natepan 76%, 블라인드 플라자 범위로 좁히면 ~8%까지 낮다.
-# 인기순 1건씩 가져와 거르므로, 80회면 통과율 8%에서도 실패 확률 약 0.1% 미만(0.92^80).
-_CLAIM_QUALITY_SKIPS_PER_WINDOW = 80
+# 윈도우당 후보를 한 번에 가져오는 개수. 인기순 상위 N건을 한 쿼리로 읽고 품질 게이트는 파이썬에서 돈다.
+# (SELECT 1회가 prod에서 ~3.8초라 후보마다 재조회하면 오케스트레이터 15초 read timeout을 넘긴다.)
+_CLAIM_BATCH_SIZE = 40
+# 윈도우당 최대 배치(=무거운 쿼리) 수. 첫 배치가 전부 불량/경합이면 한 번 더 가져온다.
+_CLAIM_BATCHES_PER_WINDOW = 2
 
 # Plaza (posts.category) → example_bank.category values that may ground it.
 # Blind crawler stores romance/marriage/workplace; natepan stores plaza enums.
@@ -89,6 +95,7 @@ def is_reservation_blocking(
         return False
     if status in (STATUS_COMMITTED, STATUS_REJECTED):
         return True
+    # STATUS_UNUSABLE 은 가족 차단이 아니다(행 단위 제외 — filter_claim_candidates 참조).
     if status == STATUS_SOFT and reserve_until is not None and reserve_until > now:
         return True
     return False
@@ -198,6 +205,8 @@ def filter_claim_candidates(
         if url in blocked_urls:
             continue
         res = reservations.get(eid)
+        if res and res.get("status") == STATUS_UNUSABLE:
+            continue  # 품질 불량으로 기록된 그 행만 제외
         if res and is_reservation_blocking(res.get("status"), res.get("reserve_until"), now):
             continue
         out.append(row)
@@ -290,32 +299,45 @@ WHERE eb.content_type = 'POST'
   -- 퍼센트 기호는 파라미터 바인딩 때문에 두 개로 이스케이프해야 한다(위 주의 참조).
   AND eb.content NOT LIKE '%%(광고)%%'
   {category_clause}
+  -- 품질 불량으로 기록된 행(UNUSABLE)은 그 행만 제외한다. 형제 URL은 막지 않는다(아래 서브쿼리는
+  -- COMMITTED/REJECTED/SOFT 만 가족 차단). example_id PK 조회라 싸다.
   AND NOT EXISTS (
-      SELECT 1
-      FROM example_bank sib
-      LEFT JOIN posts p ON p.source_example_id = sib.id
-      LEFT JOIN example_source_reservations r ON r.example_id = sib.id
-      WHERE sib.source_url = eb.source_url
+      SELECT 1 FROM example_source_reservations u
+      WHERE u.example_id = eb.id AND u.status = 'UNUSABLE'
+  )
+  -- 같은 source_url 가족이 이미 쓰였거나 예약됐으면 제외한다. 차단된 URL 집합을 **한 번만** 구한다
+  -- (비상관 서브쿼리 — 예약·게시 행에서 PK로 example_bank를 찾는다). 예전의 상관 NOT EXISTS는
+  -- source_url에 인덱스가 없어 후보 행마다 example_bank를 전부 훑었다(후보 1건 ~1.3초, 2026-11-22 실측).
+  AND eb.source_url NOT IN (
+      SELECT sib.source_url
+      FROM example_source_reservations r
+      JOIN example_bank sib ON sib.id = r.example_id
+      WHERE sib.source_url IS NOT NULL
         AND (
-            p.id IS NOT NULL
-            OR r.status IN ('COMMITTED', 'REJECTED')
+            r.status IN ('COMMITTED', 'REJECTED')
             OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
         )
+      UNION
+      SELECT sib.source_url
+      FROM posts p
+      JOIN example_bank sib ON sib.id = p.source_example_id
+      WHERE sib.source_url IS NOT NULL
   )
   {exclude_clause}
 ORDER BY eb.popularity_pct DESC
-LIMIT 1
-FOR UPDATE SKIP LOCKED
+LIMIT %s
 """
 
 
-def _select_candidate(
+def _select_candidates(
     cur,
     source: str,
     window_days: int,
     exclude_ids: Sequence[int],
     bank_categories: Optional[Sequence[str]] = None,
-) -> Optional[dict[str, Any]]:
+    limit: int = _CLAIM_BATCH_SIZE,
+) -> list[dict[str, Any]]:
+    """인기순 상위 limit건을 **잠금 없이** 한 쿼리로 읽는다. 경합 안전성은 _soft_reserve가 맡는다."""
     src = normalize_source(source)
     cats = [str(c).strip() for c in (bank_categories or ()) if c and str(c).strip()]
     if cats:
@@ -332,16 +354,61 @@ def _select_candidate(
     else:
         exclude_clause = ""
         params = [src, int(window_days), *cat_params]
+    params.append(int(limit))
     sql = _SELECT_CANDIDATE_SQL.format(
         category_clause=category_clause,
         exclude_clause=exclude_clause,
     )
     cur.execute(sql, params)
-    return cur.fetchone()
+    return list(cur.fetchall() or [])
 
 
-def _soft_reserve_one(cur, example_id: int, reservation_key: str, reserve_until: datetime) -> bool:
-    """Insert SOFT reservation for one example_id. False on PK race."""
+def _mark_unusable(cur, entries: Sequence[tuple[int, str]]) -> None:
+    """품질 불량 행을 UNUSABLE 예약으로 기록한다(행 단위). 기존 예약은 덮어쓰지 않는다.
+
+    만료된 SOFT 행만 먼저 지우고 INSERT IGNORE 한다 — COMMITTED/REJECTED/살아있는 SOFT 행은
+    PK 충돌로 그대로 남는다. (ON DUPLICATE KEY UPDATE 는 앞 대입이 뒤 조건에 보여서
+    만료 SOFT 가 영구 SOFT 로 바뀔 수 있어 쓰지 않는다.)
+    """
+    if not entries:
+        return
+    ordered = sorted(entries)
+    ids = [int(eid) for eid, _ in ordered]
+    id_placeholders = ",".join(["%s"] * len(ids))
+    cur.execute(
+        f"""
+        DELETE FROM example_source_reservations
+        WHERE example_id IN ({id_placeholders}) AND status = %s AND reserve_until <= NOW(3)
+        """,
+        [*ids, STATUS_SOFT],
+    )
+    values_sql = ",".join(["(%s, %s, %s, %s, NOW(3), NOW(3))"] * len(ordered))
+    params: list[Any] = []
+    for eid, key in ordered:
+        params.extend([int(eid), key[:128], STATUS_UNUSABLE, _UNUSABLE_RESERVE_UNTIL])
+    cur.execute(
+        f"""
+        INSERT IGNORE INTO example_source_reservations
+            (example_id, reservation_key, status, reserve_until, created_at, updated_at)
+        VALUES {values_sql}
+        """,
+        params,
+    )
+
+
+def _soft_reserve_one(
+    cur,
+    example_id: int,
+    reservation_key: str,
+    reserve_until: datetime,
+    *,
+    tolerate_unusable: bool = False,
+) -> bool:
+    """Insert SOFT reservation for one example_id. False on PK race.
+
+    tolerate_unusable: 형제 행이 이미 UNUSABLE 로 기록돼 PK 충돌이 나도 실패로 보지 않는다
+    (그 행은 UNUSABLE 로 남기고 가족 차단은 claim된 행의 SOFT 가 맡는다).
+    """
     cur.execute(
         """
         DELETE FROM example_source_reservations
@@ -360,6 +427,14 @@ def _soft_reserve_one(cur, example_id: int, reservation_key: str, reserve_until:
         )
         return True
     except IntegrityError:
+        if tolerate_unusable:
+            cur.execute(
+                "SELECT status FROM example_source_reservations WHERE example_id = %s",
+                (example_id,),
+            )
+            existing = cur.fetchone()
+            if existing and existing.get("status") == STATUS_UNUSABLE:
+                return True
         logger.info(
             "soft_reserve race/conflict example_id=%s key=%s",
             example_id,
@@ -391,7 +466,10 @@ def _sibling_ids_for_url(cur, example_id: int) -> list[int]:
 
 
 def _family_is_blocked(cur, sibling_ids: Sequence[int]) -> bool:
-    """True if any sibling is already used in posts or has a blocking reservation."""
+    """True if any sibling is already used in posts or has a blocking reservation.
+
+    UNUSABLE 은 가족 차단이 아니므로 여기서 세지 않는다(status IN 목록에 없음).
+    """
     if not sibling_ids:
         return False
     placeholders = ",".join(["%s"] * len(sibling_ids))
@@ -433,7 +511,10 @@ def _soft_reserve(cur, example_id: int, reservation_key: str, reserve_until: dat
         )
         return False
     for sid in sibling_ids:
-        if not _soft_reserve_one(cur, sid, reservation_key, reserve_until):
+        if not _soft_reserve_one(
+            cur, sid, reservation_key, reserve_until,
+            tolerate_unusable=(sid != example_id),
+        ):
             return False
     if len(sibling_ids) > 1:
         logger.info(
@@ -479,47 +560,54 @@ def claim_popular_source(
             f"category must be one of {sorted(PLAZA_NAMES)} (got {category!r})"
         )
 
+    key = str(reservation_key).strip()
+    skipped: list[int] = [int(i) for i in (exclude_ids or []) if i is not None]
     with get_db() as conn:
         with conn.cursor() as cur:
             for days in window_attempts(window_days, expand_days):
-                skipped: list[int] = [int(i) for i in (exclude_ids or []) if i is not None]
                 race_attempts = 0
-                quality_skips = 0
-                while race_attempts < _CLAIM_ATTEMPTS_PER_WINDOW:
-                    row = _select_candidate(cur, src, days, skipped, bank_cats)
-                    if not row:
+                for _batch in range(_CLAIM_BATCHES_PER_WINDOW):
+                    rows = _select_candidates(cur, src, days, skipped, bank_cats, _CLAIM_BATCH_SIZE)
+                    # 읽기 스냅샷을 끝낸다 — 이후 _family_is_blocked 가 다른 claimant의 커밋을 봐야 한다.
+                    conn.commit()
+                    if not rows:
                         break
-                    eid = int(row["id"])
-                    # 원문 품질 게이트: 잘린 미리보기·사이드바 오염·너무 짧은 글은 예약하지 않고 다음 후보로.
-                    usable, why = assess_source(row.get("title"), row.get("content"), src)
-                    if not usable:
+                    usable_rows: list[Mapping[str, Any]] = []
+                    unusable: list[tuple[int, str]] = []
+                    for row in rows:
+                        eid = int(row["id"])
                         skipped.append(eid)
-                        quality_skips += 1
+                        # 원문 품질 게이트: 잘린 미리보기·사이드바 오염·너무 짧은 글은 예약하지 않고 기록만.
+                        ok, why = assess_source(row.get("title"), row.get("content"), src)
+                        if ok:
+                            usable_rows.append(row)
+                            continue
+                        unusable.append((eid, "quality:" + ",".join(why)))
                         logger.info(
                             "claim skip unusable source example_id=%s source=%s reasons=%s",
                             eid, src, ",".join(why),
                         )
-                        if quality_skips >= _CLAIM_QUALITY_SKIPS_PER_WINDOW:
-                            logger.warning(
-                                "claim quality-skip budget exhausted source=%s plaza=%s window_days=%s skips=%s",
-                                src, category, days, quality_skips,
-                            )
+                    if unusable:
+                        # 이 호출이 None 으로 끝나도 남도록 즉시 커밋(락도 빨리 푼다).
+                        _mark_unusable(cur, unusable)
+                        conn.commit()
+                    for row in usable_rows:
+                        if race_attempts >= _CLAIM_ATTEMPTS_PER_WINDOW:
                             break
-                        continue
-                    race_attempts += 1
-                    if _soft_reserve(cur, eid, str(reservation_key).strip(), until):
-                        logger.info(
-                            "claimed source example_id=%s source=%s plaza=%s bank_cats=%s window_days=%s pct=%s",
-                            eid,
-                            src,
-                            (str(category).strip().upper() if category else None),
-                            bank_cats,
-                            days,
-                            row.get("popularity_pct"),
-                        )
-                        return row_to_claimed_item(row)
-                    skipped.append(eid)
-                # empty in this window → try expand (next iteration)
+                        race_attempts += 1
+                        if _soft_reserve(cur, int(row["id"]), key, until):
+                            logger.info(
+                                "claimed source example_id=%s source=%s plaza=%s bank_cats=%s window_days=%s pct=%s",
+                                int(row["id"]),
+                                src,
+                                (str(category).strip().upper() if category else None),
+                                bank_cats,
+                                days,
+                                row.get("popularity_pct"),
+                            )
+                            return row_to_claimed_item(row)
+                    if len(rows) < _CLAIM_BATCH_SIZE or race_attempts >= _CLAIM_ATTEMPTS_PER_WINDOW:
+                        break  # 이 윈도우에 더 가져올 후보가 없다
             return None
 
 

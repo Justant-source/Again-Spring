@@ -538,19 +538,31 @@ def available_count(
             where_conditions.append(f"eb.category IN ({cat_placeholders})")
             params.extend(bank_cats)
 
-        # Exclude used/reserved examples (same logic as claim)
+        # 품질 불량(UNUSABLE) 행은 그 행만 재고에서 제외 (claim SQL과 동일, 형제는 막지 않음)
         where_conditions.append("""
             NOT EXISTS (
-                SELECT 1
-                FROM example_bank sib
-                LEFT JOIN posts p ON p.source_example_id = sib.id
-                LEFT JOIN example_source_reservations r ON r.example_id = sib.id
-                WHERE sib.source_url = eb.source_url
+                SELECT 1 FROM example_source_reservations u
+                WHERE u.example_id = eb.id AND u.status = 'UNUSABLE'
+            )
+        """)
+
+        # Exclude used/reserved examples (same logic as claim). 차단된 URL 집합을 한 번만 구한다 —
+        # 상관 NOT EXISTS는 source_url 인덱스가 없어 후보 행마다 example_bank를 전부 훑는다.
+        where_conditions.append("""
+            eb.source_url NOT IN (
+                SELECT sib.source_url
+                FROM example_source_reservations r
+                JOIN example_bank sib ON sib.id = r.example_id
+                WHERE sib.source_url IS NOT NULL
                   AND (
-                      p.id IS NOT NULL
-                      OR r.status IN ('COMMITTED', 'REJECTED')
+                      r.status IN ('COMMITTED', 'REJECTED')
                       OR (r.status = 'SOFT' AND r.reserve_until > NOW(3))
                   )
+                UNION
+                SELECT sib.source_url
+                FROM posts p
+                JOIN example_bank sib ON sib.id = p.source_example_id
+                WHERE sib.source_url IS NOT NULL
             )
         """)
 

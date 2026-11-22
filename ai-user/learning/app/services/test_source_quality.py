@@ -1,5 +1,5 @@
 """source_quality 단위 테스트 — 실측 오염 사례(prod 30일 example_bank)를 픽스처로."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from app.services import source_claim
@@ -108,7 +108,7 @@ def test_sql_percent_signs_escaped_for_param_binding():
     stripped = sql.replace("%s", "").replace("%%", "")
     assert "%" not in stripped
     # 실제 pymysql 방식 포맷이 예외 없이 되는지
-    sql % ("blind", 14)
+    sql % ("blind", 14, 40)
     assert re.search(r"NOT LIKE '%%\(광고\)%%'", sql)
 
 
@@ -119,64 +119,139 @@ def _fake_db(cursor):
     return gd
 
 
-def test_claim_skips_unusable_and_takes_next_usable():
-    rows = [
-        {"id": 1, "content": PREVIEW, "source": "blind", "title": "a", "source_url": "u1", "popularity_pct": 0.9, "category": "MARRIED"},
-        {"id": 2, "content": CONTAMINATED, "source": "blind", "title": "b", "source_url": "u2", "popularity_pct": 0.8, "category": "MARRIED"},
-        {"id": 3, "content": GOOD_BLIND, "source": "blind", "title": "c", "source_url": "u3", "popularity_pct": 0.7, "category": "MARRIED"},
-    ]
-    seen_excludes = []
+def _row(i, content, pct=1.0):
+    return {"id": i, "content": content, "source": "blind", "title": "t", "source_url": f"u{i}",
+            "popularity_pct": pct, "category": "MARRIED"}
 
-    def fake_select(cur, src, days, exclude, cats=None):
-        seen_excludes.append(list(exclude))
-        for r in rows:
-            if r["id"] not in exclude:
-                return r
-        return None
 
-    with patch.object(source_claim, "get_db", _fake_db(MagicMock())), \
-         patch.object(source_claim, "_select_candidate", side_effect=fake_select), \
-         patch.object(source_claim, "_soft_reserve", return_value=True) as reserve:
+def _claim(select_side_effect, reserve=True):
+    cur = MagicMock()
+    with patch.object(source_claim, "get_db", _fake_db(cur)), \
+         patch.object(source_claim, "_select_candidates", side_effect=select_side_effect) as sel, \
+         patch.object(source_claim, "_mark_unusable") as mark, \
+         patch.object(source_claim, "_soft_reserve", return_value=reserve) as res:
         item = source_claim.claim_popular_source(
             source="blind", reservation_key="k", reserve_until=datetime(2030, 1, 1), category="MARRIED",
         )
+    return item, sel, mark, res
+
+
+def test_claim_batch_skips_unusable_and_takes_next_usable_in_one_query():
+    rows = [_row(1, PREVIEW, 0.9), _row(2, CONTAMINATED, 0.8), _row(3, GOOD_BLIND, 0.7)]
+    item, sel, mark, res = _claim(lambda *a, **k: rows)
     assert item["id"] == 3
-    reserve.assert_called_once()  # 오염 후보는 예약조차 하지 않는다
-    assert seen_excludes[-1] == [1, 2]
+    assert sel.call_count == 1  # 후보 쿼리는 한 번
+    res.assert_called_once()  # 불량 후보는 예약조차 하지 않는다
+    marked = mark.call_args.args[1]
+    assert [e[0] for e in marked] == [1, 2]
+    assert all(e[1].startswith("quality:") for e in marked)
 
 
-def test_claim_quality_skips_do_not_consume_race_budget():
-    n = source_claim._CLAIM_ATTEMPTS_PER_WINDOW + 5  # 경합 예산보다 많은 불량 후보
-    bad = [{"id": i, "content": PREVIEW, "source": "blind", "title": "x", "source_url": f"u{i}", "popularity_pct": 1.0, "category": "MARRIED"} for i in range(1, n + 1)]
-    good = {"id": 999, "content": GOOD_BLIND, "source": "blind", "title": "g", "source_url": "ug", "popularity_pct": 0.1, "category": "MARRIED"}
-    rows = bad + [good]
+def test_claim_all_unusable_returns_none_and_records_rows():
+    rows = [_row(i, PREVIEW) for i in range(1, 6)]
+    # 5건 < 배치 크기 → 윈도우당 쿼리 1회, 14일/30일 두 윈도우
+    seen = []
 
-    def fake_select(cur, src, days, exclude, cats=None):
-        return next((r for r in rows if r["id"] not in exclude), None)
+    def sel(cur, src, days, exclude, cats=None, limit=None):
+        seen.append(list(exclude))
+        return [r for r in rows if r["id"] not in exclude]
 
-    with patch.object(source_claim, "get_db", _fake_db(MagicMock())), \
-         patch.object(source_claim, "_select_candidate", side_effect=fake_select), \
-         patch.object(source_claim, "_soft_reserve", return_value=True):
-        item = source_claim.claim_popular_source(
-            source="blind", reservation_key="k", reserve_until=datetime(2030, 1, 1),
-        )
-    assert item["id"] == 999
-
-
-def test_claim_returns_none_when_only_unusable_and_budget_bounded():
-    calls = {"n": 0}
-
-    def fake_select(cur, src, days, exclude, cats=None):
-        calls["n"] += 1
-        return {"id": calls["n"] + 1000, "content": PREVIEW, "source": "blind", "title": "x", "source_url": "u", "popularity_pct": 1.0, "category": "MARRIED"}
-
-    with patch.object(source_claim, "get_db", _fake_db(MagicMock())), \
-         patch.object(source_claim, "_select_candidate", side_effect=fake_select), \
-         patch.object(source_claim, "_soft_reserve", return_value=True) as reserve:
-        item = source_claim.claim_popular_source(
-            source="blind", reservation_key="k", reserve_until=datetime(2030, 1, 1),
-        )
+    item, selm, mark, res = _claim(sel)
     assert item is None
-    reserve.assert_not_called()
-    # window 2회(14일, 30일) × 품질 스킵 예산
-    assert calls["n"] == 2 * source_claim._CLAIM_QUALITY_SKIPS_PER_WINDOW
+    res.assert_not_called()
+    assert selm.call_count == 2
+    assert [e[0] for e in mark.call_args_list[0].args[1]] == [1, 2, 3, 4, 5]
+
+
+def test_claim_fetches_second_batch_when_first_is_all_unusable():
+    n = source_claim._CLAIM_BATCH_SIZE
+    first = [_row(i, PREVIEW) for i in range(1, n + 1)]
+    second = [_row(999, GOOD_BLIND, 0.1)]
+    batches = iter([first, second])
+    item, sel, mark, res = _claim(lambda *a, **k: next(batches))
+    assert item["id"] == 999
+    assert sel.call_count == 2
+
+
+def test_claim_race_loss_moves_to_next_candidate_in_batch():
+    rows = [_row(1, GOOD_BLIND, 0.9), _row(2, GOOD_BLIND, 0.8)]
+    cur = MagicMock()
+    with patch.object(source_claim, "get_db", _fake_db(cur)), \
+         patch.object(source_claim, "_select_candidates", return_value=rows) as sel, \
+         patch.object(source_claim, "_mark_unusable"), \
+         patch.object(source_claim, "_soft_reserve", side_effect=[False, True]) as res:
+        item = source_claim.claim_popular_source(
+            source="blind", reservation_key="k", reserve_until=datetime(2030, 1, 1),
+        )
+    assert item["id"] == 2
+    assert sel.call_count == 1
+
+
+def test_mark_unusable_never_overwrites_existing_reservation():
+    cur = MagicMock()
+    source_claim._mark_unusable(cur, [(7, "quality:truncated_preview"), (3, "x" * 300)])
+    (del_sql, del_params), (ins_sql, ins_params) = [c.args for c in cur.execute.call_args_list]
+    # 만료된 SOFT 만 지운다 — COMMITTED/REJECTED/살아있는 SOFT 는 남는다
+    assert "status = %s AND reserve_until <= NOW(3)" in " ".join(del_sql.split())
+    assert del_params == [3, 7, "SOFT"]
+    # 남은 행은 PK 충돌로 건드리지 않는다
+    assert "INSERT IGNORE" in ins_sql
+    assert "ON DUPLICATE" not in ins_sql
+    assert ins_params[:4] == [3, "x" * 128, "UNUSABLE", "2099-12-31 00:00:00"]
+    assert ins_params[4:8] == [7, "quality:truncated_preview", "UNUSABLE", "2099-12-31 00:00:00"]
+
+
+def test_unusable_does_not_block_same_url_sibling():
+    now = datetime(2026, 1, 1)
+    rows = [
+        {"id": 1, "content": GOOD_BLIND, "source": "blind", "content_type": "POST", "source_url": "same",
+         "popularity_pct": 0.9, "category": "MARRIED", "created_at": now},
+        {"id": 2, "content": GOOD_BLIND, "source": "blind", "content_type": "POST", "source_url": "same",
+         "popularity_pct": 0.8, "category": "MARRIED", "created_at": now},
+    ]
+    res = {1: {"status": "UNUSABLE", "reserve_until": datetime(2099, 12, 31)}}
+    out = source_claim.filter_claim_candidates(
+        rows, source="blind", used_example_ids=set(), reservations=res,
+        window_start=now - timedelta(days=1), now=now,
+    )
+    assert [r["id"] for r in out] == [2]  # 형제는 청구 가능, UNUSABLE 행 자신은 제외
+    assert source_claim.is_reservation_blocking("UNUSABLE", datetime(2099, 12, 31), now) is False
+
+
+def test_candidate_sql_excludes_unusable_row_level_only():
+    sql = source_claim._SELECT_CANDIDATE_SQL
+    assert "u.example_id = eb.id AND u.status = 'UNUSABLE'" in sql
+    assert "r.status IN ('COMMITTED', 'REJECTED')" in sql  # 가족 차단 목록에 UNUSABLE 없음
+    assert "FOR UPDATE" not in sql
+
+
+def test_soft_reserve_tolerates_unusable_sibling_pk_collision():
+    from pymysql.err import IntegrityError
+    cur = MagicMock()
+    cur.fetchone.side_effect = [
+        {"source_url": "u"},  # _sibling_ids_for_url
+        None, None,           # family not blocked
+        {"status": "UNUSABLE"},  # collision lookup for sibling 20
+    ]
+    cur.fetchall.return_value = [{"id": 10}, {"id": 20}]
+
+    def execute(sql, params=None):
+        if "INSERT" in sql and params[0] == 20:
+            raise IntegrityError(1062, "dup")
+
+    cur.execute.side_effect = execute
+    assert source_claim._soft_reserve(cur, 10, "k", datetime(2030, 1, 1)) is True
+
+
+def test_soft_reserve_fails_on_real_race_for_sibling():
+    from pymysql.err import IntegrityError
+    cur = MagicMock()
+    cur.fetchone.side_effect = [{"source_url": "u"}, None, None, {"status": "SOFT"}]
+    cur.fetchall.return_value = [{"id": 10}, {"id": 20}]
+
+    def execute(sql, params=None):
+        if "INSERT" in sql and params[0] == 20:
+            raise IntegrityError(1062, "dup")
+
+    cur.execute.side_effect = execute
+    assert source_claim._soft_reserve(cur, 10, "k", datetime(2030, 1, 1)) is False

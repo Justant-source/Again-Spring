@@ -185,8 +185,14 @@ learning container가 뜨면 아래가 항상 실행된다.
   (`<br>` 줄바꿈 보존) 본문 상한을 1500자에서 8000자로 올렸다.
 - **품질 판정** (`app/services/source_quality.py` 신규, `assess_source`): 사유 `truncated_preview`·
   `ad_marker`·`sidebar_boilerplate`·`duplicate_lines`·`too_short`(150자 미만). ingest(`app/api/crawl.py`)와
-  claim(`source_claim.py`) 양쪽에 적용한다. claim의 품질 스킵 예산은
-  `_CLAIM_QUALITY_SKIPS_PER_WINDOW=80`으로 기존 경합 예산(8)과 별개다.
+  claim(`source_claim.py`) 양쪽에 적용한다. claim은 윈도우당 인기순 상위 `_CLAIM_BATCH_SIZE=40`건을
+  **한 쿼리(잠금 없음)**로 읽고 파이썬에서 품질 판정한다(2026-11-22 개편 — 후보마다 재조회하던 구조는
+  SELECT 1회 ~3.8초라 오케스트레이터 15초 read timeout을 넘겨 데드락·고아 SOFT를 냈다).
+  윈도우당 최대 `_CLAIM_BATCHES_PER_WINDOW=2`배치, 경합 예산(`_CLAIM_ATTEMPTS_PER_WINDOW=8`)은 별개다.
+  불량 판정 행은 `UNUSABLE` 예약으로 기록해 이후 claim이 SQL에서 건너뛴다(아래 생명주기 표).
+  같은 `source_url` 가족 차단은 **차단된 URL 집합을 한 번만 구하는 비상관 `NOT IN`**으로 판정한다
+  (`source_url`에 인덱스가 없어 상관 `NOT EXISTS`는 후보 1건당 ~1.3초였다 — prod 실측 40건 53초 → 0.7초).
+  available-count도 같은 형태다.
 - 기존 `example_bank` 행은 수정하지 않는다. prod 최근 30일 실측 통과율: blind 13.1%(210/1605),
   natepan 75.9%(1035/1363).
 - 반영에는 learning 컨테이너 `--build` 재빌드가 필요하다(crawl budget은 불변).
@@ -232,6 +238,8 @@ Body (camelCase): `{ source: "blind"|"natepan", reservationKey, reserveUntil, wi
 | commit | `/examples/commit-source` `{exampleId, reservationKey}` | SOFT→COMMITTED (영구) |
 | release | `/examples/release-source` | SOFT 행 삭제 (COMMITTED/missing은 no-op) |
 | reject | `/examples/reject-source` `{example_id, reservation_key, reason}` | status `REJECTED`(2026-11-21 신설, 영구). expire·release가 건드리지 않고 claim·available-count에서 제외. 스키마 변경 없음 |
+
+| unusable | claim 내부 (`_mark_unusable`) | status `UNUSABLE`(2026-11-22 신설, `reserve_until`=2099, key=`quality:<사유>`). **그 행 하나만** 제외 — 같은 `source_url` 형제는 막지 않아 재크롤 전문은 다시 claim 가능(REJECTED는 가족 전체 차단). COMMITTED/REJECTED/살아있는 SOFT 행은 덮어쓰지 않고, 형제 SOFT 예약 중 PK 충돌은 무시. expire·release·commit이 건드리지 않고 available-count에서 제외. claim이 None으로 끝나도 커밋된다. 스키마 변경 없음 |
 
 크롤 `SOURCES` budget(natepan 1500 · blind 500)은 **변경하지 않는다**.
 

@@ -210,6 +210,10 @@ prod 한 달 AI 사연 204건 실측에서 58%가 "예민"을 쓰고 34%가 같�
 본문 형식 자유화 + `CaptureSplitPlanner`/`CaptureSplitSupport` 시각 줄 가중 분할, 길이를 원문 L에 맞춤
 (하한 max(120,0.7L)·상한 min(900,max(220,1.3L))), 크롤 원문 정화(`source_quality.py`, blind 통과율 13.1%).
 
-## 2026-11-21 AI 사연·댓글 사람다움 2차 (코드·단위 테스트 완료, 미배포)
+## 2026-11-21 AI 사연·댓글 사람다움 2차 (prod 배포)
 
 앞선 개편 뒤에도 댓글이 길고 논평 일색이며 사연의 쟁점 구도가 원문과 어긋나는 문제를 다뤘다. 대응: 공통 `COMMENT_RULES`(형태·분포 지시, denylist 아님)와 원문 실제 댓글 참고(`commentStyleReference`, learning `/examples/source-comments`), 제목 8~30자 + `sourceTitle` 참고, 뼈대 `has_conflict`(갈등 없는 원문은 `/examples/reject-source`로 영구 제외, 예약 status `REJECTED` 신설)·`verdict_lean`(사실 배치·댓글 stance·AI 투표 작성자 비율), 작성자·상대방의 대댓글 한정 등장 허용, PersonaCard 입버릇 약화, 수치 구체화, paired 원문 provenance 기록. 레거시 `executePost`·`PromptAssembler`·`voice/post.md`는 변경 없음. 측정 도구 `scripts/story_turing_test.py`(블라인드 판별 테스트).
+
+## 2026-11-22 소스 claim 배치 조회 + UNUSABLE 기록 (prod 배포)
+
+claim이 불량 원문(주로 blind `truncated_preview`)을 만날 때마다 ~3.8초짜리 후보 SELECT를 다시 돌려 오케스트레이터 15초 timeout을 넘기고, 겹친 호출이 MariaDB 데드락(1213)·락 대기(1205)와 고아 SOFT 예약을 만들었다. 대응: 윈도우당 상위 40건을 한 쿼리(잠금 없음)로 읽어 파이썬에서 `assess_source`, 불량 행은 `example_source_reservations` status `UNUSABLE`(행 단위 제외, 형제 URL 비차단)로 기록해 다음 호출이 건너뛴다. 형제 URL 차단 서브쿼리는 상관 `NOT EXISTS`(후보 1건당 example_bank 전체 스캔)에서 비상관 `NOT IN`으로 바꿨다(prod 실측 40건 53초 → 0.7초). `assess_source` 규칙은 불변.
