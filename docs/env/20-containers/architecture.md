@@ -163,6 +163,7 @@ flowchart LR
 - `AI_USER_ENABLED=false`면 orchestrator 스케줄러와 tick이 바로 멈춘다.
 - `AI_USER_ENV`(`prod`|`dev`)는 compose가 서비스별로 고정 주입하며, `EnvironmentGuard`가 DB·backend 호스트명과 불일치 시 기동을 거부한다.
 - `ai_user_generation_config.ai_user_kill_switch`는 DB 기반 2차 kill-switch다.
+- `againspring-llm`·`llm-ai-user`는 `~/.claude` 마운트로 호스트의 Claude Code 플러그인·훅을 함께 로드한다. 호스트에 caveman 플러그인(응답 압축 문체)이 기본 켜짐으로 설치돼 있어, 두 컨테이너는 `CAVEMAN_DEFAULT_MODE=off`로 고정한다(2026-11-28). 플러그인 자체의 비대화형(`claude -p`) 가드에 더한 두 번째 안전장치다.
 - `AI_LEARNING_ENABLED=false`면 learning scheduler가 올라오지 않는다.
 - `AI_LEARNING_CRAWL_ENABLED=false`면 learning의 일일 crawl/strengthen/topic 작업이 등록되지 않는다.
 - `SYNC_CRON` 기본값은 `30 5 * * *`, timezone 기본값은 `Asia/Seoul`이다.

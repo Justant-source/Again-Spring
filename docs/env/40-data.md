@@ -79,6 +79,7 @@ last_updated: 2026-09-01
 | `LLM_REMOTE_DEFAULT_TIMEOUT_MS` | backend가 bridge에 전달하는 요청 timeout | `600000` |
 | `LLM_REMOTE_READ_TIMEOUT_MS` | backend → bridge HTTP read timeout (실행 timeout보다 길어야 함) | `610000` |
 | `LLM_PROCESS_TERMINATION_GRACE_MS` | 타임아웃·취소 뒤 CLI 프로세스 트리에 정상 종료를 허용하는 시간 | `2000` |
+| `CAVEMAN_DEFAULT_MODE` | 호스트 `~/.claude`에 설치된 caveman 플러그인(응답 압축 문체)이 컨테이너 CLI에서 켜지지 않게 고정. compose에 상수로 박혀 있고 `.env`로 바꾸지 않는다 | `off` |
 | `LLM_REMOTE_CONNECT_TIMEOUT_MS` | backend → bridge HTTP connect timeout | `10000` (2026-08-15, 기존 `5000`) |
 | `ASM_REQUEST_TIMEOUT_MS` | backend → ASM 일반 요청 timeout | `30000` (2026-08-15, 기존 `10000`) |
 | `ASM_STATS_REQUEST_TIMEOUT_MS` | backend → ASM 긴 읽기 (통계 collect · X inbox/outbound Playwright) | `300000` |
@@ -201,6 +202,7 @@ last_updated: 2026-09-01
 | `LLM_API_REFUSAL_RETRIES` | refusal 재시도 | `0` |
 | `LLM_API_REFUSAL_FALLBACK_MODEL` | 재시도 소진 후 fallback | 공란 |
 | `LLM_STUB_FIXTURE_DIR` | provider=STUB일 때 픽스처 디렉토리(비면 classpath `stub/`) — dev canary 전용 | 공란 |
+| `CAVEMAN_DEFAULT_MODE` | 호스트 `~/.claude`에 설치된 caveman 플러그인(응답 압축 문체)이 컨테이너 CLI에서 켜지지 않게 고정. compose에 상수로 박혀 있고 `.env`로 바꾸지 않는다 | `off` |
 | `LLM_AUTH_DOWN_TTL_MINUTES` | `ProviderHealthRegistry` — CLI stderr에서 인증 실패(`AUTH_ERROR`)가 잡힌 provider를 `AUTH_DOWN`으로 표시해두는 TTL(분). 경과 후 다음 조회 때 자동 `UP` | `10` |
 | `LLM_STRUCTURED_PROMPT_MODE` | 구조화 생성 시 `--json-schema` 플래그 대신 프롬프트에 스키마 주입 (기본 off) | `false` |
 | `LLM_STRUCTURED_GENERATION_FAILURE_ALERTS_ENABLED` | 구조화 생성 번들 실패 시 Telegram 알림(워커) | `true` |

@@ -40,6 +40,8 @@ services:
       LLM_API_REFUSAL_RETRIES: ${LLM_API_REFUSAL_RETRIES:-0}
       LLM_API_REFUSAL_FALLBACK_MODEL: ${LLM_API_REFUSAL_FALLBACK_MODEL:-}
       LLM_STUB_FIXTURE_DIR: /app/stub-fixtures
+      # caveman 플러그인(~/.claude 마운트로 함께 로드됨)이 운영 생성물에 켜지지 않게 고정
+      CAVEMAN_DEFAULT_MODE: "off"
       LLM_AUTH_DOWN_TTL_MINUTES: ${LLM_AUTH_DOWN_TTL_MINUTES:-10}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
       HOME: /home/justant
